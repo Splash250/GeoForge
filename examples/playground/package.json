@@ -1,0 +1,25 @@
+{
+  "name": "@geoforge/playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5177",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "maplibre-geoforge": "workspace:*",
+    "maplibre-gl": "5.15.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@types/geojson": "^7946.0.16",
+    "sass": "^1.96.0",
+    "svelte": "^5.45.10",
+    "svelte-preprocess": "^6.0.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.7",
+    "vite-svg-loader": "^5.1.0"
+  }
+}

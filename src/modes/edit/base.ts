@@ -1,0 +1,300 @@
+import { GM_SYSTEM_PREFIX } from '@/core/constants.ts';
+import { SHAPE_NAMES } from '@/modes/constants.ts';
+import { FeatureData } from '@/core/features/feature-data.ts';
+import type { FeatureSourceName } from '@/types/features.ts';
+import type { GeoJsonShapeFeature } from '@/types/geojson.ts';
+import type { PointerEventName } from '@/types/map/index.ts';
+import type { DrawModeName, EditModeName, MarkerData } from '@/types/modes/index.ts';
+import type { ActionType } from '@/types/options.ts';
+import type {
+  GmDrawShapeEvent,
+  GmDrawShapeEventWithData,
+  GmEditFeatureEditEndEvent,
+  GmEditFeatureEditStartEvent,
+  GmEditFeatureRemovedEvent,
+  GmEditFeatureUpdatedEvent,
+  GmFeatureBeforeUpdateEvent,
+  GmSystemEvent,
+  NonEmptyArray,
+} from '@/types/events/index.ts';
+import { BaseAction } from '@/modes/base-action.ts';
+import { isGmDrawLineDrawerEvent } from '@/utils/guards/events/draw.ts';
+import { includesWithType } from '@/utils/typing.ts';
+import type { BaseMapPointerEvent } from '@mapLib/types/events.ts';
+import { cloneDeep, isEqual } from 'lodash-es';
+
+export abstract class BaseEdit extends BaseAction {
+  actionType: ActionType = 'edit';
+  abstract mode: EditModeName;
+  featureData: FeatureData | null = null;
+  cursorExcludedLayerIds: Array<string> = ['rectangle-line', 'polygon-line', 'circle-line'];
+  layerEventHandlersData: Array<{
+    eventName: PointerEventName;
+    layerId: string;
+    callback: () => void;
+  }> = [];
+
+  startAction() {
+    this.setEventsForLayers('mouseenter', this.setCursorToPointer.bind(this));
+    this.setEventsForLayers('mouseleave', this.setCursorToEmpty.bind(this));
+    super.startAction();
+  }
+
+  endAction() {
+    this.clearEventsForLayers();
+    super.endAction();
+  }
+
+  setCursorToPointer() {
+    if (this.flags.actionInProgress) {
+      return;
+    }
+    this.gm.mapAdapter.setCursor('pointer');
+  }
+
+  setCursorToEmpty() {
+    if (this.flags.actionInProgress) {
+      return;
+    }
+    this.gm.mapAdapter.setCursor('');
+  }
+
+  getFeatureByMouseEvent({
+    event,
+    sourceNames,
+  }: {
+    event: BaseMapPointerEvent;
+    sourceNames: Array<FeatureSourceName>;
+  }): FeatureData | null {
+    const featureData = this.gm.features.getFeatureByMouseEvent({
+      event,
+      sourceNames,
+    });
+
+    if (!this.gm.isFeatureEditable(featureData)) {
+      return null;
+    }
+    return featureData;
+  }
+
+  setEventsForLayers(eventName: PointerEventName, callback: () => void) {
+    const targetLayerIds = this.gm.features.layers
+      .map((layer) => layer.id)
+      .filter(
+        (layerId) => !this.cursorExcludedLayerIds.some((subName) => layerId.includes(subName)),
+      );
+
+    targetLayerIds.forEach((layerId) => {
+      this.gm.mapAdapter.on(eventName, layerId, callback);
+      this.layerEventHandlersData.push({ eventName, layerId, callback });
+    });
+  }
+
+  clearEventsForLayers() {
+    this.layerEventHandlersData.forEach(({ eventName, layerId, callback }) => {
+      this.gm.mapAdapter.off(eventName, layerId, callback);
+    });
+    this.layerEventHandlersData = [];
+  }
+
+  updateFeatureGeoJson({
+    featureData,
+    featureGeoJson,
+    forceMode = undefined,
+  }: {
+    featureData: FeatureData;
+    featureGeoJson: GeoJsonShapeFeature;
+    forceMode?: EditModeName;
+  }): boolean {
+    if (!this.flags.featureUpdateAllowed) {
+      // used for geofencing violations, other modes could be added in the future
+      return false;
+    }
+
+    const sourceGeoJson = cloneDeep(featureData.getGeoJson());
+
+    featureData.updateGeoJsonGeometry(featureGeoJson.geometry);
+    if (!isEqual(featureData.getGeoJson().properties, featureGeoJson.properties)) {
+      featureData._updateAllProperties(featureGeoJson.properties);
+    }
+
+    this.fireFeatureUpdatedEvent({
+      sourceFeatures: [featureData],
+      sourceGeoJsonFeatures: [sourceGeoJson],
+      targetFeatures: [featureData],
+      forceMode,
+    });
+
+    return true;
+  }
+
+  fireBeforeFeatureUpdate({
+    features,
+    geoJsonFeatures,
+    forceMode = undefined,
+  }: {
+    features: NonEmptyArray<FeatureData>;
+    geoJsonFeatures: NonEmptyArray<GeoJsonShapeFeature>;
+    forceMode?: EditModeName;
+  }) {
+    this.flags.featureUpdateAllowed = true;
+
+    const payload: GmFeatureBeforeUpdateEvent = {
+      name: `${GM_SYSTEM_PREFIX}:feature:before_update`,
+      level: 'system',
+      actionType: 'edit',
+      mode: forceMode || this.mode,
+      action: 'before_update',
+      features,
+      geoJsonFeatures,
+    };
+    this.gm.events.fire(`${GM_SYSTEM_PREFIX}:${this.actionType}`, payload);
+  }
+
+  fireFeatureUpdatedEvent({
+    sourceFeatures,
+    targetFeatures,
+    markerData = undefined,
+    forceMode = undefined,
+    sourceGeoJsonFeatures = undefined,
+  }: {
+    sourceFeatures: NonEmptyArray<FeatureData>;
+    sourceGeoJsonFeatures?: NonEmptyArray<GeoJsonShapeFeature>;
+    targetFeatures: NonEmptyArray<FeatureData>;
+    markerData?: MarkerData;
+    forceMode?: EditModeName;
+  }) {
+    const payload: GmEditFeatureUpdatedEvent = {
+      name: `${GM_SYSTEM_PREFIX}:edit:feature_updated`,
+      level: 'system',
+      actionType: 'edit',
+      action: 'feature_updated',
+      mode: forceMode || this.mode,
+      sourceFeatures,
+      ...(sourceGeoJsonFeatures ? { sourceGeoJsonFeatures } : {}),
+      targetFeatures,
+      markerData: markerData || null,
+    };
+
+    this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
+  }
+
+  fireFeatureEditStartEvent({
+    feature,
+    forceMode = undefined,
+  }: {
+    feature: FeatureData;
+    forceMode?: EditModeName;
+  }) {
+    const payload: GmEditFeatureEditStartEvent = {
+      name: `${GM_SYSTEM_PREFIX}:edit:feature_edit_start`,
+      level: 'system',
+      actionType: 'edit',
+      action: 'feature_edit_start',
+      mode: forceMode || this.mode,
+      feature,
+    };
+
+    this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
+  }
+
+  fireFeatureEditEndEvent({
+    feature,
+    forceMode = undefined,
+  }: {
+    feature: FeatureData;
+    forceMode?: EditModeName;
+  }) {
+    const payload: GmEditFeatureEditEndEvent = {
+      name: `${GM_SYSTEM_PREFIX}:edit:feature_edit_end`,
+      level: 'system',
+      actionType: 'edit',
+      action: 'feature_edit_end',
+      mode: forceMode || this.mode,
+      feature,
+    };
+
+    this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
+  }
+
+  fireMarkerPointerUpdateEvent() {
+    if (!this.gm.markerPointer.marker) {
+      return;
+    }
+
+    const marker = this.gm.markerPointer.marker;
+    const payload: GmDrawShapeEventWithData = {
+      name: `${GM_SYSTEM_PREFIX}:draw:shape_with_data`,
+      level: 'system',
+      variant: null,
+      actionType: 'draw',
+      mode: this.getLineDrawerMode(),
+      action: 'update',
+      markerData: {
+        type: 'dom',
+        instance: marker,
+        position: {
+          coordinate: marker.getLngLat(),
+          path: [-1],
+        },
+      },
+      featureData: null,
+    };
+    this.gm.events.fire(`${GM_SYSTEM_PREFIX}:draw`, payload);
+  }
+
+  forwardLineDrawerEvent(payload: GmSystemEvent) {
+    if (!isGmDrawLineDrawerEvent(payload) || !['cut', 'split'].includes(this.mode)) {
+      return { next: true };
+    }
+
+    if (payload.action === 'start' || payload.action === 'update') {
+      const eventData: GmDrawShapeEventWithData = {
+        name: `${GM_SYSTEM_PREFIX}:draw:shape_with_data`,
+        level: 'system',
+        actionType: 'draw',
+        mode: this.getLineDrawerMode(),
+        variant: null,
+        action: payload.action,
+        featureData: payload.featureData,
+        markerData: payload.markerData,
+      };
+      this.gm.events.fire(`${GM_SYSTEM_PREFIX}:draw`, eventData);
+    } else if (payload.action === 'finish' || payload.action === 'cancel') {
+      const eventData: GmDrawShapeEvent = {
+        name: `${GM_SYSTEM_PREFIX}:draw:shape`,
+        level: 'system',
+        actionType: 'draw',
+        mode: this.getLineDrawerMode(),
+        variant: null,
+        action: payload.action,
+      };
+      this.gm.events.fire(`${GM_SYSTEM_PREFIX}:draw`, eventData);
+    }
+
+    return { next: true };
+  }
+
+  fireFeatureRemovedEvent(featureData: FeatureData) {
+    if (includesWithType(featureData.shape, SHAPE_NAMES)) {
+      const payload: GmEditFeatureRemovedEvent = {
+        name: `${GM_SYSTEM_PREFIX}:edit:feature_removed`,
+        level: 'system',
+        actionType: 'edit',
+        mode: featureData.shape,
+        action: 'feature_removed',
+        featureData,
+      };
+      this.gm.events.fire(`${GM_SYSTEM_PREFIX}:edit`, payload);
+    }
+  }
+
+  getLineDrawerMode(): DrawModeName {
+    if (this.mode === 'cut') {
+      return 'polygon';
+    } else if (this.mode === 'split') {
+      return 'line';
+    }
+    return 'line';
+  }
+}

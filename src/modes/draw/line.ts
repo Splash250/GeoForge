@@ -1,0 +1,73 @@
+import { GM_SYSTEM_PREFIX } from '@/core/constants.ts';
+import { SOURCES } from '@/core/features/constants.ts';
+import { BaseDraw } from '@/modes/draw/base.ts';
+import type { GeoJsonShapeFeature } from '@/types/geojson.ts';
+import type { LineEventHandlerArguments } from '@/types/modes/line-drawer.ts';
+import type { DrawModeName, ShapeName } from '@/types/modes/index.ts';
+import { LineDrawer } from '@/utils/draw/line-drawer.ts';
+import { isMapPointerEvent } from '@/utils/guards/map.ts';
+import type { BaseMapEvent } from '@mapLib/types/events.ts';
+import type { Position } from 'geojson';
+
+export class DrawLine extends BaseDraw {
+  mode: DrawModeName = 'line';
+  shape: ShapeName = 'line';
+  lineDrawer = new LineDrawer(this.gm, { snappingMarkers: 'first', targetShape: 'line' });
+  eventHandlers = {
+    [`${GM_SYSTEM_PREFIX}:draw`]: this.forwardLineDrawerEvent.bind(this),
+    mousemove: this.onMouseMove.bind(this),
+  };
+
+  onStartAction(): void {
+    this.lineDrawer.startAction();
+    this.lineDrawer.on('nMarkerClick', this.lineFinished.bind(this));
+  }
+
+  onEndAction(): void {
+    this.lineDrawer.endAction();
+  }
+
+  onMouseMove(event: BaseMapEvent) {
+    if (!isMapPointerEvent(event)) {
+      return { next: true };
+    }
+
+    if (!this.lineDrawer.featureData) {
+      this.fireMarkerPointerUpdateEvent();
+    }
+    return { next: true };
+  }
+
+  lineFinished(event: LineEventHandlerArguments) {
+    this.lineDrawer.endShape();
+
+    let shapeCoordinates = event.shapeCoordinates;
+    if (event.markerIndex > 0) {
+      // cut the shape coordinates to the marker index
+      shapeCoordinates = shapeCoordinates.slice(0, event.markerIndex + 1);
+    }
+
+    if (shapeCoordinates.length < 2) {
+      // lines with less than 2 points are discarded
+      return null;
+    }
+
+    return this.gm.features.createFeature({
+      shapeGeoJson: this.getFeatureGeoJson(shapeCoordinates),
+      sourceName: SOURCES.main,
+    });
+  }
+
+  getFeatureGeoJson(shapeCoordinates: Array<Position>): GeoJsonShapeFeature {
+    return {
+      type: 'Feature',
+      properties: {
+        shape: this.shape,
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: shapeCoordinates,
+      },
+    };
+  }
+}

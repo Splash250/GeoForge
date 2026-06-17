@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "baseUrl": ".",
+    "paths": {
+      "maplibre-geoforge": ["../../src/index.ts"],
+      "maplibre-geoforge/dist/maplibre-geoforge.css": [
+        "../../src/styles/style.css"
+      ],
+      "@/*": ["../../src/*"],
+      "@tests/*": ["../../tests/*"],
+      "@mapLib/*": ["../../src/core/map/maplibre/*"]
+    },
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src", "vite.config.ts", "../../src/vite-env.d.ts"]
+}
