@@ -277,6 +277,10 @@ test('keeps package subpath exports limited to root and CSS', async () => {
     '.',
     './dist/maplibre-geoforge.css',
   ]);
+  expect(packageJson.exports?.['./dist/maplibre-geoforge.css']).toEqual({
+    types: './dist/maplibre-geoforge.css.d.ts',
+    default: './dist/maplibre-geoforge.css',
+  });
 });
 
 test('documents public API boundary guidance and unsupported subpaths', async () => {

@@ -27,6 +27,7 @@ export default [
       '**/dist/*',
       '*.js',
       '*.mjs',
+      '**/*.mjs',
     ],
   }, ...compat.extends(
     'eslint:recommended',
