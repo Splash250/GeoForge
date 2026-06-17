@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src",
+    "*.d.ts",
+    "*.svelte"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "svelte.config.js",
+    "eslint.config.mjs"
+  ]
+}
