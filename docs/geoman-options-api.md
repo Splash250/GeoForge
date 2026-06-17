@@ -1,11 +1,13 @@
-# Geoman Options API
+# GeoForge Options API
 
 `gm.options` manages configuration for controls, layer styles, and mode state. Use it to toggle modes programmatically and inspect control settings.
 
 ## Accessing `GmOptions`
 
 ```ts
-const gm = new Geoman(map, options);
+import { GeoForge } from 'maplibre-geoforge';
+
+const gm = new GeoForge(map, options);
 const gmOptions = gm.options;
 ```
 

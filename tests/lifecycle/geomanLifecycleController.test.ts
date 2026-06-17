@@ -239,7 +239,7 @@ describe('GeomanLifecycleController', () => {
     const { TextEncoder } = await import('node:util');
     const textEncoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextEncoder');
     const uint8ArrayDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
-    const originalGeomanVersion = process.env.VITE_GEOMAN_VERSION;
+    const originalGeomanVersion = process.env.VITE_GEOFORGE_VERSION;
 
     Object.defineProperty(globalThis, 'TextEncoder', {
       configurable: true,
@@ -249,7 +249,7 @@ describe('GeomanLifecycleController', () => {
       configurable: true,
       value: new TextEncoder().encode('').constructor,
     });
-    process.env.VITE_GEOMAN_VERSION = 'free';
+    process.env.VITE_GEOFORGE_VERSION = 'free';
 
     const { createServer } = await import('vite');
     const { svelte } = await import('@sveltejs/vite-plugin-svelte');
@@ -371,9 +371,9 @@ describe('GeomanLifecycleController', () => {
       }
 
       if (originalGeomanVersion === undefined) {
-        delete process.env.VITE_GEOMAN_VERSION;
+        delete process.env.VITE_GEOFORGE_VERSION;
       } else {
-        process.env.VITE_GEOMAN_VERSION = originalGeomanVersion;
+        process.env.VITE_GEOFORGE_VERSION = originalGeomanVersion;
       }
     }
   });

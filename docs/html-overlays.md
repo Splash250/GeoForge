@@ -1,14 +1,16 @@
 # HTML Overlays
 
 HTML overlays place iframe-backed HTML inside a projected rectangle on the map.
-Use `geoman.overlays.html` for the high-level lifecycle.
+Use `geoForge.overlays.html` for the high-level lifecycle.
 
 ## Add an overlay
 
 ```ts
-const geoman = new Geoman(map);
+import { GeoForge } from 'maplibre-geoforge';
 
-geoman.overlays.html.add({
+const geoForge = new GeoForge(map);
+
+geoForge.overlays.html.add({
   id: 'inspection-panel',
   html: '<main><h1>Inspection</h1></main>',
   corners: {
@@ -32,18 +34,18 @@ geoman.overlays.html.add({
 ## Lifecycle API
 
 ```ts
-geoman.overlays.html.update('inspection-panel', {
+geoForge.overlays.html.update('inspection-panel', {
   html: '<main><h1>Updated inspection</h1></main>',
   visible: true,
 });
 
-geoman.overlays.html.setSelected('inspection-panel');
+geoForge.overlays.html.setSelected('inspection-panel');
 
-const overlay = geoman.overlays.html.get('inspection-panel');
-const overlays = geoman.overlays.html.getAll();
+const overlay = geoForge.overlays.html.get('inspection-panel');
+const overlays = geoForge.overlays.html.getAll();
 
-geoman.overlays.html.remove('inspection-panel');
-geoman.overlays.html.destroy();
+geoForge.overlays.html.remove('inspection-panel');
+geoForge.overlays.html.destroy();
 ```
 
 - `update(id, patch)` merges a partial definition into an existing overlay and
@@ -56,7 +58,7 @@ geoman.overlays.html.destroy();
 - `destroy()` removes all overlay DOM and releases map listeners.
 
 The low-level HTML overlay manager is kept for advanced compatibility. New
-application code should use `geoman.overlays.html` unless it must own overlay
+application code should use `geoForge.overlays.html` unless it must own overlay
 manager construction and cleanup directly.
 
 ## Iframe interaction

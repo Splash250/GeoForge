@@ -1,5 +1,5 @@
-# MapLibre Geoman Examples
+# GeoForge Examples
 
 | Framework / Template        | Demo | Source | Description |
 |-----------------------------|------|--------|-------------|
-| maplibre-geoman-react       | [maplibre-geoman-react.vercel.app](https://maplibre-geoman-react.vercel.app/) | [GitHub](https://github.com/geoman-io/maplibre-geoman-examples/tree/master/maplibre-geoman-react) | React integration using the package root API. |
+| Local playground            | Run the repository playground locally. | `examples/playground` | Browser verification surface for package APIs, controls, decorators, overlays, and editing workflows. |

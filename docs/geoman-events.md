@@ -1,6 +1,6 @@
-# Geoman Events
+# GeoForge Events
 
-Geoman exposes a comprehensive event system so you can react to drawing, editing, or helper interactions. Listen to individual events or capture everything through a global listener.
+GeoForge exposes a comprehensive event system so you can react to drawing, editing, or helper interactions. Listen to individual events or capture everything through a global listener.
 
 ## Listening Strategies
 
@@ -15,7 +15,7 @@ map.on('gm:create', (event) => {
 ### Global Event Listener
 
 ```ts
-import type { GmEvent, GmSystemEvent } from '@sewergy/maplibre-geoman';
+import type { GmEvent, GmSystemEvent } from 'maplibre-geoforge';
 
 geoman.setGlobalEventsListener((event: GmSystemEvent | GmEvent) => {
   console.log('Event:', event);
@@ -209,11 +209,11 @@ map.on('gm:toolend', (event) => {
 
 ```ts
 import {
-  Geoman,
+  GeoForge,
   type GmEvent,
   type GmOptionsPartial,
   type GmSystemEvent,
-} from '@sewergy/maplibre-geoman';
+} from 'maplibre-geoforge';
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -224,11 +224,11 @@ const options: GmOptionsPartial = {
   // configuration options (see Configuring Geoman)
 };
 
-const gm = new Geoman(map, options);
+const geoForge = new GeoForge(map, options);
 const gmEvents: Array<Record<string, unknown>> = [];
 
 map.once('gm:loaded', () => {
-  console.log('Geoman loaded');
+  console.log('GeoForge loaded');
 
   const getGeoJson = (featureData: any) => {
     try {
@@ -286,7 +286,7 @@ map.once('gm:loaded', () => {
   map.on('_gm:control', handleEvent);
 });
 
-gm.setGlobalEventsListener((event: GmSystemEvent | GmEvent) => {
+geoForge.setGlobalEventsListener((event: GmSystemEvent | GmEvent) => {
   console.log('Global event:', event);
 });
 ```

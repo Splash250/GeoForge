@@ -1,10 +1,10 @@
 # Context Panels
 
-Context panels are Geoman-owned right-side map panels for custom tool
+Context panels are GeoForge-owned right-side map panels for custom tool
 workflows. They are intended for feature inspection, segment details, and other
 map interaction results that should stay attached to the current map session.
 
-Geoman owns the panel slot and lifecycle. Your application owns the content,
+GeoForge owns the panel slot and lifecycle. Your application owns the content,
 business logic, feature data, and any app-specific styling inside the panel.
 
 ## Register a Panel
@@ -76,7 +76,7 @@ feature.updateProperties({
 ```
 
 Panel render functions can then read those properties from
-`feature.getGeoJson().properties`. Properties prefixed with `gm_` are Geoman
+`feature.getGeoJson().properties`. Properties prefixed with `gm_` are GeoForge
 system properties and should be treated as protected implementation details.
 
 ## Reusable Controls
@@ -88,8 +88,8 @@ import {
   createContextPanelDescriptionList,
   createContextPanelTextInput,
   defineGeomanContextPanel,
-} from '@sewergy/maplibre-geoman';
-import type { FeatureData, GeomanLineSegmentContext } from '@sewergy/maplibre-geoman';
+} from 'maplibre-geoforge';
+import type { FeatureData, GeomanLineSegmentContext } from 'maplibre-geoforge';
 
 type SegmentDetailsPanelData = {
   feature: FeatureData;

@@ -132,7 +132,7 @@ describe('SourceUpdateManager sourceUpdates settings', () => {
       pendingPromiseCount: 1,
     });
     expect(consoleWarn).toHaveBeenCalledWith(
-      'MapLibre Geoman source update wait timed out',
+      'GeoForge source update wait timed out',
       expect.objectContaining({
         sourceName: SOURCES.main,
         waitTimeoutMs: 25,

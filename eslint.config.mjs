@@ -49,7 +49,7 @@ export default [
       sourceType: 'module',
 
       parserOptions: {
-        project: ['./tsconfig.json'],
+        project: ['./tsconfig.eslint.json'],
         extraFileExtensions: ['.svelte'],
       },
     },
@@ -67,7 +67,7 @@ export default [
 
       'import/resolver': {
         typescript: {
-          project: './tsconfig.json',
+          project: './tsconfig.eslint.json',
         },
       },
     },
@@ -106,7 +106,7 @@ export default [
 
       parserOptions: {
         parser: '@typescript-eslint/parser',
-        project: './tsconfig.json',
+        project: './tsconfig.eslint.json',
         extraFileExtensions: ['.svelte'],
       },
     },

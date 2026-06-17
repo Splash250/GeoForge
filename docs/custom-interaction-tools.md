@@ -1,11 +1,11 @@
 # Custom Interaction Tools
 
 Custom interaction tools let applications build map editor workflows on top of
-Geoman without forking helper modes or treating Geoman as a standalone app. A
+GeoForge without forking helper modes or treating GeoForge as a standalone app. A
 tool is registered with behavior, activated by the application, and receives
 typed feature and map interaction hooks while it is active.
 
-The control surface stays small by design. Geoman owns feature resolution,
+The control surface stays small by design. GeoForge owns feature resolution,
 selection state, lifecycle events, interaction dispatch, and optional basic tool
 buttons. Your application can still own richer product UI such as toolbars,
 shortcut handlers, side panels, menus, and workflow state.
@@ -70,13 +70,13 @@ type GeomanToolContext = {
 };
 ```
 
-Use the context to compose existing Geoman primitives. For example, a custom
+Use the context to compose existing GeoForge primitives. For example, a custom
 edit tool can activate selection on start, select one feature on click, and then
 enable a built-in edit mode only for that selected feature.
 
 ## Built-In Selection Feedback
 
-Tools that behave like a select mode can opt into Geoman-owned selection
+Tools that behave like a select mode can opt into GeoForge-owned selection
 feedback without manually wiring hover hooks:
 
 ```ts

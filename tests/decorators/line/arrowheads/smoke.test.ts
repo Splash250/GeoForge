@@ -7,7 +7,7 @@ import {
   destinationPoint,
 } from '../../../../src/decorators/line/arrowheads/index.ts';
 
-describe('maplibre-geoman arrowhead utilities', () => {
+describe('maplibre-geoforge arrowhead utilities', () => {
   it('detects size units', () => {
     expect(isInMeters('25m')).toBe(true);
     expect(isInPercent('15%')).toBe(true);

@@ -1,6 +1,6 @@
 # Patch Log
 
-This fork is used by the Sewergy frontend as `@sewergy/maplibre-geoman`.
+GeoForge is a standalone MapLibre GL JS toolkit distributed as `maplibre-geoforge`.
 
 ## Local changes
 - Forked package metadata (name, exports, local version).
@@ -9,7 +9,7 @@ This fork is used by the Sewergy frontend as `@sewergy/maplibre-geoman`.
 
 ## Line Decorators
 
-Sewergy extends the local Geoman package with `src/decorators/line`.
+GeoForge extends the Geoman-derived editing core with `src/decorators/line`.
 
 - `LineDecoratorManager` is the public manager for line decorators.
 - `arrowhead` decorators preserve the existing geometry-arrowhead behavior.
@@ -19,17 +19,17 @@ Sewergy extends the local Geoman package with `src/decorators/line`.
 - The first editor UI adds one `symbol` decorator at a time to the selected line, using segment, anchor, percentage offset, and pixel line distance controls.
 - The editor UI also adds one `text` decorator at a time with text content, size, color, halo, rotation mode, and the same placement controls.
 - `/_line-decorator-playground` is a DEV-only playground for browser verification of SVG and text decorator placement.
-- Animation config is typed but intentionally not rendered per-frame yet.
+- Text and symbol decorators support per-frame animation through the line decorator animation runner.
 
 ## Build
-From `frontend/packages/maplibre-geoman`:
+From the package root:
 
 ```sh
 pnpm run build
 ```
 
-This generates `dist/maplibre-geoman.es.js`, `dist/maplibre-geoman.umd.js`,
-`dist/maplibre-geoman.css`, and `dist/maplibre-geoman.d.ts`.
+This generates `dist/maplibre-geoforge.es.js`, `dist/maplibre-geoforge.umd.js`,
+`dist/maplibre-geoforge.css`, and `dist/maplibre-geoforge.d.ts`.
 
 ## Upstream update policy
 - Pull from upstream only for critical fixes or security issues.

@@ -1,6 +1,6 @@
-# Configuring Geoman
+# Configuring GeoForge
 
-Geoman accepts a rich configuration object that lets you customize controls, styles, and behavior. Pass the configuration to the `Geoman` constructor to apply your preferred defaults.
+GeoForge accepts a rich configuration object that lets you customize controls, styles, and behavior. Pass the configuration to the `GeoForge` constructor to apply your preferred defaults.
 
 ## Configuration Structure
 
@@ -39,7 +39,7 @@ Use `GmOptionsPartial` to override only the properties you need.
 ## Basic Usage
 
 ```ts
-import { Geoman, type GmOptionsPartial } from '@sewergy/maplibre-geoman';
+import { GeoForge, type GmOptionsPartial } from 'maplibre-geoforge';
 
 const gmOptions: GmOptionsPartial = {
   settings: {
@@ -58,7 +58,7 @@ const gmOptions: GmOptionsPartial = {
   },
 };
 
-const gm = new Geoman(map, gmOptions);
+const geoForge = new GeoForge(map, gmOptions);
 ```
 
 ## Settings Configuration
@@ -199,7 +199,7 @@ const gmOptions: GmOptionsPartial = {
 
 ## Layer Styles Configuration
 
-Geoman uses the Mapbox/MapLibre style specification. Each shape can define multiple layer styles using two categories:
+GeoForge uses the Mapbox/MapLibre style specification. Each shape can define multiple layer styles using two categories:
 
 - `gm_main`: default styles for static rendering.
 - `gm_temporary`: override styles applied while editing or drawing.
@@ -528,7 +528,7 @@ const gmOptions: GmOptionsPartial = {
   },
 };
 
-const gm = new Geoman(map, gmOptions);
+const geoForge = new GeoForge(map, gmOptions);
 ```
 
 This configuration combines custom controls, styles, and settings. Because everything is a partial, you can override only what you need and rely on sensible defaults for the rest.

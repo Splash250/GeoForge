@@ -16,6 +16,7 @@ import type {
 } from '../../src/index.ts';
 
 const STABLE_ROOT_EXPORTS = [
+  'GeoForge',
   'Geoman',
   'createGeomanInstance',
   'GeomanGeometrySubsystem',
@@ -89,7 +90,7 @@ describe('public API barrel', () => {
     const { TextEncoder } = await import('node:util');
     const textEncoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextEncoder');
     const uint8ArrayDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
-    const originalGeomanVersion = process.env.VITE_GEOMAN_VERSION;
+    const originalGeomanVersion = process.env.VITE_GEOFORGE_VERSION;
 
     Object.defineProperty(globalThis, 'TextEncoder', {
       configurable: true,
@@ -99,7 +100,7 @@ describe('public API barrel', () => {
       configurable: true,
       value: new TextEncoder().encode('').constructor,
     });
-    process.env.VITE_GEOMAN_VERSION = 'free';
+    process.env.VITE_GEOFORGE_VERSION = 'free';
 
     const { createServer } = await import('vite');
     const { svelte } = await import('@sveltejs/vite-plugin-svelte');
@@ -141,6 +142,10 @@ describe('public API barrel', () => {
     try {
       const mainModule = await server.ssrLoadModule('/src/main.ts');
       const publicBarrel = await server.ssrLoadModule('/src/index.ts');
+
+      expect(publicBarrel.GeoForge).toBeDefined();
+      expect(publicBarrel.GeoForge).toBe(mainModule.Geoman);
+      expect(publicBarrel.Geoman).toBe(mainModule.Geoman);
 
       for (const exportName of STABLE_ROOT_EXPORTS) {
         expect(publicBarrel[exportName], `stable export ${exportName}`).toBeDefined();
@@ -228,9 +233,9 @@ describe('public API barrel', () => {
       }
 
       if (originalGeomanVersion === undefined) {
-        delete process.env.VITE_GEOMAN_VERSION;
+        delete process.env.VITE_GEOFORGE_VERSION;
       } else {
-        process.env.VITE_GEOMAN_VERSION = originalGeomanVersion;
+        process.env.VITE_GEOFORGE_VERSION = originalGeomanVersion;
       }
     }
   });

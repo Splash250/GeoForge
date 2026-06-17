@@ -1,6 +1,6 @@
 # Exporting GeoJSON
 
-Geoman exports features as GeoJSON FeatureCollections. Export everything at once or filter by source or shape type depending on your workflow.
+GeoForge exports features as GeoJSON FeatureCollections. Export everything at once or filter by source or shape type depending on your workflow.
 
 ## Export All Features
 
@@ -34,7 +34,9 @@ interface GeoJsonShapeFeatureCollection {
 ## Complete Example
 
 ```ts
-const gm = new Geoman(map);
+import { GeoForge } from 'maplibre-geoforge';
+
+const gm = new GeoForge(map);
 
 // Draw some features...
 

@@ -1,9 +1,11 @@
-# Geoman Features API
+# GeoForge Features API
 
-`gm.features` manages all geometries stored in Geoman. Access it directly from the `Geoman` instance after initialization.
+`gm.features` manages all geometries stored in GeoForge. Access it directly from the `GeoForge` instance after initialization.
 
 ```ts
-const gm = new Geoman(map, options);
+import { GeoForge } from 'maplibre-geoforge';
+
+const gm = new GeoForge(map, options);
 const features = gm.features;
 ```
 

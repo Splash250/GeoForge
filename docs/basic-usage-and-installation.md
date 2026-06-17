@@ -1,14 +1,14 @@
 # Basic Usage and Installation
 
-Set up MapLibre Geoman in a few steps: install the package, provide the expected HTML scaffold, and initialize the plugin alongside MapLibre GL.
+Set up GeoForge in a few steps: install the package, provide the expected HTML scaffold, and initialize the toolkit alongside MapLibre GL.
 
 ## Installation
 
 ```bash
-pnpm add @sewergy/maplibre-geoman
+pnpm add maplibre-geoforge maplibre-gl
 ```
 
-You can also download the package directly from [npm](https://www.npmjs.com/package/@sewergy/maplibre-geoman).
+You can also download the package directly from [npm](https://www.npmjs.com/package/maplibre-geoforge).
 
 ## Expected HTML Structure
 
@@ -16,7 +16,7 @@ You can also download the package directly from [npm](https://www.npmjs.com/pack
 <!-- index.html -->
 <html lang="en_US">
   <head>
-    <title>Geoman MapLibre</title>
+    <title>GeoForge MapLibre</title>
     <style>
       #dev-map {
         height: 100vh;
@@ -30,14 +30,14 @@ You can also download the package directly from [npm](https://www.npmjs.com/pack
 </html>
 ```
 
-## MapLibre and Geoman Initialization
+## MapLibre and GeoForge Initialization
 
 ```ts
 import 'maplibre-gl/dist/maplibre-gl.css';
-import '@sewergy/maplibre-geoman/dist/maplibre-geoman.css';
+import 'maplibre-geoforge/dist/maplibre-geoforge.css';
 
 import ml from 'maplibre-gl';
-import { Geoman, type GmOptionsPartial } from '@sewergy/maplibre-geoman';
+import { GeoForge, type GeoJsonImportFeature, type GmOptionsPartial } from 'maplibre-geoforge';
 
 const mapLibreStyle: ml.StyleSpecification = {
   version: 8,
@@ -69,29 +69,29 @@ const map = new ml.Map({
 });
 
 const gmOptions: GmOptionsPartial = {
-  // Geoman options here
+  // GeoForge options here
 };
 
-// Create a new Geoman instance
-const geoman = new Geoman(map, gmOptions);
+// Create a new GeoForge instance
+const geoForge = new GeoForge(map, gmOptions);
 
-// Callback when Geoman is fully loaded
+// Callback when GeoForge is fully loaded
 map.on('gm:loaded', () => {
-  console.log('Geoman fully loaded');
+  console.log('GeoForge fully loaded');
 
   // Add GeoJSON shapes
-  const shapeGeoJson = {
+  const shapeGeoJson: GeoJsonImportFeature = {
     type: 'Feature',
     geometry: { type: 'Point', coordinates: [0, 51] },
     properties: {},
   };
-  geoman.features.importGeoJsonFeature(shapeGeoJson);
+  geoForge.features.importGeoJsonFeature(shapeGeoJson);
 
-  const shapeGeoJson2 = {
+  const shapeGeoJson2: GeoJsonImportFeature = {
     type: 'Feature',
     geometry: { type: 'Point', coordinates: [3, 52] },
     properties: {},
   };
-  map.gm?.features.importGeoJsonFeature(shapeGeoJson2);
+  geoForge.features.importGeoJsonFeature(shapeGeoJson2);
 });
 ```

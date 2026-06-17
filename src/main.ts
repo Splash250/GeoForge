@@ -484,6 +484,8 @@ export class Geoman {
   }
 }
 
+export const GeoForge = Geoman;
+
 const geomanLifecycleControllers = new WeakMap<Geoman, GeomanLifecycleController<Geoman>>();
 
 function getGeomanLifecycleController(geoman: Geoman): GeomanLifecycleController<Geoman> {

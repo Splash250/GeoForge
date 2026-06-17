@@ -1,10 +1,10 @@
-# Contributing to Maplibre-Geoman
+# Contributing to GeoForge
 
 Thank you for your interest in contributing! We welcome all kinds of contributions, including bug reports, feature requests, documentation improvements, and code.
 
 ## How to Contribute
 
-- **Bug Reports & Feature Requests:** This package is maintained as a Sewergy fork. Report package issues through the Sewergy project support process for the repository that consumes `@sewergy/maplibre-geoman`. Use upstream Geoman issue trackers only for upstream package behavior that reproduces outside this fork.
+- **Bug Reports & Feature Requests:** Report package issues in the `Splash250/GeoForge` repository unless a maintainer has provided another private support route. Use upstream Geoman issue trackers only for upstream behavior that reproduces outside GeoForge.
 - **Pull Requests:**
   1. Fork the repository and create your branch from `main`.
   2. Write clear, concise commit messages.
@@ -16,7 +16,7 @@ Thank you for your interest in contributing! We welcome all kinds of contributio
 
 ## Contributor License Agreement (CLA)
 
-By contributing, you agree that your contributions will be licensed under the same license as the project (MIT for the free version).
+By contributing, you agree that your contributions will be licensed under the same license as the project.
 
 ## Community
 

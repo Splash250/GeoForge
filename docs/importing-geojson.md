@@ -1,6 +1,6 @@
 # Importing GeoJSON Data
 
-Import existing GeoJSON into Geoman with the feature and collection helpers. Use `gm.features.importGeoJsonFeature` for individual features and `gm.features.importGeoJson` for entire collections.
+Import existing GeoJSON into GeoForge with the feature and collection helpers. Use `gm.features.importGeoJsonFeature` for individual features and `gm.features.importGeoJson` for entire collections.
 
 ## Import a Single Feature
 

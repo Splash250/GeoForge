@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "paths": {
+      "maplibre-geoforge": ["src/index.ts"],
+      "maplibre-geoforge/dist/maplibre-geoforge.css": ["src/styles/style.css"],
+      "@/*": ["src/*"],
+      "@tests/*": ["tests/*"],
+      "@mapLib/*": ["src/core/map/maplibre/*"]
+    }
+  },
+  "include": [
+    "src",
+    "tests",
+    "examples/playground/src",
+    "examples/playground/vite.config.ts",
+    "*.d.ts",
+    "*.ts",
+    "*.svelte"
+  ],
+  "exclude": ["node_modules", "dist", "examples/playground/dist"]
+}

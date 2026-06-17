@@ -1,17 +1,17 @@
-# Geoman Instance API
+# GeoForge Instance API
 
-The Geoman instance is your entry point for managing draw, edit, and helper modes. This reference lists the most important properties and functions exposed on `gm`.
+The GeoForge instance is your entry point for managing draw, edit, and helper modes. This reference lists the most important properties and functions exposed on `geoForge`.
 
 ## Installation and Initialization
 
 ```ts
-import { Geoman, type GmOptionsPartial } from '@sewergy/maplibre-geoman';
+import { GeoForge, type GmOptionsPartial } from 'maplibre-geoforge';
 
 const options: GmOptionsPartial = {
   // configuration options
 };
 
-const gm = new Geoman(map, options);
+const geoForge = new GeoForge(map, options);
 ```
 
 ## Core Properties
@@ -31,7 +31,7 @@ const gm = new Geoman(map, options);
 methods remain supported for compatibility.
 
 ```ts
-const geoman = new Geoman(map);
+const geoman = new GeoForge(map);
 
 geoman.modes.enable('draw', 'line');
 geoman.modes.disable('draw', 'line');
@@ -280,7 +280,7 @@ const map = new maplibregl.Map({
   style: 'https://maps.geoman.io/styles/basic/style.json',
 });
 
-const geoman = new Geoman(map);
+const geoman = new GeoForge(map);
 
 await geoman.addControls();
 

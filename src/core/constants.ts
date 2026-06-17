@@ -4,7 +4,7 @@ let geomanVersion: Options['GmVersion'] | null;
 try {
   geomanVersion = __GEOMAN_VERSION__;
 } catch {
-  geomanVersion = (process.env.VITE_GEOMAN_VERSION as Options['GmVersion']) || null;
+  geomanVersion = (process.env.VITE_GEOFORGE_VERSION as Options['GmVersion']) || null;
 }
 
 export const GM_PREFIX = 'gm' as const;

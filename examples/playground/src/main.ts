@@ -3,10 +3,9 @@ import 'maplibre-geoforge/dist/maplibre-geoforge.css';
 import './styles.css';
 
 import {
-  Geoman,
+  GeoForge,
   SOURCES,
   type ArrowFrequencyUnit,
-  type DeselectFwdEvent,
   type FeatureData,
   type GeomanSelectionOptions,
   type LineDecoratorAnimationOptions,
@@ -204,7 +203,7 @@ const map = new maplibregl.Map({
 
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-left');
 
-const geoman = new Geoman(map, {
+const geoman = new GeoForge(map, {
   layerStyles: {
     line: {
       [SOURCES.main]: geomanLineLayerStyle,
@@ -302,7 +301,7 @@ map.on('gm:select', (event: SelectFwdEvent) => {
   selectedLineId = String(event.feature.id);
   renderDecoratorPlayground();
 });
-map.on('gm:deselect', (_event: DeselectFwdEvent) => {
+map.on('gm:deselect', () => {
   selectedLineId = null;
   renderDecoratorPlayground();
 });

@@ -1,6 +1,6 @@
-# Feature IDs in Geoman
+# Feature IDs in GeoForge
 
-Geoman uses feature IDs to track geometry across imports, edits, and exports. Understanding how IDs are assigned keeps your data consistent.
+GeoForge uses feature IDs to track geometry across imports, edits, and exports. Understanding how IDs are assigned keeps your data consistent.
 
 ## ID Handling on Import
 
@@ -9,7 +9,7 @@ Geoman uses feature IDs to track geometry across imports, edits, and exports. Un
 ```ts
 const feature = {
   type: 'Feature',
-  id: 'custom-123', // Geoman will reuse this id
+  id: 'custom-123', // GeoForge will reuse this id
   properties: {
     shape: 'polygon',
   },
@@ -49,7 +49,7 @@ const exported = gm.features.exportGeoJson();
 
 const feature = exported.features[0];
 console.log(feature.id); // custom id if present
-console.log(feature.properties.__gm_id); // Geoman id mirror
+console.log(feature.properties.__gm_id); // GeoForge id mirror
 ```
 
 ## Reimporting Exported Features

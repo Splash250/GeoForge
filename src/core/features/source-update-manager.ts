@@ -300,11 +300,11 @@ export class SourceUpdateManager {
 
     if (settings.onTimeout === 'throw') {
       throw new Error(
-        `MapLibre Geoman source update wait timed out for "${sourceName}" after ${settings.waitTimeoutMs}ms.`,
+        `GeoForge source update wait timed out for "${sourceName}" after ${settings.waitTimeoutMs}ms.`,
       );
     }
 
-    console.warn('MapLibre Geoman source update wait timed out', diagnostic);
+    console.warn('GeoForge source update wait timed out', diagnostic);
     return false;
   }
 
