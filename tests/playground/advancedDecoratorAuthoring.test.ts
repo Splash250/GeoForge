@@ -113,6 +113,13 @@ describe('advanced decorator authoring helpers', () => {
     });
   });
 
+  test('uses the Demo Studio chevron image for default symbol decorators', () => {
+    expect(buildDecoratorFromAdvancedState(createAdvancedDecoratorState())).toMatchObject({
+      kind: 'symbol',
+      imageId: 'gf-demo-chevron',
+    });
+  });
+
   test('builds text decorators from advanced state', () => {
     const state: AdvancedDecoratorState = {
       ...createAdvancedDecoratorState(),
@@ -380,7 +387,9 @@ describe('advanced decorator authoring helpers', () => {
     const code = getAdvancedDecoratorCode(state);
 
     expect(code).toContain('geoForge.features.importGeoJson(lineFeature');
-    expect(code).toContain('geoForge.decorators.lines.configure({ layerPosition: "below-lines" });');
+    expect(code).toContain(
+      'geoForge.decorators.lines.configure({ layerPosition: "below-lines" });',
+    );
     expect(code).toContain('geoForge.decorators.lines.syncFromFeatures(features, (feature) =>');
     expect(code).toContain('feature.properties?.decorators');
     expect(code).toContain('"decorators"');

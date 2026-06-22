@@ -152,6 +152,13 @@ const ADVANCED_DECORATOR_LINE_COORDINATES: [number, number][] = [
   [19.071, 47.501],
 ];
 
+const SYMBOL_IMAGE_IDS: Record<AdvancedDecoratorSymbolPreset, string> = {
+  chevron: 'gf-demo-chevron',
+  diamond: 'gf-demo-diamond',
+  dot: 'gf-demo-dot',
+  custom: 'gf-demo-custom-advanced',
+};
+
 export function createAdvancedDecoratorState(): AdvancedDecoratorState {
   return {
     selectedLineId: null,
@@ -241,7 +248,10 @@ export function addAdvancedDecorator(
 ): AdvancedDecoratorState {
   return {
     ...state,
-    decorators: [...(state.decorators ?? []).map(cloneLineDecorator), cloneLineDecorator(decorator)],
+    decorators: [
+      ...(state.decorators ?? []).map(cloneLineDecorator),
+      cloneLineDecorator(decorator),
+    ],
   };
 }
 
@@ -310,9 +320,15 @@ export function mergeSvgCss(svg: string, css: string): string {
   return svg.replace(/<svg([^>]*)>/i, `<svg$1><style>${css}</style>`);
 }
 
+export function getAdvancedSymbolImageId(
+  state: Pick<AdvancedDecoratorState, 'symbolPreset'>,
+): string {
+  return SYMBOL_IMAGE_IDS[state.symbolPreset];
+}
+
 export function buildDecoratorFromAdvancedState(
   form: AdvancedDecoratorState,
-  imageId = 'lab-chevron',
+  imageId = getAdvancedSymbolImageId(form),
 ): LineDecoratorOptions {
   const offsets = buildOffsets(form);
 

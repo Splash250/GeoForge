@@ -1,7 +1,18 @@
 import type { GeoJsonImportFeature } from 'maplibre-geoforge';
 import type { DemoContext, DemoDefinition } from '../../registry/types.ts';
-import { ensureBaseSymbolImages } from '../shared/symbolImages.ts';
+import { ensureBaseSymbolImages, ensureSvgImage } from '../shared/symbolImages.ts';
+import AdvancedDecoratorInspector from './AdvancedDecoratorInspector.svelte';
 import LineDecoratorsInspector from './LineDecoratorsInspector.svelte';
+import {
+  createAdvancedDecoratorState,
+  getAdvancedDecoratorCode,
+  getAdvancedDecoratorLineFeature,
+  mergeSvgCss,
+  syncAdvancedDecorators,
+  validateSvgMarkup,
+  type AdvancedDecoratorSyncTarget,
+  type AdvancedDecoratorState,
+} from './advancedDecoratorAuthoring.ts';
 import {
   buildLineDecoratorSnippet,
   createDecoratorFromState,
@@ -28,12 +39,12 @@ const routeFeature: GeoJsonImportFeature = {
   },
 };
 
-type LineDecoratorsInspectorProps = {
-  state: LineDecoratorDemoState;
-  onStateChange: (state: LineDecoratorDemoState) => void;
+type AdvancedDecoratorInspectorProps = {
+  state: AdvancedDecoratorState;
+  onStateChange: (state: AdvancedDecoratorState) => void;
 };
 
-export const lineDecoratorDemos: DemoDefinition<LineDecoratorsInspectorProps>[] = [
+export const lineDecoratorDemos: DemoDefinition[] = [
   {
     id: 'line-decorators-arrowheads',
     title: 'Arrowheads',
@@ -70,12 +81,15 @@ export const lineDecoratorDemos: DemoDefinition<LineDecoratorsInspectorProps>[] 
         throw new Error(message);
       }
 
-      const getRouteFeatures = () => importedRouteFeatures.map((featureData) => featureData.getGeoJson());
+      const getRouteFeatures = () =>
+        importedRouteFeatures.map((featureData) => featureData.getGeoJson());
 
       const syncDecorators = (nextState: LineDecoratorDemoState) => {
         geoForge.decorators.lines.configure({ layerPosition: nextState.layerPosition });
         geoForge.decorators.lines.syncFromFeatures(getRouteFeatures(), () =>
-          nextState.decorators.length ? nextState.decorators : [createDecoratorFromState(nextState)]
+          nextState.decorators.length
+            ? nextState.decorators
+            : [createDecoratorFromState(nextState)],
         );
       };
 
@@ -126,6 +140,123 @@ export const lineDecoratorDemos: DemoDefinition<LineDecoratorsInspectorProps>[] 
       };
     },
   },
+  {
+    id: 'line-decorators-advanced-authoring',
+    title: 'Advanced decorator authoring',
+    description:
+      'Author symbol, text, and arrowhead decorators with placement and animation controls.',
+    docsPath: '/docs/decorators',
+    code: () => getAdvancedDecoratorCode(createAdvancedDecoratorState()),
+    inspector: AdvancedDecoratorInspector,
+    setup: async (context) => {
+      const { map, geoForge } = context;
+      let state = createAdvancedDecoratorState();
+      let syncVersion = 0;
+
+      if (context.signal.aborted || !context.isCurrent()) {
+        return { teardown: () => {} };
+      }
+
+      await ensureBaseSymbolImages(map);
+      await ensureCustomSymbolImage(context, state);
+
+      if (context.signal.aborted || !context.isCurrent()) {
+        return { teardown: () => {} };
+      }
+
+      const importResult = runWithoutHistory(geoForge, () =>
+        geoForge.features.importGeoJson(getAdvancedDecoratorLineFeature(state), {
+          overwrite: true,
+        }),
+      );
+      const importedLineFeatures = importResult.addedFeatures;
+
+      if (!importedLineFeatures.length) {
+        const message = `Unable to import advanced decorator line (${importResult.stats.success}/${importResult.stats.total} features imported).`;
+        context.notify({
+          title: 'Advanced line import failed',
+          body: message,
+          tone: 'error',
+        });
+        throw new Error(message);
+      }
+
+      const getLineFeatures = () =>
+        importedLineFeatures.map((featureData) => featureData.getGeoJson());
+
+      const syncRuntime = (nextState: AdvancedDecoratorState) => {
+        syncAdvancedDecorators({
+          geoForge: geoForge as AdvancedDecoratorSyncTarget,
+          state: nextState,
+          features: getLineFeatures(),
+        });
+      };
+
+      const updateInspector = (nextState: AdvancedDecoratorState) => {
+        const code = getAdvancedDecoratorCode(nextState);
+        context.setInspectorProps({
+          state: nextState,
+          onStateChange,
+        } satisfies AdvancedDecoratorInspectorProps);
+        context.setCode(code);
+      };
+
+      const applyState = async (nextState: AdvancedDecoratorState) => {
+        const version = ++syncVersion;
+        state = nextState;
+        updateInspector(state);
+        await ensureCustomSymbolImage(context, state);
+
+        if (context.signal.aborted || !context.isCurrent() || version !== syncVersion) {
+          return;
+        }
+
+        syncRuntime(state);
+      };
+
+      const onStateChange = (nextState: AdvancedDecoratorState) => {
+        if (context.signal.aborted || !context.isCurrent()) {
+          return;
+        }
+
+        void applyState(nextState);
+      };
+
+      syncRuntime(state);
+      updateInspector(state);
+
+      context.logEvent({
+        name: 'line-decorators-advanced-authoring:ready',
+        category: 'demo-studio',
+        payload: {
+          routeFeatureIds: importedLineFeatures.map((featureData) => featureData.id),
+          stats: importResult.stats,
+        },
+      });
+      context.notify({
+        title: 'Advanced decorators ready',
+        body: 'The seeded line is synced from the advanced decorator authoring state.',
+        tone: 'success',
+      });
+
+      return {
+        inspectorProps: {
+          state,
+          onStateChange,
+        } satisfies AdvancedDecoratorInspectorProps,
+        code: getAdvancedDecoratorCode(state),
+        teardown: () => {
+          syncVersion++;
+          geoForge.decorators.lines.destroy();
+          runWithoutHistory(geoForge, () => {
+            importedLineFeatures.forEach((featureData) => {
+              geoForge.features.delete(featureData);
+            });
+          });
+        },
+      };
+    },
+  },
 ];
 
 function createInitialState(): LineDecoratorDemoState {
@@ -139,4 +270,23 @@ function runWithoutHistory<T>(geoForge: DemoContext['geoForge'], callback: () =>
   const history = geoForge.history as { suspend?: <TResult>(callback: () => TResult) => TResult };
 
   return history.suspend ? history.suspend(callback) : callback();
+}
+
+async function ensureCustomSymbolImage(
+  context: Pick<DemoContext, 'map' | 'signal' | 'isCurrent'>,
+  state: AdvancedDecoratorState,
+): Promise<void> {
+  if (state.kind !== 'symbol' || state.symbolPreset !== 'custom') {
+    return;
+  }
+
+  if (!validateSvgMarkup(state.customSvg).valid || context.signal.aborted || !context.isCurrent()) {
+    return;
+  }
+
+  await ensureSvgImage(
+    context.map,
+    'gf-demo-custom-advanced',
+    mergeSvgCss(state.customSvg, state.customSvgCss),
+  );
 }
