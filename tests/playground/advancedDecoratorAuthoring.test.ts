@@ -472,6 +472,25 @@ describe('advanced decorator authoring helpers', () => {
     });
   });
 
+  test('clones decorators without relying on structuredClone', () => {
+    const originalStructuredClone = globalThis.structuredClone;
+    globalThis.structuredClone = (() => {
+      throw new DOMException('could not be cloned', 'DataCloneError');
+    }) as typeof structuredClone;
+
+    try {
+      const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+      const nextState = addAdvancedDecorator(createAdvancedDecoratorState(), decorator);
+
+      expect(nextState.decorators?.[0]).toMatchObject({
+        kind: 'symbol',
+        rotate: { mode: 'line', angle: -90 },
+      });
+    } finally {
+      globalThis.structuredClone = originalStructuredClone;
+    }
+  });
+
   test('clones surviving decorators when removing from state', () => {
     const first = buildDecoratorFromAdvancedState({
       ...createAdvancedDecoratorState(),

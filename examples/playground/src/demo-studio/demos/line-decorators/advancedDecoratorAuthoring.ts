@@ -907,9 +907,5 @@ function validateSvgMarkupWithoutDomParser(svg: string): AdvancedSvgValidationRe
 }
 
 function cloneLineDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(decorator) as LineDecoratorOptions;
-  }
-
   return JSON.parse(JSON.stringify(decorator)) as LineDecoratorOptions;
 }
