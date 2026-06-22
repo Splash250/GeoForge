@@ -275,6 +275,16 @@ describe('raster layer helpers', () => {
     );
   });
 
+  test('infers WMTS service from cased request params when building a capabilities URL', () => {
+    expect(
+      buildRasterCapabilitiesRequestUrl(
+        'https://tiles.example.test/wmts?tenant=demo&SERVICE=WMTS&REQUEST=GetTile&LAYER=population&TILEMATRIX=4&TILEROW=5&TILECOL=6',
+      ),
+    ).toBe(
+      'https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities',
+    );
+  });
+
   test('parses WMTS ResourceURL templates into MapLibre tiles', () => {
     const layers = parseRasterCapabilities(
       `<?xml version="1.0"?>

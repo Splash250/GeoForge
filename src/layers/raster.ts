@@ -497,7 +497,9 @@ function decodeMapLibreTokens(url: string): string {
 }
 
 function inferRasterService(url: URL): 'WMS' | 'WMTS' {
-  return url.searchParams.get('service')?.toUpperCase() === 'WMTS' ? 'WMTS' : 'WMS';
+  return getSearchParamCaseInsensitive(url, 'service')?.toUpperCase() === 'WMTS'
+    ? 'WMTS'
+    : 'WMS';
 }
 
 function inferCapabilitiesService(document: Document, capabilitiesUrl: string): 'WMS' | 'WMTS' {
@@ -510,7 +512,7 @@ function inferCapabilitiesService(document: Document, capabilitiesUrl: string): 
   try {
     const url = new URL(capabilitiesUrl);
 
-    if (url.searchParams.get('service')?.toUpperCase() === 'WMTS') {
+    if (getSearchParamCaseInsensitive(url, 'service')?.toUpperCase() === 'WMTS') {
       return 'WMTS';
     }
   } catch {
@@ -518,6 +520,18 @@ function inferCapabilitiesService(document: Document, capabilitiesUrl: string): 
   }
 
   return 'WMS';
+}
+
+function getSearchParamCaseInsensitive(url: URL, name: string): string | null {
+  const normalizedName = name.toLowerCase();
+
+  for (const [key, value] of url.searchParams) {
+    if (key.toLowerCase() === normalizedName) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 function parseXmlDocument(xmlText: string): Document {
