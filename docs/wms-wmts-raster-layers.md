@@ -62,6 +62,10 @@ geoForge.layers.addRasterLayers(
 );
 ```
 
+Discovery results include `service`, and WMTS results may include `style`, `format`, and
+`tileMatrixSet` when advertised by the capabilities document. Prefer adding discovered WMTS layers
+instead of hand-writing KVP tile URLs.
+
 ## CORS and Proxies
 
 Browsers require WMS/WMTS servers to allow cross-origin tile requests. If a server does not send

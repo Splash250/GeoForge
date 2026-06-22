@@ -216,6 +216,7 @@ describe('GeomanLayerSubsystem', () => {
     expect(discovered).toEqual([
       expect.objectContaining({
         name: 'hotmaps:nuts',
+        service: 'WMS',
         title: 'NUTS boundaries',
       }),
     ]);
@@ -421,11 +422,49 @@ describe('raster layer helpers', () => {
 
     expect(layers).toEqual([
       {
+        format: 'image/png',
         name: 'population',
+        service: 'WMTS',
+        style: 'default',
+        tileMatrixSet: 'EPSG:3857',
         title: 'Population',
         url: 'https://tiles.test/{z}/{y}/{x}.png',
       },
     ]);
+  });
+
+  test('builds WMTS KVP URLs from advertised style format and matrix set', () => {
+    const layers = parseRasterCapabilities(
+      `<?xml version="1.0"?>
+      <Capabilities xmlns="http://www.opengis.net/wmts/1.0">
+        <Contents>
+          <Layer>
+            <Title>Population</Title>
+            <Identifier>population</Identifier>
+            <Style isDefault="true">
+              <Identifier>bright</Identifier>
+            </Style>
+            <Format>image/jpeg</Format>
+            <TileMatrixSetLink>
+              <TileMatrixSet>GoogleMapsCompatible</TileMatrixSet>
+            </TileMatrixSetLink>
+          </Layer>
+        </Contents>
+      </Capabilities>`,
+      'https://tiles.test/wmts?service=WMTS&request=GetCapabilities',
+    );
+
+    expect(layers[0]).toEqual(
+      expect.objectContaining({
+        service: 'WMTS',
+        format: 'image/jpeg',
+        style: 'bright',
+        tileMatrixSet: 'GoogleMapsCompatible',
+      }),
+    );
+    expect(layers[0]?.url).toContain('style=bright');
+    expect(layers[0]?.url).toContain('format=image%2Fjpeg');
+    expect(layers[0]?.url).toContain('tilematrixset=GoogleMapsCompatible');
   });
 
   test('resolves WMS GetMap OnlineResource endpoints from capabilities', () => {

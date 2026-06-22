@@ -42,6 +42,10 @@ export type DiscoveredRasterLayer = {
   name: string;
   title: string;
   url: string;
+  service: 'WMS' | 'WMTS';
+  format?: string;
+  style?: string;
+  tileMatrixSet?: string;
 };
 
 export type RasterLayerInput = {
@@ -458,6 +462,7 @@ function parseWmsCapabilities(
 
       return {
         name,
+        service: 'WMS',
         title,
         url: buildWmsTileTemplateUrl(getMapUrl, name, version),
       };
@@ -478,6 +483,7 @@ function parseWmtsCapabilities(
       }
 
       const title = getDirectChildText(layer, 'Title') || name;
+      const metadata = getWmtsLayerMetadata(layer);
       const resourceUrl = Array.from(layer.children).find(
         (child) =>
           child.localName === 'ResourceURL' &&
@@ -487,13 +493,37 @@ function parseWmtsCapabilities(
 
       return {
         name,
+        service: 'WMTS',
         title,
+        ...metadata,
         url: template
           ? normalizeWmtsTemplateUrl(template, capabilitiesUrl)
-          : buildWmtsKvpTileTemplateUrl(capabilitiesUrl, name),
+          : buildWmtsKvpTileTemplateUrl(capabilitiesUrl, name, metadata),
       };
     })
     .filter((layer): layer is DiscoveredRasterLayer => layer !== null);
+}
+
+function getWmtsLayerMetadata(layer: Element): {
+  style: string;
+  format: string;
+  tileMatrixSet: string;
+} {
+  const styles = findDirectChildrenByLocalName(layer, 'Style');
+  const defaultStyle = styles.find((style) => style.getAttribute('isDefault') === 'true');
+  const style =
+    getDirectChildText(defaultStyle ?? styles[0], 'Identifier') ||
+    getDirectChildText(styles[0], 'Identifier') ||
+    'default';
+  const format = getDirectChildText(layer, 'Format') || 'image/png';
+  const tileMatrixSetLink = findDirectChildrenByLocalName(layer, 'TileMatrixSetLink')[0];
+  const tileMatrixSet = getDirectChildText(tileMatrixSetLink, 'TileMatrixSet') || 'EPSG:3857';
+
+  return {
+    style,
+    format,
+    tileMatrixSet,
+  };
 }
 
 function buildWmsTileTemplateUrl(
@@ -519,19 +549,23 @@ function buildWmsTileTemplateUrl(
   return decodeMapLibreTokens(url.toString());
 }
 
-function buildWmtsKvpTileTemplateUrl(capabilitiesUrl: string, layerName: string): string {
+function buildWmtsKvpTileTemplateUrl(
+  capabilitiesUrl: string,
+  layerName: string,
+  metadata: { style: string; format: string; tileMatrixSet: string },
+): string {
   const url = new URL(capabilitiesUrl);
 
   url.searchParams.set('service', 'WMTS');
   url.searchParams.set('request', 'GetTile');
   url.searchParams.set('version', '1.0.0');
   url.searchParams.set('layer', layerName);
-  url.searchParams.set('style', 'default');
-  url.searchParams.set('tilematrixset', 'EPSG:3857');
+  url.searchParams.set('style', metadata.style);
+  url.searchParams.set('tilematrixset', metadata.tileMatrixSet);
   url.searchParams.set('tilematrix', '{z}');
   url.searchParams.set('tilerow', '{y}');
   url.searchParams.set('tilecol', '{x}');
-  url.searchParams.set('format', 'image/png');
+  url.searchParams.set('format', metadata.format);
 
   return decodeMapLibreTokens(url.toString());
 }
@@ -625,9 +659,15 @@ function getGlobalFetch(): NonNullable<DiscoverRasterLayersOptions['fetchFn']> {
   throw new Error('fetch is unavailable. Pass discoverRasterLayers(..., { fetchFn }).');
 }
 
-function getDirectChildText(element: Element, childName: string): string {
-  const child = Array.from(element.children).find((candidate) => candidate.localName === childName);
+function getDirectChildText(element: Element | undefined, childName: string): string {
+  const child = element
+    ? findDirectChildrenByLocalName(element, childName)[0]
+    : undefined;
   return child?.textContent?.trim() ?? '';
+}
+
+function findDirectChildrenByLocalName(element: Element, childName: string): Element[] {
+  return Array.from(element.children).filter((candidate) => candidate.localName === childName);
 }
 
 function getWmsGetMapEndpoint(document: Document, capabilitiesUrl: string): string {
