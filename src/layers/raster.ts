@@ -3,6 +3,33 @@ import { GM_PREFIX } from '@/core/constants.ts';
 const rasterLayerPrefix = `${GM_PREFIX}-raster-layer-`;
 const rasterSourcePrefix = `${GM_PREFIX}-raster-source-`;
 const defaultRasterTileSize = 256;
+const rasterCapabilitiesRequestTileParams = new Set([
+  'bbox',
+  'crs',
+  'exceptions',
+  'format',
+  'height',
+  'i',
+  'j',
+  'layer',
+  'layers',
+  'request',
+  'row',
+  'service',
+  'srs',
+  'style',
+  'styles',
+  'tilecol',
+  'tilematrix',
+  'tilematrixset',
+  'tilerow',
+  'transparent',
+  'version',
+  'width',
+  'x',
+  'y',
+  'z',
+]);
 
 export type GeomanRasterLayer = {
   id: string;
@@ -201,6 +228,12 @@ export function buildRasterCapabilitiesRequestUrl(rawUrl: string): string {
 
   const service = inferRasterService(url);
   const baseUrl = new URL(url.origin + url.pathname);
+
+  for (const [key, value] of url.searchParams) {
+    if (!rasterCapabilitiesRequestTileParams.has(key.toLowerCase())) {
+      baseUrl.searchParams.append(key, value);
+    }
+  }
 
   baseUrl.searchParams.set('service', service);
   baseUrl.searchParams.set('request', 'GetCapabilities');

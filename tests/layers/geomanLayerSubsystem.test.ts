@@ -255,6 +255,26 @@ describe('raster layer helpers', () => {
     ).toBe('https://example.test/wms?service=WMS&request=GetCapabilities');
   });
 
+  test('preserves service routing params when building a WMS capabilities URL', () => {
+    expect(
+      buildRasterCapabilitiesRequestUrl(
+        'https://maps.example.test/wms?map=/srv/city.map&token=abc123&service=WMS&request=GetMap&layers=roads&bbox=1,2,3,4&width=256&height=256',
+      ),
+    ).toBe(
+      'https://maps.example.test/wms?map=%2Fsrv%2Fcity.map&token=abc123&service=WMS&request=GetCapabilities',
+    );
+  });
+
+  test('preserves service routing params when building a WMTS capabilities URL', () => {
+    expect(
+      buildRasterCapabilitiesRequestUrl(
+        'https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetTile&layer=population&tilematrix=4&tilerow=5&tilecol=6',
+      ),
+    ).toBe(
+      'https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities',
+    );
+  });
+
   test('parses WMTS ResourceURL templates into MapLibre tiles', () => {
     const layers = parseRasterCapabilities(
       `<?xml version="1.0"?>
