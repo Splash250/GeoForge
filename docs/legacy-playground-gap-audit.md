@@ -1,26 +1,29 @@
 # Legacy Playground Gap Audit
 
-This audit compares the legacy playground in `examples/playground/src/routes/legacy-playground.ts`
-with the newer Demo Studio in `examples/playground/src/demo-studio/`.
+This audit records the retired legacy playground that previously lived at
+`examples/playground/src/routes/legacy-playground.ts` and compares its former coverage with the
+newer Demo Studio in `examples/playground/src/demo-studio/`.
 
 ## Executive Summary
 
-The legacy playground is now a narrow lab for two advanced surfaces: line decorators and HTML
-overlays. Demo Studio has become the broader product-quality sandbox: it has routing, category
-navigation, per-demo setup/teardown, inspectors, code snippets, toasts, WMS/WMTS layer management,
-feature import/export, geometry/network tools, transactions, history, and a reusable UI system.
+The legacy playground was a narrow lab for two advanced surfaces: line decorators and HTML
+overlays. Demo Studio is now the only playground route and the broader product-quality sandbox: it
+has routing, category navigation, per-demo setup/teardown, inspectors, code snippets, toasts,
+WMS/WMTS layer management, feature import/export, geometry/network tools, transactions, history,
+and a reusable UI system.
 
-The legacy playground is still valuable as a dense decorator/overlay stress test, but it is no
-longer representative of the full GeoForge API. It is also harder to extend because most UI,
-state, event wiring, and rendering lives in one imperative TypeScript file.
+The former legacy-only decorator and overlay capabilities have Demo Studio replacements. Advanced
+decorator authoring now lives in the Line Decorators category, and overlay pointer-mode controls now
+live in the Overlays category. Legacy hashes such as `#decorators` and `#overlays` are retained as
+compatibility entries that resolve to Demo Studio instead of mounting the removed route.
 
 ## Structure Comparison
 
 ### Legacy Playground
 
-Entry point: `examples/playground/src/routes/legacy-playground.ts`
+Entry point: removed (`examples/playground/src/routes/legacy-playground.ts`)
 
-Current route coverage:
+Former route coverage:
 
 - `#decorators`
 - `#overlays`
@@ -186,7 +189,7 @@ not demonstrate the production workflow APIs.
 
 Legacy lifecycle is more fragile because most behavior is centralized.
 
-Current strengths:
+Former strengths:
 
 - It has `activeLegacyMountId`, `syncRun`, and cleanup guards.
 - It removes the MapLibre map on teardown.
@@ -231,9 +234,9 @@ Missing from legacy:
 Legacy has one status region and some direct status text updates, which is adequate for a small lab
 but not enough for broad API validation.
 
-## Legacy Strengths Worth Preserving
+## Preserved Legacy Strengths
 
-The legacy playground still has some useful depth:
+The legacy playground had useful depth that is now represented in Demo Studio:
 
 - Dense line decorator authoring in one place.
 - SVG symbol authoring and preview.
@@ -243,35 +246,22 @@ The legacy playground still has some useful depth:
 - Direct stress of `syncFromFeatures(...)`.
 - Simple overlay interactability and pointer mode checks.
 
-These should be preserved by migrating them into Demo Studio rather than deleting them outright.
+These are preserved by the Demo Studio advanced decorator authoring and overlay pointer-mode demos.
 
 ## Recommended Path
 
-### Short Term
+### Complete
 
-- Keep legacy route available as a compatibility/deep-lab page.
-- Add a visible link from Demo Studio to legacy only if that deep decorator authoring remains useful.
-- Do not add new API coverage to legacy.
-
-### Medium Term
-
-- Port the legacy decorator authoring controls into the existing Line Decorators category as an
+- Removed `legacy-playground.ts`.
+- Kept Demo Studio as the only user-facing playground and API demonstration surface.
+- Preserved old `#decorators` and `#overlays` hashes by resolving them to Demo Studio.
+- Migrated the legacy decorator authoring controls into the Line Decorators category as the
   “Advanced decorator authoring” demo.
-- Port the legacy overlay pointer controls into the Overlays category if Demo Studio does not yet
-  expose the same pointer-mode depth.
-- Add tests or smoke coverage for any migrated flows before removing legacy.
-
-### Long Term
-
-- Remove `legacy-playground.ts` once all unique decorator/overlay capabilities are represented in
-  Demo Studio.
-- Keep Demo Studio as the only user-facing sandbox and API demonstration surface.
+- Migrated the legacy overlay pointer controls into the Overlays category.
+- Kept WMS/WMTS layer management, feature import/export, geometry tools, transactions, history, and
+  event diagnostics in Demo Studio.
 
 ## Prioritized Gap List
 
-1. Add/migrate advanced decorator authoring to Demo Studio.
-2. Add/migrate overlay pointer-mode controls if still more complete in legacy.
-3. Keep WMS/WMTS layer management only in Demo Studio.
-4. Keep feature import/export, geometry tools, transactions, history, and event diagnostics in Demo Studio.
-5. Stop expanding legacy route except for critical compatibility fixes.
+Retirement is complete. No legacy-only decorator or overlay gaps remain.
 

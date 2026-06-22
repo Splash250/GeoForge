@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button, CodeBlock, ControlRow, InspectorSection } from '../../ui';
+  import { Button, CodeBlock, ControlRow, InspectorSection } from '../../ui/index.ts';
 
   export type FeatureDataDemoState = {
     featureCount: number;
@@ -38,14 +38,14 @@
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function copyCode(value: string) {
-    const writeText = globalThis.navigator?.clipboard?.writeText;
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
 
-    if (!writeText) {
+    if (!clipboard?.writeText) {
       return;
     }
 
     try {
-      await writeText.call(globalThis.navigator.clipboard, value);
+      await clipboard.writeText.call(clipboard, value);
       copied = true;
       clearTimeout(copyResetTimer);
       copyResetTimer = setTimeout(() => {

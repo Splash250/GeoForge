@@ -23,6 +23,7 @@ const makePropertyUnavailable = (target: object, key: 'localStorage' | 'window')
       return;
     }
   } catch {
+    // Ignore delete failures and fall through to shadow the property with undefined.
   }
 
   Object.defineProperty(target, key, {

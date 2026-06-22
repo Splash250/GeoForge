@@ -19,8 +19,8 @@
     <tbody>
       {#each rows as row}
         <tr>
-          {#each columns as _, index}
-            <td data-label={columns[index]}>{row[index] ?? ''}</td>
+          {#each columns as column, index}
+            <td data-label={column}>{row[index] ?? ''}</td>
           {/each}
         </tr>
       {/each}

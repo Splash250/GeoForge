@@ -27,7 +27,7 @@ export type DemoSetupResult = {
   teardown: () => void;
 };
 
-export type DemoDefinition<TInspectorProps extends Record<string, any> = Record<string, unknown>> = {
+export type DemoDefinition<TInspectorProps extends object = Record<string, unknown>> = {
   id: string;
   title: string;
   description: string;
@@ -37,7 +37,7 @@ export type DemoDefinition<TInspectorProps extends Record<string, any> = Record<
   setup: (context: DemoContext) => DemoSetupResult | Promise<DemoSetupResult>;
 };
 
-export type RegisteredDemoDefinition = DemoDefinition<any>;
+export type RegisteredDemoDefinition = DemoDefinition<never>;
 
 export type DemoCategory = {
   id: DemoCategoryId;

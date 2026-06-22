@@ -7,7 +7,7 @@
     InspectorSection,
     SegmentedControl,
     ToggleSwitch,
-  } from '../../ui';
+  } from '../../ui/index.ts';
   import { createDecoratorFromState, initialLineDecoratorState } from './state.ts';
   import type { DecoratorKind, LayerPosition, LineDecoratorDemoState } from './types.ts';
 
@@ -117,14 +117,14 @@
   }
 
   async function copyCode(value: string) {
-    const writeText = globalThis.navigator?.clipboard?.writeText;
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
 
-    if (!writeText) {
+    if (!clipboard?.writeText) {
       return;
     }
 
     try {
-      await writeText.call(globalThis.navigator.clipboard, value);
+      await clipboard.writeText.call(clipboard, value);
       copied = true;
       clearTimeout(copyResetTimer);
       copyResetTimer = setTimeout(() => {

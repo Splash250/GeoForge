@@ -1,17 +1,26 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { CodeBlock, ControlRow, InspectorSection, SegmentedControl, ToggleSwitch } from '../../ui/index.ts';
+  import {
+    Button,
+    CodeBlock,
+    ControlRow,
+    InspectorSection,
+    SegmentedControl,
+    ToggleSwitch,
+  } from '../../ui/index.ts';
   import type { HtmlOverlayPointerMode } from 'maplibre-geoforge';
 
-  type OverlayDemoState = {
-    visible: boolean;
+  type OverlayPointerDemoState = {
     interactable: boolean;
     pointerMode: HtmlOverlayPointerMode;
+    mapPitched: boolean;
   };
 
-  type OverlayInspectorProps = {
-    state?: OverlayDemoState;
-    onStateChange?: (state: OverlayDemoState) => void;
+  type OverlayPointerInspectorProps = {
+    state?: OverlayPointerDemoState;
+    onStateChange?: (state: OverlayPointerDemoState) => void;
+    onPitchToggle?: () => void;
+    onReset?: () => void;
     code?: string;
     title?: string;
     description?: string;
@@ -23,24 +32,26 @@
     { value: 'none', label: 'None' },
   ];
 
-  const emptyOverlayState: OverlayDemoState = {
-    visible: true,
+  const emptyPointerState: OverlayPointerDemoState = {
     interactable: true,
     pointerMode: 'selected',
+    mapPitched: false,
   };
 
   let {
-    state: demoState = emptyOverlayState,
+    state: demoState = emptyPointerState,
     onStateChange = () => {},
+    onPitchToggle = () => {},
+    onReset = () => {},
     code = '',
-    title = 'HTML overlay',
+    title = 'Overlay pointer modes',
     description,
-  }: OverlayInspectorProps = $props();
+  }: OverlayPointerInspectorProps = $props();
 
   let copied = $state(false);
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function patch(patch: Partial<OverlayDemoState>) {
+  function patch(patch: Partial<OverlayPointerDemoState>) {
     onStateChange({ ...demoState, ...patch });
   }
 
@@ -76,14 +87,6 @@
   {/if}
 
   <div class="section-stack">
-    <ControlRow label="Visible">
-      <ToggleSwitch
-        checked={demoState.visible}
-        label="Overlay visible"
-        onChange={(visible) => patch({ visible })}
-      />
-    </ControlRow>
-
     <ControlRow label="Interactable">
       <ToggleSwitch
         checked={demoState.interactable}
@@ -99,6 +102,16 @@
         options={pointerModeOptions}
         onChange={handlePointerModeChange}
       />
+    </ControlRow>
+
+    <ControlRow label="Map pitch">
+      <Button variant="utility" onclick={onPitchToggle}>
+        {demoState.mapPitched ? 'Flatten map' : 'Pitch map'}
+      </Button>
+    </ControlRow>
+
+    <ControlRow label="Defaults">
+      <Button variant="secondary" onclick={onReset}>Reset overlay</Button>
     </ControlRow>
   </div>
 </InspectorSection>
