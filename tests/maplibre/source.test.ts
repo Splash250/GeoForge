@@ -200,7 +200,7 @@ describe('MaplibreSource', () => {
 
     let caughtValue: unknown;
     try {
-      source.loaded;
+      Reflect.get(source, 'loaded');
     } catch (error) {
       caughtValue = error;
     }

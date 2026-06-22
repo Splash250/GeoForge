@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button, InspectorSection } from '../../ui';
+  import { Button, InspectorSection } from '../../ui/index.ts';
   import { getAdvancedDecoratorLineFeature, type AdvancedDecoratorState } from './advancedDecoratorAuthoring.ts';
 
   type AdvancedDecoratorJsonPanelProps = {
@@ -19,7 +19,7 @@
   );
 
   async function copyValue(kind: 'feature' | 'decorators' | 'code', value: string) {
-    const clipboard = navigator.clipboard;
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
 
     if (!clipboard?.writeText) {
       return;

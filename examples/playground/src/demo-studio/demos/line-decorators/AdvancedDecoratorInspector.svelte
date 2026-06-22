@@ -5,7 +5,7 @@
     InspectorSection,
     SegmentedControl,
     ToggleSwitch,
-  } from '../../ui';
+  } from '../../ui/index.ts';
   import AdvancedDecoratorJsonPanel from './AdvancedDecoratorJsonPanel.svelte';
   import {
     addAdvancedDecorator,
@@ -30,6 +30,7 @@
     title?: string;
     description?: string;
   };
+  type AdvancedDecoratorFeature = ReturnType<typeof getAdvancedDecoratorLineFeature>;
 
   const defaultState = createAdvancedDecoratorState();
 
@@ -109,7 +110,6 @@
     svgValidation.valid ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(mergedSvg)}` : '',
   );
   const currentDecorator = $derived(buildDecoratorFromAdvancedState(demoState));
-  const currentFeature = $derived(getAdvancedDecoratorLineFeature(demoState));
 
   function patch(patchValue: Partial<AdvancedDecoratorState>) {
     onStateChange({ ...demoState, ...patchValue });
@@ -165,7 +165,7 @@
     input.value = '';
   }
 
-  function decoratorDetail(decorator: (typeof currentFeature.properties.decorators)[number]) {
+  function decoratorDetail(decorator: AdvancedDecoratorFeature['properties']['decorators'][number]) {
     if (decorator.kind === 'text') {
       return decorator.text;
     }

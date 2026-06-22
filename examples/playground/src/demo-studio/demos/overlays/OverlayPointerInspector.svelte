@@ -60,14 +60,14 @@
   }
 
   async function copyCode(value: string) {
-    const writeText = navigator?.clipboard?.writeText;
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
 
-    if (!writeText) {
+    if (!clipboard?.writeText) {
       return;
     }
 
     try {
-      await writeText.call(navigator.clipboard, value);
+      await clipboard.writeText.call(clipboard, value);
       copied = true;
       clearTimeout(copyResetTimer);
       copyResetTimer = setTimeout(() => {

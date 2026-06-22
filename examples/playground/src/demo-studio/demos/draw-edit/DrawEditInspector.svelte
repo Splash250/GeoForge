@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button, CodeBlock, ControlRow, InspectorSection, SegmentedControl } from '../../ui';
+  import { Button, CodeBlock, ControlRow, InspectorSection, SegmentedControl } from '../../ui/index.ts';
 
   export type DrawEditShapeTool =
     | 'marker'
@@ -75,7 +75,7 @@
   }
 
   async function copyCode(value: string) {
-    const clipboard = navigator.clipboard;
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
 
     if (!clipboard?.writeText) {
       return;

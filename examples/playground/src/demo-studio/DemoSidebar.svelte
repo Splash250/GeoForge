@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DemoCategory } from './registry/types.ts';
-  import { SearchInput } from './ui';
+  import { SearchInput } from './ui/index.ts';
 
   type DemoSidebarProps = {
     categories: DemoCategory[];
