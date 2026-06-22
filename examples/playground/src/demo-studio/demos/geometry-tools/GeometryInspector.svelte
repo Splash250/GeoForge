@@ -41,7 +41,7 @@
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function copyCode(value: string) {
-    const clipboard = navigator.clipboard;
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
 
     if (!clipboard?.writeText) {
       return;
