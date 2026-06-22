@@ -420,6 +420,30 @@ describe('advanced decorator authoring helpers', () => {
     });
   });
 
+  test('clones surviving decorators when removing from state', () => {
+    const first = buildDecoratorFromAdvancedState({
+      ...createAdvancedDecoratorState(),
+      kind: 'text',
+      text: 'FLOW',
+    });
+    const second = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      decorators: [first, second],
+    };
+    const nextState = removeAdvancedDecorator(state, 0);
+
+    const survivingDecorator = state.decorators?.[1];
+    if (survivingDecorator?.kind === 'symbol' && survivingDecorator.rotate) {
+      survivingDecorator.rotate.angle = 45;
+    }
+
+    expect(nextState.decorators?.[0]).toMatchObject({
+      kind: 'symbol',
+      rotate: { mode: 'line', angle: -90 },
+    });
+  });
+
   test('clones line feature decorators so later nested mutations do not change output', () => {
     const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
     const feature = getAdvancedDecoratorLineFeature({

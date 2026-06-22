@@ -251,7 +251,9 @@ export function removeAdvancedDecorator(
 ): AdvancedDecoratorState {
   return {
     ...state,
-    decorators: (state.decorators ?? []).filter((_, decoratorIndex) => decoratorIndex !== index),
+    decorators: (state.decorators ?? [])
+      .filter((_, decoratorIndex) => decoratorIndex !== index)
+      .map(cloneLineDecorator),
   };
 }
 
