@@ -470,11 +470,18 @@ describe('advanced decorator authoring helpers', () => {
     });
   });
 
-  test('sync adapter configures layer position and syncs decorators from features', () => {
-    const decorators = [buildDecoratorFromAdvancedState(createAdvancedDecoratorState())];
+  test('sync adapter configures layer position and syncs decorators from current state', () => {
+    const oldDecorators = [buildDecoratorFromAdvancedState(createAdvancedDecoratorState())];
+    const currentDecorators = [
+      buildDecoratorFromAdvancedState({
+        ...createAdvancedDecoratorState(),
+        kind: 'text',
+        text: 'LIVE',
+      }),
+    ];
     const feature = getAdvancedDecoratorLineFeature({
       ...createAdvancedDecoratorState(),
-      decorators,
+      decorators: oldDecorators,
     });
     const calls: unknown[] = [];
     const geoForge: AdvancedDecoratorSyncTarget = {
@@ -492,22 +499,32 @@ describe('advanced decorator authoring helpers', () => {
       state: {
         ...createAdvancedDecoratorState(),
         layerPosition: 'below-lines',
+        decorators: currentDecorators,
       },
       features: [feature],
     });
 
     expect(calls).toEqual([
       ['configure', { layerPosition: 'below-lines' }],
-      ['syncFromFeatures', [feature], decorators],
+      ['syncFromFeatures', [feature], currentDecorators],
     ]);
   });
 
-  test('sync adapter clones feature decorators before returning them to GeoForge', () => {
+  test('sync adapter clones state decorators before returning them to GeoForge', () => {
+    const oldDecorator = buildDecoratorFromAdvancedState({
+      ...createAdvancedDecoratorState(),
+      kind: 'text',
+      text: 'OLD',
+    });
     const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
     const feature = getAdvancedDecoratorLineFeature({
       ...createAdvancedDecoratorState(),
-      decorators: [decorator],
+      decorators: [oldDecorator],
     });
+    const state = {
+      ...createAdvancedDecoratorState(),
+      decorators: [decorator],
+    };
     let resolvedDecorators: unknown;
     const geoForge: AdvancedDecoratorSyncTarget = {
       decorators: {
@@ -522,11 +539,11 @@ describe('advanced decorator authoring helpers', () => {
 
     syncAdvancedDecorators({
       geoForge,
-      state: createAdvancedDecoratorState(),
+      state,
       features: [feature],
     });
 
-    const firstDecorator = feature.properties.decorators[0];
+    const firstDecorator = state.decorators[0];
     if (firstDecorator?.kind === 'symbol' && firstDecorator.rotate) {
       firstDecorator.rotate.angle = 45;
     }

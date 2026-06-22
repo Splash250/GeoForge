@@ -280,9 +280,7 @@ export function syncAdvancedDecorators({
   features,
 }: SyncAdvancedDecoratorsOptions): void {
   geoForge.decorators.lines.configure({ layerPosition: state.layerPosition });
-  geoForge.decorators.lines.syncFromFeatures(features, (feature) =>
-    resolveAdvancedDecoratorFeatureDecorators(feature, state),
-  );
+  geoForge.decorators.lines.syncFromFeatures(features, () => getAdvancedDecorators(state));
 }
 
 function getAdvancedDecorators(state: AdvancedDecoratorState): LineDecoratorOptions[] {
@@ -529,15 +527,6 @@ function validateSvgMarkupWithoutDomParser(svg: string): AdvancedSvgValidationRe
   return stack.length === 0
     ? { valid: true, message: 'Live' }
     : { valid: false, message: 'Invalid SVG' };
-}
-
-function resolveAdvancedDecoratorFeatureDecorators(
-  feature: GeoJsonImportFeature,
-  state: AdvancedDecoratorState,
-): LineDecoratorOptions[] {
-  return Array.isArray(feature.properties?.decorators)
-    ? (feature.properties.decorators as LineDecoratorOptions[]).map(cloneLineDecorator)
-    : getAdvancedDecorators(state);
 }
 
 function cloneLineDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
