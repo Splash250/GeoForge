@@ -107,6 +107,7 @@ export type AdvancedDecoratorState = {
   animationDirection: LineDecoratorAnimationDirection;
   animationEasing: LineDecoratorAnimationEasing;
   decorators?: LineDecoratorOptions[];
+  customSymbolImages?: Record<string, { svg: string }>;
 };
 
 export type AdvancedDecoratorSyncTarget = {
@@ -151,10 +152,18 @@ export type AdvancedCustomSvgEnsureOptions = {
 
 export type AdvancedCustomSvgEnsureResult = {
   customImageReady: boolean;
+  readyImageIds?: string[];
 };
 
 export type AdvancedDecoratorRenderStateOptions = {
   customImageReady: boolean;
+  readyImageIds?: string[];
+};
+
+type AdvancedCustomSymbolImageSource = {
+  id: string;
+  svg: string | null;
+  throwOnFailure: boolean;
 };
 
 const DEFAULT_LINE_STYLE: AdvancedLineStyleState = {
@@ -190,6 +199,7 @@ const SYMBOL_IMAGE_IDS: Record<AdvancedDecoratorSymbolPreset, string> = {
 };
 
 export const ADVANCED_CUSTOM_SYMBOL_IMAGE_ID = SYMBOL_IMAGE_IDS.custom;
+const ADVANCED_SAVED_CUSTOM_SYMBOL_IMAGE_ID_PREFIX = `${ADVANCED_CUSTOM_SYMBOL_IMAGE_ID}-saved-`;
 
 export function createAdvancedDecoratorState(): AdvancedDecoratorState {
   return {
@@ -278,12 +288,20 @@ export function addAdvancedDecorator(
   state: AdvancedDecoratorState,
   decorator: LineDecoratorOptions,
 ): AdvancedDecoratorState {
+  const nextCustomSymbolImages = { ...(state.customSymbolImages ?? {}) };
+  const nextDecorator = captureSavedCustomSymbolDecorator(
+    state,
+    cloneLineDecorator(decorator),
+    nextCustomSymbolImages,
+  );
+
   return {
     ...state,
     decorators: [
       ...(state.decorators ?? []).map(cloneLineDecorator),
-      cloneLineDecorator(decorator),
+      nextDecorator,
     ],
+    customSymbolImages: emptyToUndefined(nextCustomSymbolImages),
   };
 }
 
@@ -291,11 +309,14 @@ export function removeAdvancedDecorator(
   state: AdvancedDecoratorState,
   index: number,
 ): AdvancedDecoratorState {
+  const decorators = (state.decorators ?? [])
+    .filter((_, decoratorIndex) => decoratorIndex !== index)
+    .map(cloneLineDecorator);
+
   return {
     ...state,
-    decorators: (state.decorators ?? [])
-      .filter((_, decoratorIndex) => decoratorIndex !== index)
-      .map(cloneLineDecorator),
+    decorators,
+    customSymbolImages: pruneCustomSymbolImages(state.customSymbolImages, decorators),
   };
 }
 
@@ -303,6 +324,7 @@ export function clearAdvancedDecorators(state: AdvancedDecoratorState): Advanced
   return {
     ...state,
     decorators: [],
+    customSymbolImages: undefined,
   };
 }
 
@@ -334,32 +356,54 @@ export function getAdvancedDecoratorRenderState(
   state: AdvancedDecoratorState,
   options: AdvancedDecoratorRenderStateOptions,
 ): AdvancedDecoratorState {
+  const readyImageIds = new Set(options.readyImageIds);
+
   if (options.customImageReady) {
+    readyImageIds.add(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
+  }
+
+  if (readyImageIds.size && allCustomSymbolDecoratorsReady(state, readyImageIds)) {
     return state;
   }
 
   return {
     ...state,
-    symbolPreset: state.symbolPreset === 'custom' ? 'chevron' : state.symbolPreset,
-    decorators: state.decorators?.map(replaceCustomSymbolDecorator),
+    symbolPreset:
+      state.symbolPreset === 'custom' && !readyImageIds.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)
+        ? 'chevron'
+        : state.symbolPreset,
+    decorators: state.decorators?.map((decorator) =>
+      replaceUnavailableCustomSymbolDecorator(decorator, readyImageIds),
+    ),
   };
 }
 
 export function createAdvancedCustomSvgImageManager<TImage>(
   loadImage: AdvancedSvgImageLoader<TImage>,
 ) {
-  let registeredSvg: string | undefined;
+  const registeredSvgs = new Map<string, string>();
 
   function isCurrent(options: AdvancedCustomSvgEnsureOptions): boolean {
     return options.isCurrent ? options.isCurrent() : true;
   }
 
   function removeRegisteredImage(map: AdvancedCustomSvgImageTarget<TImage>): void {
-    if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID) && map.removeImage) {
-      map.removeImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
+    for (const imageId of [...registeredSvgs.keys()]) {
+      removeRegisteredImageById(map, imageId);
     }
 
-    registeredSvg = undefined;
+    registeredSvgs.clear();
+  }
+
+  function removeRegisteredImageById(
+    map: AdvancedCustomSvgImageTarget<TImage>,
+    imageId: string,
+  ): void {
+    if (map.hasImage(imageId) && map.removeImage) {
+      map.removeImage(imageId);
+    }
+
+    registeredSvgs.delete(imageId);
   }
 
   return {
@@ -368,7 +412,17 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       state: AdvancedDecoratorState,
       options: AdvancedCustomSvgEnsureOptions = {},
     ): Promise<AdvancedCustomSvgEnsureResult> {
-      if (!stateNeedsAdvancedCustomSymbolImage(state)) {
+      const sources = getAdvancedCustomSymbolImageSources(state);
+      const sourceIds = new Set(sources.map((source) => source.id));
+      const readyImageIds: string[] = [];
+
+      for (const imageId of [...registeredSvgs.keys()]) {
+        if (!sourceIds.has(imageId) && isCurrent(options)) {
+          removeRegisteredImageById(map, imageId);
+        }
+      }
+
+      if (!sources.length) {
         if (isCurrent(options)) {
           removeRegisteredImage(map);
         }
@@ -376,49 +430,57 @@ export function createAdvancedCustomSvgImageManager<TImage>(
         return { customImageReady: false };
       }
 
-      if (!validateSvgMarkup(state.customSvg).valid) {
-        if (isCurrent(options)) {
-          removeRegisteredImage(map);
+      for (const source of sources) {
+        if (!source.svg) {
+          if (isCurrent(options)) {
+            removeRegisteredImageById(map, source.id);
+          }
+
+          continue;
         }
 
-        return { customImageReady: false };
-      }
-
-      const svg = mergeSvgCss(state.customSvg, state.customSvgCss);
-
-      if (registeredSvg === svg && map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)) {
-        return { customImageReady: true };
-      }
-
-      let image: TImage;
-      try {
-        image = await loadImage(svg);
-      } catch (error) {
-        if (isCurrent(options)) {
-          removeRegisteredImage(map);
-          throw error;
+        if (registeredSvgs.get(source.id) === source.svg && map.hasImage(source.id)) {
+          readyImageIds.push(source.id);
+          continue;
         }
 
-        return { customImageReady: false };
-      }
+        let image: TImage;
+        try {
+          image = await loadImage(source.svg);
+        } catch (error) {
+          if (isCurrent(options)) {
+            removeRegisteredImageById(map, source.id);
+            if (source.throwOnFailure) {
+              throw error;
+            }
+          }
 
-      if (!isCurrent(options)) {
-        return { customImageReady: false };
-      }
-
-      if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)) {
-        if (map.updateImage) {
-          map.updateImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, image);
-        } else if (map.removeImage) {
-          map.removeImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
-          map.addImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, image);
+          continue;
         }
-      } else {
-        map.addImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, image);
+
+        if (!isCurrent(options)) {
+          continue;
+        }
+
+        if (map.hasImage(source.id)) {
+          if (map.updateImage) {
+            map.updateImage(source.id, image);
+          } else if (map.removeImage) {
+            map.removeImage(source.id);
+            map.addImage(source.id, image);
+          }
+        } else {
+          map.addImage(source.id, image);
+        }
+
+        registeredSvgs.set(source.id, source.svg);
+        readyImageIds.push(source.id);
       }
 
-      registeredSvg = svg;
-      return { customImageReady: true };
+      return {
+        customImageReady: readyImageIds.includes(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID),
+        readyImageIds,
+      };
     },
 
     cleanup(map: AdvancedCustomSvgImageTarget<TImage>): void {
@@ -433,10 +495,17 @@ function getAdvancedDecorators(state: AdvancedDecoratorState): LineDecoratorOpti
     : [cloneLineDecorator(buildDecoratorFromAdvancedState(state))];
 }
 
-function replaceCustomSymbolDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
+function replaceUnavailableCustomSymbolDecorator(
+  decorator: LineDecoratorOptions,
+  readyImageIds: Set<string>,
+): LineDecoratorOptions {
   const clone = cloneLineDecorator(decorator);
 
-  if (clone.kind === 'symbol' && clone.imageId === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID) {
+  if (
+    clone.kind === 'symbol' &&
+    isAdvancedCustomSymbolImageId(clone.imageId) &&
+    !readyImageIds.has(clone.imageId)
+  ) {
     return {
       ...clone,
       imageId: SYMBOL_IMAGE_IDS.chevron,
@@ -446,18 +515,138 @@ function replaceCustomSymbolDecorator(decorator: LineDecoratorOptions): LineDeco
   return clone;
 }
 
-function stateNeedsAdvancedCustomSymbolImage(state: AdvancedDecoratorState): boolean {
+function allCustomSymbolDecoratorsReady(
+  state: AdvancedDecoratorState,
+  readyImageIds: Set<string>,
+): boolean {
+  const draftReady =
+    state.kind !== 'symbol' ||
+    state.symbolPreset !== 'custom' ||
+    readyImageIds.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
+
+  return (
+    draftReady &&
+    (state.decorators ?? []).every(
+      (decorator) =>
+        decorator.kind !== 'symbol' ||
+        !isAdvancedCustomSymbolImageId(decorator.imageId) ||
+        readyImageIds.has(decorator.imageId),
+    )
+  );
+}
+
+function getAdvancedCustomSymbolImageSources(
+  state: AdvancedDecoratorState,
+): AdvancedCustomSymbolImageSource[] {
+  const sources: AdvancedCustomSymbolImageSource[] = [];
+
   if (state.kind === 'symbol' && state.symbolPreset === 'custom') {
-    return true;
+    sources.push({
+      id: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+      svg: validateSvgMarkup(state.customSvg).valid
+        ? mergeSvgCss(state.customSvg, state.customSvgCss)
+        : null,
+      throwOnFailure: true,
+    });
   }
 
-  return Boolean(
-    state.decorators?.some(
+  for (const [id, image] of Object.entries(state.customSymbolImages ?? {})) {
+    sources.push({
+      id,
+      svg: image.svg,
+      throwOnFailure: false,
+    });
+  }
+
+  if (
+    (state.decorators ?? []).some(
       (decorator) =>
         decorator.kind === 'symbol' &&
         decorator.imageId === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
-    ),
+    ) &&
+    !sources.some((source) => source.id === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)
+  ) {
+    sources.push({
+      id: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+      svg: validateSvgMarkup(state.customSvg).valid
+        ? mergeSvgCss(state.customSvg, state.customSvgCss)
+        : null,
+      throwOnFailure: true,
+    });
+  }
+
+  return sources;
+}
+
+function isAdvancedCustomSymbolImageId(imageId: string): boolean {
+  return (
+    imageId === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID ||
+    imageId.startsWith(ADVANCED_SAVED_CUSTOM_SYMBOL_IMAGE_ID_PREFIX)
   );
+}
+
+function captureSavedCustomSymbolDecorator(
+  state: AdvancedDecoratorState,
+  decorator: LineDecoratorOptions,
+  customSymbolImages: Record<string, { svg: string }>,
+): LineDecoratorOptions {
+  if (decorator.kind !== 'symbol' || decorator.imageId !== ADVANCED_CUSTOM_SYMBOL_IMAGE_ID) {
+    return decorator;
+  }
+
+  const imageId = getNextSavedCustomSymbolImageId(state);
+  customSymbolImages[imageId] = {
+    svg: mergeSvgCss(state.customSvg, state.customSvgCss),
+  };
+
+  return {
+    ...decorator,
+    imageId,
+  };
+}
+
+function getNextSavedCustomSymbolImageId(state: AdvancedDecoratorState): string {
+  const reservedIds = new Set([
+    ...Object.keys(state.customSymbolImages ?? {}),
+    ...(state.decorators ?? [])
+      .filter((decorator): decorator is LineDecoratorOptions & { kind: 'symbol' } =>
+        decorator.kind === 'symbol',
+      )
+      .map((decorator) => decorator.imageId),
+  ]);
+  let index = 1;
+
+  while (reservedIds.has(`${ADVANCED_SAVED_CUSTOM_SYMBOL_IMAGE_ID_PREFIX}${index}`)) {
+    index++;
+  }
+
+  return `${ADVANCED_SAVED_CUSTOM_SYMBOL_IMAGE_ID_PREFIX}${index}`;
+}
+
+function pruneCustomSymbolImages(
+  customSymbolImages: AdvancedDecoratorState['customSymbolImages'],
+  decorators: LineDecoratorOptions[],
+): AdvancedDecoratorState['customSymbolImages'] {
+  if (!customSymbolImages) {
+    return undefined;
+  }
+
+  const usedImageIds = new Set(
+    decorators
+      .filter((decorator): decorator is LineDecoratorOptions & { kind: 'symbol' } =>
+        decorator.kind === 'symbol',
+      )
+      .map((decorator) => decorator.imageId),
+  );
+  const nextImages = Object.fromEntries(
+    Object.entries(customSymbolImages).filter(([imageId]) => usedImageIds.has(imageId)),
+  );
+
+  return emptyToUndefined(nextImages);
+}
+
+function emptyToUndefined<T>(record: Record<string, T>): Record<string, T> | undefined {
+  return Object.keys(record).length ? record : undefined;
 }
 
 export function validateSvgMarkup(svg: string): AdvancedSvgValidationResult {
