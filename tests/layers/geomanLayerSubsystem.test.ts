@@ -160,6 +160,30 @@ describe('GeomanLayerSubsystem', () => {
     expect(map.sources.values().next().value?.tiles[0]).toContain('/second?url=');
   });
 
+  test('refreshes a raster source when transformed tile URL changes', () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+
+    layers.addRasterLayer(
+      {
+        id: 'external-wms-nuts',
+        name: 'NUTS boundaries',
+        url: 'https://example.test/wms?service=WMS&request=GetMap&layers=nuts',
+      },
+      {
+        basemapLayerId: 'base',
+        transformTileUrl: (url) => `/proxy-a?url=${encodeURIComponent(url)}`,
+      },
+    );
+
+    layers.syncRasterLayers({
+      basemapLayerId: 'base',
+      transformTileUrl: (url) => `/proxy-b?url=${encodeURIComponent(url)}`,
+    });
+
+    expect(map.sources.values().next().value?.tiles[0]).toContain('/proxy-b?url=');
+    expect(map.orderedLayerIds).toEqual(['base', 'external-wms-nuts', 'gm_main-fill']);
+  });
+
   test('discovers WMS layers with an injectable request URL transformer', async () => {
     const { layers } = createLayerSubsystem();
     const fetchFn = vi.fn(async () => ({

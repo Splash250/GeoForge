@@ -337,11 +337,17 @@ export function syncRasterLayers(
 
   for (const layer of [...layers].reverse()) {
     const sourceId = getRasterSourceId(layer.id);
+    const tileUrl = options.transformTileUrl?.(layer.url) ?? layer.url;
+    const existingSource = map.getSource(sourceId) as { tiles?: string[] } | undefined;
+
+    if (existingSource && existingSource.tiles?.[0] !== tileUrl) {
+      removeRasterLayerFromMap(map, layer.id);
+    }
 
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
         type: 'raster',
-        tiles: [options.transformTileUrl?.(layer.url) ?? layer.url],
+        tiles: [tileUrl],
         tileSize: defaultRasterTileSize,
       });
     }
