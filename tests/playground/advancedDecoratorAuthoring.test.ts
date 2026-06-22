@@ -1,9 +1,16 @@
 import { describe, expect, test } from 'vitest';
 import {
+  addAdvancedDecorator,
   buildDecoratorFromAdvancedState,
+  clearAdvancedDecorators,
   createAdvancedDecoratorState,
+  getAdvancedDecoratorCode,
+  getAdvancedDecoratorLineFeature,
   mergeSvgCss,
   parseIterationCount,
+  removeAdvancedDecorator,
+  syncAdvancedDecorators,
+  type AdvancedDecoratorSyncTarget,
   validateSvgMarkup,
   type AdvancedDecoratorState,
 } from '../../examples/playground/src/demo-studio/demos/line-decorators/advancedDecoratorAuthoring.ts';
@@ -305,5 +312,221 @@ describe('advanced decorator authoring helpers', () => {
       animationDirection: 'normal',
       animationEasing: 'linear',
     });
+  });
+
+  test('builds a seeded line import feature with style and state decorators', () => {
+    const decorators = [
+      buildDecoratorFromAdvancedState({
+        ...createAdvancedDecoratorState(),
+        kind: 'text',
+        text: 'FLOW',
+      }),
+    ];
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      lineStyle: {
+        color: '#be123c',
+        width: 9,
+        opacity: 0.64,
+      },
+      decorators,
+    };
+
+    expect(getAdvancedDecoratorLineFeature(state)).toEqual({
+      type: 'Feature',
+      id: 'advanced-decorator-line',
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [19.025, 47.491],
+          [19.04, 47.497],
+          [19.055, 47.493],
+          [19.071, 47.501],
+        ],
+      },
+      properties: {
+        lineColor: '#be123c',
+        lineWidth: 9,
+        lineOpacity: 0.64,
+        decorators,
+      },
+    });
+  });
+
+  test('falls back to the authored decorator when a line feature has no decorator list', () => {
+    const state = {
+      ...createAdvancedDecoratorState(),
+      kind: 'arrowhead' as const,
+      arrowColor: '#2563eb',
+    };
+
+    expect(getAdvancedDecoratorLineFeature(state).properties?.decorators).toEqual([
+      buildDecoratorFromAdvancedState(state),
+    ]);
+  });
+
+  test('builds an advanced decorator code snippet with import and sync calls', () => {
+    const state = {
+      ...createAdvancedDecoratorState(),
+      layerPosition: 'below-lines' as const,
+      decorators: [
+        buildDecoratorFromAdvancedState({
+          ...createAdvancedDecoratorState(),
+          kind: 'symbol',
+          symbolColor: '#123456',
+        }),
+      ],
+    };
+    const code = getAdvancedDecoratorCode(state);
+
+    expect(code).toContain('geoForge.features.importGeoJson(lineFeature');
+    expect(code).toContain('geoForge.decorators.lines.configure({ layerPosition: "below-lines" });');
+    expect(code).toContain('geoForge.decorators.lines.syncFromFeatures(features, (feature) =>');
+    expect(code).toContain('feature.properties?.decorators');
+    expect(code).toContain('"decorators"');
+  });
+
+  test('adds, removes, and clears decorators without mutating the original state', () => {
+    const state = createAdvancedDecoratorState();
+    const first = buildDecoratorFromAdvancedState(state);
+    const second = buildDecoratorFromAdvancedState({ ...state, kind: 'text', text: 'FLOW' });
+
+    const withFirst = addAdvancedDecorator(state, first);
+    const withSecond = addAdvancedDecorator(withFirst, second);
+    const withoutFirst = removeAdvancedDecorator(withSecond, 0);
+    const afterOutOfRangeRemove = removeAdvancedDecorator(withSecond, 20);
+    const cleared = clearAdvancedDecorators(withSecond);
+
+    expect(state).not.toHaveProperty('decorators');
+    expect(withFirst.decorators).toEqual([first]);
+    expect(withSecond.decorators).toEqual([first, second]);
+    expect(withoutFirst.decorators).toEqual([second]);
+    expect(afterOutOfRangeRemove).toEqual(withSecond);
+    expect(afterOutOfRangeRemove).not.toBe(withSecond);
+    expect(cleared.decorators).toEqual([]);
+  });
+
+  test('clones added decorators so later nested mutations do not change state', () => {
+    const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const nextState = addAdvancedDecorator(createAdvancedDecoratorState(), decorator);
+
+    if (decorator.kind === 'symbol' && decorator.rotate) {
+      decorator.rotate.angle = 45;
+    }
+
+    expect(nextState.decorators?.[0]).toMatchObject({
+      kind: 'symbol',
+      rotate: { mode: 'line', angle: -90 },
+    });
+  });
+
+  test('clones surviving decorators when removing from state', () => {
+    const first = buildDecoratorFromAdvancedState({
+      ...createAdvancedDecoratorState(),
+      kind: 'text',
+      text: 'FLOW',
+    });
+    const second = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      decorators: [first, second],
+    };
+    const nextState = removeAdvancedDecorator(state, 0);
+
+    const survivingDecorator = state.decorators?.[1];
+    if (survivingDecorator?.kind === 'symbol' && survivingDecorator.rotate) {
+      survivingDecorator.rotate.angle = 45;
+    }
+
+    expect(nextState.decorators?.[0]).toMatchObject({
+      kind: 'symbol',
+      rotate: { mode: 'line', angle: -90 },
+    });
+  });
+
+  test('clones line feature decorators so later nested mutations do not change output', () => {
+    const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const feature = getAdvancedDecoratorLineFeature({
+      ...createAdvancedDecoratorState(),
+      decorators: [decorator],
+    });
+
+    if (decorator.kind === 'symbol' && decorator.rotate) {
+      decorator.rotate.angle = 45;
+    }
+
+    expect(feature.properties.decorators[0]).toMatchObject({
+      kind: 'symbol',
+      rotate: { mode: 'line', angle: -90 },
+    });
+  });
+
+  test('sync adapter configures layer position and syncs decorators from features', () => {
+    const decorators = [buildDecoratorFromAdvancedState(createAdvancedDecoratorState())];
+    const feature = getAdvancedDecoratorLineFeature({
+      ...createAdvancedDecoratorState(),
+      decorators,
+    });
+    const calls: unknown[] = [];
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: (options) => calls.push(['configure', options]),
+          syncFromFeatures: (features, getDecorators) =>
+            calls.push(['syncFromFeatures', features, getDecorators(feature)]),
+        },
+      },
+    };
+
+    syncAdvancedDecorators({
+      geoForge,
+      state: {
+        ...createAdvancedDecoratorState(),
+        layerPosition: 'below-lines',
+      },
+      features: [feature],
+    });
+
+    expect(calls).toEqual([
+      ['configure', { layerPosition: 'below-lines' }],
+      ['syncFromFeatures', [feature], decorators],
+    ]);
+  });
+
+  test('sync adapter clones feature decorators before returning them to GeoForge', () => {
+    const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const feature = getAdvancedDecoratorLineFeature({
+      ...createAdvancedDecoratorState(),
+      decorators: [decorator],
+    });
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    syncAdvancedDecorators({
+      geoForge,
+      state: createAdvancedDecoratorState(),
+      features: [feature],
+    });
+
+    const firstDecorator = feature.properties.decorators[0];
+    if (firstDecorator?.kind === 'symbol' && firstDecorator.rotate) {
+      firstDecorator.rotate.angle = 45;
+    }
+
+    expect(resolvedDecorators).toMatchObject([
+      {
+        kind: 'symbol',
+        rotate: { mode: 'line', angle: -90 },
+      },
+    ]);
   });
 });

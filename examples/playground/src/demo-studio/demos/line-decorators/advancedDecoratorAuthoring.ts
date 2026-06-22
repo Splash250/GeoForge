@@ -2,6 +2,7 @@ import type {
   ArrowFrequencyUnit,
   ArrowOffsetUnit,
   ArrowSizeUnit,
+  GeoJsonImportFeature,
   LineDecoratorAnimationDirection,
   LineDecoratorAnimationEasing,
   LineDecoratorAnimationOptions,
@@ -25,6 +26,20 @@ export type AdvancedLineStyleState = {
   color: string;
   width: number;
   opacity: number;
+};
+
+export type AdvancedDecoratorLineFeature = GeoJsonImportFeature & {
+  id: 'advanced-decorator-line';
+  geometry: {
+    type: 'LineString';
+    coordinates: [number, number][];
+  };
+  properties: {
+    lineColor: string;
+    lineWidth: number;
+    lineOpacity: number;
+    decorators: LineDecoratorOptions[];
+  };
 };
 
 export type AdvancedSvgValidationResult =
@@ -91,6 +106,25 @@ export type AdvancedDecoratorState = {
   animationIterationCount: string;
   animationDirection: LineDecoratorAnimationDirection;
   animationEasing: LineDecoratorAnimationEasing;
+  decorators?: LineDecoratorOptions[];
+};
+
+export type AdvancedDecoratorSyncTarget = {
+  decorators: {
+    lines: {
+      configure: (options: { layerPosition: AdvancedDecoratorLayerPosition }) => void;
+      syncFromFeatures: (
+        features: GeoJsonImportFeature[],
+        resolveDecorators: (feature: GeoJsonImportFeature) => LineDecoratorOptions[],
+      ) => void;
+    };
+  };
+};
+
+export type SyncAdvancedDecoratorsOptions = {
+  geoForge: AdvancedDecoratorSyncTarget;
+  state: AdvancedDecoratorState;
+  features: GeoJsonImportFeature[];
 };
 
 const DEFAULT_LINE_STYLE: AdvancedLineStyleState = {
@@ -110,6 +144,13 @@ const DEFAULT_CUSTOM_SVG_CSS = `.mark {
   stroke-linecap: round;
   stroke-linejoin: round;
 }`;
+
+const ADVANCED_DECORATOR_LINE_COORDINATES: [number, number][] = [
+  [19.025, 47.491],
+  [19.04, 47.497],
+  [19.055, 47.493],
+  [19.071, 47.501],
+];
 
 export function createAdvancedDecoratorState(): AdvancedDecoratorState {
   return {
@@ -159,6 +200,85 @@ export function createAdvancedDecoratorState(): AdvancedDecoratorState {
     animationDirection: 'normal',
     animationEasing: 'linear',
   };
+}
+
+export function getAdvancedDecoratorLineFeature(
+  state: AdvancedDecoratorState,
+): AdvancedDecoratorLineFeature {
+  return {
+    type: 'Feature',
+    id: 'advanced-decorator-line',
+    geometry: {
+      type: 'LineString',
+      coordinates: ADVANCED_DECORATOR_LINE_COORDINATES.map(([lng, lat]) => [lng, lat]),
+    },
+    properties: {
+      lineColor: state.lineStyle.color,
+      lineWidth: state.lineStyle.width,
+      lineOpacity: state.lineStyle.opacity,
+      decorators: getAdvancedDecorators(state),
+    },
+  };
+}
+
+export function getAdvancedDecoratorCode(state: AdvancedDecoratorState): string {
+  const lineFeatureJson = JSON.stringify(getAdvancedDecoratorLineFeature(state), null, 2);
+  const layerPositionJson = JSON.stringify(state.layerPosition);
+
+  return `const lineFeature = ${lineFeatureJson};
+const importResult = geoForge.features.importGeoJson(lineFeature, { overwrite: true });
+const features = importResult.addedFeatures.map((featureData) => featureData.getGeoJson());
+
+geoForge.decorators.lines.configure({ layerPosition: ${layerPositionJson} });
+geoForge.decorators.lines.syncFromFeatures(features, (feature) =>
+  Array.isArray(feature.properties?.decorators) ? feature.properties.decorators : []
+);`;
+}
+
+export function addAdvancedDecorator(
+  state: AdvancedDecoratorState,
+  decorator: LineDecoratorOptions,
+): AdvancedDecoratorState {
+  return {
+    ...state,
+    decorators: [...(state.decorators ?? []).map(cloneLineDecorator), cloneLineDecorator(decorator)],
+  };
+}
+
+export function removeAdvancedDecorator(
+  state: AdvancedDecoratorState,
+  index: number,
+): AdvancedDecoratorState {
+  return {
+    ...state,
+    decorators: (state.decorators ?? [])
+      .filter((_, decoratorIndex) => decoratorIndex !== index)
+      .map(cloneLineDecorator),
+  };
+}
+
+export function clearAdvancedDecorators(state: AdvancedDecoratorState): AdvancedDecoratorState {
+  return {
+    ...state,
+    decorators: [],
+  };
+}
+
+export function syncAdvancedDecorators({
+  geoForge,
+  state,
+  features,
+}: SyncAdvancedDecoratorsOptions): void {
+  geoForge.decorators.lines.configure({ layerPosition: state.layerPosition });
+  geoForge.decorators.lines.syncFromFeatures(features, (feature) =>
+    resolveAdvancedDecoratorFeatureDecorators(feature, state),
+  );
+}
+
+function getAdvancedDecorators(state: AdvancedDecoratorState): LineDecoratorOptions[] {
+  return state.decorators
+    ? state.decorators.map(cloneLineDecorator)
+    : [cloneLineDecorator(buildDecoratorFromAdvancedState(state))];
 }
 
 export function validateSvgMarkup(svg: string): AdvancedSvgValidationResult {
@@ -393,4 +513,21 @@ function validateSvgMarkupWithoutDomParser(svg: string): AdvancedSvgValidationRe
   return stack.length === 0
     ? { valid: true, message: 'Live' }
     : { valid: false, message: 'Invalid SVG' };
+}
+
+function resolveAdvancedDecoratorFeatureDecorators(
+  feature: GeoJsonImportFeature,
+  state: AdvancedDecoratorState,
+): LineDecoratorOptions[] {
+  return Array.isArray(feature.properties?.decorators)
+    ? (feature.properties.decorators as LineDecoratorOptions[]).map(cloneLineDecorator)
+    : getAdvancedDecorators(state);
+}
+
+function cloneLineDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(decorator) as LineDecoratorOptions;
+  }
+
+  return JSON.parse(JSON.stringify(decorator)) as LineDecoratorOptions;
 }
