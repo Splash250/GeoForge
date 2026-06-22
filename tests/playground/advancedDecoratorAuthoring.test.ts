@@ -717,6 +717,92 @@ describe('advanced decorator authoring helpers', () => {
     expect(calls).toEqual([]);
     expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
   });
+
+  test('custom SVG image manager removes a registered image when current SVG is invalid', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const invalidState: AdvancedDecoratorState = {
+      ...validState,
+      customSvg: '<span>not svg</span>',
+    };
+
+    await imageManager.ensure(map, validState);
+    await imageManager.ensure(map, invalidState);
+
+    expect(calls).toEqual([
+      [
+        'addImage',
+        ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+        {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>',
+        },
+      ],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+    ]);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
+
+  test('custom SVG image manager removes a registered image when changed SVG loading fails', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const validSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>';
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => {
+      if (svg !== validSvg) {
+        throw new Error('decode failed');
+      }
+
+      return { svg };
+    });
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const failingState: AdvancedDecoratorState = {
+      ...validState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+
+    await imageManager.ensure(map, validState);
+    await expect(imageManager.ensure(map, failingState)).rejects.toThrow('decode failed');
+
+    expect(calls).toEqual([
+      ['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: validSvg }],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+    ]);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
 });
 
 type Deferred<T> = {

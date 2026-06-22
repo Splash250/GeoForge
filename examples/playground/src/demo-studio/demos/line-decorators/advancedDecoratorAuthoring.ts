@@ -327,6 +327,18 @@ export function createAdvancedCustomSvgImageManager<TImage>(
 ) {
   let registeredSvg: string | undefined;
 
+  function isCurrent(options: AdvancedCustomSvgEnsureOptions): boolean {
+    return options.isCurrent ? options.isCurrent() : true;
+  }
+
+  function removeRegisteredImage(map: AdvancedCustomSvgImageTarget<TImage>): void {
+    if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID) && map.removeImage) {
+      map.removeImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
+    }
+
+    registeredSvg = undefined;
+  }
+
   return {
     async ensure(
       map: AdvancedCustomSvgImageTarget<TImage>,
@@ -334,10 +346,18 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       options: AdvancedCustomSvgEnsureOptions = {},
     ): Promise<void> {
       if (state.kind !== 'symbol' || state.symbolPreset !== 'custom') {
+        if (isCurrent(options)) {
+          removeRegisteredImage(map);
+        }
+
         return;
       }
 
       if (!validateSvgMarkup(state.customSvg).valid) {
+        if (isCurrent(options)) {
+          removeRegisteredImage(map);
+        }
+
         return;
       }
 
@@ -347,9 +367,19 @@ export function createAdvancedCustomSvgImageManager<TImage>(
         return;
       }
 
-      const image = await loadImage(svg);
+      let image: TImage;
+      try {
+        image = await loadImage(svg);
+      } catch (error) {
+        if (isCurrent(options)) {
+          removeRegisteredImage(map);
+          throw error;
+        }
 
-      if (options.isCurrent && !options.isCurrent()) {
+        return;
+      }
+
+      if (!isCurrent(options)) {
         return;
       }
 
@@ -368,11 +398,7 @@ export function createAdvancedCustomSvgImageManager<TImage>(
     },
 
     cleanup(map: AdvancedCustomSvgImageTarget<TImage>): void {
-      if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID) && map.removeImage) {
-        map.removeImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
-      }
-
-      registeredSvg = undefined;
+      removeRegisteredImage(map);
     },
   };
 }
