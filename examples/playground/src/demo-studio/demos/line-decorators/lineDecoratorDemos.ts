@@ -155,26 +155,39 @@ export const lineDecoratorDemos: DemoDefinition[] = [
       let state = createAdvancedDecoratorState();
       let syncVersion = 0;
       const customSvgImageManager = createAdvancedCustomSvgImageManager(svgToImage);
+      const isLatestSetup = () => !context.signal.aborted && context.isCurrent();
+      const emptyTeardown = () => ({ teardown: () => {} });
+      const cleanupAndEmptyTeardown = () => {
+        customSvgImageManager.cleanup(map);
+        return emptyTeardown();
+      };
 
-      if (context.signal.aborted || !context.isCurrent()) {
-        return { teardown: () => {} };
+      if (!isLatestSetup()) {
+        return emptyTeardown();
       }
 
       await ensureBaseSymbolImages(map);
-      await customSvgImageManager.ensure(map, state);
+      await customSvgImageManager.ensure(map, state, { isCurrent: isLatestSetup });
 
-      if (context.signal.aborted || !context.isCurrent()) {
-        return { teardown: () => {} };
+      if (!isLatestSetup()) {
+        return cleanupAndEmptyTeardown();
       }
 
-      const importResult = runWithoutHistory(geoForge, () =>
-        geoForge.features.importGeoJson(getAdvancedDecoratorLineFeature(state), {
-          overwrite: true,
-        }),
-      );
+      let importResult: ReturnType<typeof geoForge.features.importGeoJson>;
+      try {
+        importResult = runWithoutHistory(geoForge, () =>
+          geoForge.features.importGeoJson(getAdvancedDecoratorLineFeature(state), {
+            overwrite: true,
+          }),
+        );
+      } catch (error) {
+        customSvgImageManager.cleanup(map);
+        throw error;
+      }
       const importedLineFeatures = importResult.addedFeatures;
 
       if (!importedLineFeatures.length) {
+        customSvgImageManager.cleanup(map);
         const message = `Unable to import advanced decorator line (${importResult.stats.success}/${importResult.stats.total} features imported).`;
         context.notify({
           title: 'Advanced line import failed',
