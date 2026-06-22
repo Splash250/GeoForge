@@ -8,14 +8,14 @@
     code?: string;
   };
 
-  let { state, code = '' }: AdvancedDecoratorJsonPanelProps = $props();
+  let { state: panelState, code = '' }: AdvancedDecoratorJsonPanelProps = $props();
 
   let copied = $state<'feature' | 'decorators' | 'code' | null>(null);
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const featureJson = $derived(JSON.stringify(getAdvancedDecoratorLineFeature(state), null, 2));
+  const featureJson = $derived(JSON.stringify(getAdvancedDecoratorLineFeature(panelState), null, 2));
   const decoratorsJson = $derived(
-    JSON.stringify(getAdvancedDecoratorLineFeature(state).properties.decorators, null, 2),
+    JSON.stringify(getAdvancedDecoratorLineFeature(panelState).properties.decorators, null, 2),
   );
 
   async function copyValue(kind: 'feature' | 'decorators' | 'code', value: string) {
