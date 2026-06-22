@@ -2,6 +2,7 @@
 import {
   GeomanLayerSubsystem,
   buildRasterCapabilitiesRequestUrl,
+  normalizeRasterTileUrl,
   parseRasterCapabilities,
 } from '@/layers/index.ts';
 import { describe, expect, test, vi } from 'vitest';
@@ -79,6 +80,111 @@ function createLayerSubsystem(map = createMapStub(['base', 'gm_main-fill'])) {
 }
 
 describe('GeomanLayerSubsystem', () => {
+  test('uses configured raster defaults for discovery and layer sync', async () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => `<?xml version="1.0"?>
+        <WMS_Capabilities version="1.3.0">
+          <Capability>
+            <Layer>
+              <Layer>
+                <Name>nuts</Name>
+                <Title>NUTS</Title>
+              </Layer>
+            </Layer>
+          </Capability>
+        </WMS_Capabilities>`,
+    }));
+
+    layers.configureRasterLayers({
+      basemapLayerId: 'base',
+      fetchFn,
+      transformRequestUrl: (url) => `/capabilities?url=${encodeURIComponent(url)}`,
+      transformTileUrl: (url) => `/tiles?url=${encodeURIComponent(url)}`,
+    });
+
+    const discovered = await layers.discoverRasterLayers('https://example.test/wms?service=WMS');
+    layers.addRasterLayer({ name: discovered[0]!.title, url: discovered[0]!.url });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/capabilities?url=https%3A%2F%2Fexample.test%2Fwms%3Fservice%3DWMS%26request%3DGetCapabilities',
+    );
+    expect(map.orderedLayerIds).toEqual([
+      'base',
+      expect.stringMatching(/^gm-raster-layer-/),
+      'gm_main-fill',
+    ]);
+    expect(map.sources.values().next().value?.tiles[0]).toContain('/tiles?url=');
+  });
+
+  test('lets per-call raster sync options override configured defaults', () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'labels', 'gm_main-fill']));
+
+    layers.configureRasterLayers({ basemapLayerId: 'base' });
+    layers.addRasterLayer(
+      {
+        name: 'NUTS boundaries',
+        url: 'https://example.test/wms?service=WMS&request=GetMap&layers=nuts',
+      },
+      { basemapLayerId: 'labels' },
+    );
+
+    expect(map.orderedLayerIds).toEqual([
+      'base',
+      'labels',
+      expect.stringMatching(/^gm-raster-layer-/),
+      'gm_main-fill',
+    ]);
+  });
+
+  test('resyncs existing raster layers when configured defaults change', () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'labels']));
+
+    layers.configureRasterLayers({
+      basemapLayerId: 'base',
+      transformTileUrl: (url) => `/first?url=${encodeURIComponent(url)}`,
+    });
+    layers.addRasterLayer({
+      id: 'external-wms-nuts',
+      name: 'NUTS boundaries',
+      url: 'https://example.test/wms?service=WMS&request=GetMap&layers=nuts',
+    });
+
+    layers.configureRasterLayers({
+      basemapLayerId: 'labels',
+      transformTileUrl: (url) => `/second?url=${encodeURIComponent(url)}`,
+    });
+
+    expect(map.orderedLayerIds).toEqual(['base', 'labels', 'external-wms-nuts']);
+    expect(map.sources.values().next().value?.tiles[0]).toContain('/second?url=');
+  });
+
+  test('refreshes a raster source when transformed tile URL changes', () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+
+    layers.addRasterLayer(
+      {
+        id: 'external-wms-nuts',
+        name: 'NUTS boundaries',
+        url: 'https://example.test/wms?service=WMS&request=GetMap&layers=nuts',
+      },
+      {
+        basemapLayerId: 'base',
+        transformTileUrl: (url) => `/proxy-a?url=${encodeURIComponent(url)}`,
+      },
+    );
+
+    layers.syncRasterLayers({
+      basemapLayerId: 'base',
+      transformTileUrl: (url) => `/proxy-b?url=${encodeURIComponent(url)}`,
+    });
+
+    expect(map.sources.values().next().value?.tiles[0]).toContain('/proxy-b?url=');
+    expect(map.orderedLayerIds).toEqual(['base', 'external-wms-nuts', 'gm_main-fill']);
+  });
+
   test('discovers WMS layers with an injectable request URL transformer', async () => {
     const { layers } = createLayerSubsystem();
     const fetchFn = vi.fn(async () => ({
@@ -111,6 +217,7 @@ describe('GeomanLayerSubsystem', () => {
     expect(discovered).toEqual([
       expect.objectContaining({
         name: 'hotmaps:nuts',
+        service: 'WMS',
         title: 'NUTS boundaries',
       }),
     ]);
@@ -166,6 +273,24 @@ describe('GeomanLayerSubsystem', () => {
     );
 
     expect(layers.getRasterLayers().map((layer) => layer.name)).toEqual(['Layer A', 'Layer B']);
+  });
+
+  test('generates unique ids for duplicate layer names added in one batch', () => {
+    const { layers } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+
+    layers.addRasterLayers(
+      [
+        { name: 'Duplicate', url: 'https://example.test/a/{z}/{x}/{y}.png' },
+        { name: 'Duplicate', url: 'https://example.test/b/{z}/{x}/{y}.png' },
+      ],
+      { basemapLayerId: 'base' },
+    );
+
+    const stored = layers.getRasterLayers();
+
+    expect(stored).toHaveLength(2);
+    expect(new Set(stored.map((layer) => layer.id)).size).toBe(2);
+    expect(stored.every((layer) => layer.id.startsWith('gm-raster-layer-duplicate-'))).toBe(true);
   });
 
   test('removes caller-supplied raster layer ids from the map and source registry', () => {
@@ -255,6 +380,47 @@ describe('raster layer helpers', () => {
     ).toBe('https://example.test/wms?service=WMS&request=GetCapabilities');
   });
 
+  test('preserves service routing params when building a WMS capabilities URL', () => {
+    expect(
+      buildRasterCapabilitiesRequestUrl(
+        'https://maps.example.test/wms?map=/srv/city.map&token=abc123&service=WMS&request=GetMap&layers=roads&bbox=1,2,3,4&width=256&height=256',
+      ),
+    ).toBe(
+      'https://maps.example.test/wms?map=%2Fsrv%2Fcity.map&token=abc123&service=WMS&request=GetCapabilities',
+    );
+  });
+
+  test('preserves service routing params when building a WMTS capabilities URL', () => {
+    expect(
+      buildRasterCapabilitiesRequestUrl(
+        'https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetTile&layer=population&tilematrix=4&tilerow=5&tilecol=6',
+      ),
+    ).toBe('https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities');
+  });
+
+  test('infers WMTS service from cased request params when building a capabilities URL', () => {
+    expect(
+      buildRasterCapabilitiesRequestUrl(
+        'https://tiles.example.test/wmts?tenant=demo&SERVICE=WMTS&REQUEST=GetTile&LAYER=population&TILEMATRIX=4&TILEROW=5&TILECOL=6',
+      ),
+    ).toBe('https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities');
+  });
+
+  test('normalizes direct WMS tile URLs with cased service params', () => {
+    const url = normalizeRasterTileUrl(
+      'https://example.test/wms?SERVICE=WMS&REQUEST=GetMap&LAYERS=nuts',
+    );
+
+    expect(url).toContain('service=WMS');
+    expect(url).toContain('request=GetMap');
+    expect(url).toContain('LAYERS=nuts');
+    expect(url).toContain('bbox={bbox-epsg-3857}');
+    expect(url).toContain('width=256');
+    expect(url).toContain('height=256');
+    expect(decodeURIComponent(url)).toContain('crs=EPSG:3857');
+    expect(decodeURIComponent(url)).toContain('srs=EPSG:3857');
+  });
+
   test('parses WMTS ResourceURL templates into MapLibre tiles', () => {
     const layers = parseRasterCapabilities(
       `<?xml version="1.0"?>
@@ -272,11 +438,77 @@ describe('raster layer helpers', () => {
 
     expect(layers).toEqual([
       {
+        format: 'image/png',
         name: 'population',
+        service: 'WMTS',
+        style: 'default',
+        tileMatrixSet: 'EPSG:3857',
         title: 'Population',
         url: 'https://tiles.test/{z}/{y}/{x}.png',
       },
     ]);
+  });
+
+  test('builds WMTS KVP URLs from advertised style format and matrix set', () => {
+    const layers = parseRasterCapabilities(
+      `<?xml version="1.0"?>
+      <Capabilities xmlns="http://www.opengis.net/wmts/1.0">
+        <Contents>
+          <Layer>
+            <Title>Population</Title>
+            <Identifier>population</Identifier>
+            <Style isDefault="true">
+              <Identifier>bright</Identifier>
+            </Style>
+            <Format>image/jpeg</Format>
+            <TileMatrixSetLink>
+              <TileMatrixSet>GoogleMapsCompatible</TileMatrixSet>
+            </TileMatrixSetLink>
+          </Layer>
+        </Contents>
+      </Capabilities>`,
+      'https://tiles.test/wmts?service=WMTS&request=GetCapabilities',
+    );
+
+    expect(layers[0]).toEqual(
+      expect.objectContaining({
+        service: 'WMTS',
+        format: 'image/jpeg',
+        style: 'bright',
+        tileMatrixSet: 'GoogleMapsCompatible',
+      }),
+    );
+    expect(layers[0]?.url).toContain('style=bright');
+    expect(layers[0]?.url).toContain('format=image%2Fjpeg');
+    expect(layers[0]?.url).toContain('tilematrixset=GoogleMapsCompatible');
+  });
+
+  test('substitutes WMTS ResourceURL style and matrix set placeholders', () => {
+    const layers = parseRasterCapabilities(
+      `<?xml version="1.0"?>
+      <Capabilities xmlns="http://www.opengis.net/wmts/1.0">
+        <Contents>
+          <Layer>
+            <Title>Population</Title>
+            <Identifier>population</Identifier>
+            <Style isDefault="true">
+              <Identifier>bright</Identifier>
+            </Style>
+            <TileMatrixSetLink>
+              <TileMatrixSet>GoogleMapsCompatible</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL resourceType="tile" template="https://tiles.test/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png" />
+          </Layer>
+        </Contents>
+      </Capabilities>`,
+      'https://tiles.test/wmts?service=WMTS&request=GetCapabilities',
+    );
+
+    expect(layers[0]?.url).toBe(
+      'https://tiles.test/bright/GoogleMapsCompatible/{z}/{y}/{x}.png',
+    );
+    expect(layers[0]?.url).not.toContain('{Style}');
+    expect(layers[0]?.url).not.toContain('{TileMatrixSet}');
   });
 
   test('resolves WMS GetMap OnlineResource endpoints from capabilities', () => {
