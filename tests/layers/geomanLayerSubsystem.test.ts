@@ -249,6 +249,24 @@ describe('GeomanLayerSubsystem', () => {
     expect(layers.getRasterLayers().map((layer) => layer.name)).toEqual(['Layer A', 'Layer B']);
   });
 
+  test('generates unique ids for duplicate layer names added in one batch', () => {
+    const { layers } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+
+    layers.addRasterLayers(
+      [
+        { name: 'Duplicate', url: 'https://example.test/a/{z}/{x}/{y}.png' },
+        { name: 'Duplicate', url: 'https://example.test/b/{z}/{x}/{y}.png' },
+      ],
+      { basemapLayerId: 'base' },
+    );
+
+    const stored = layers.getRasterLayers();
+
+    expect(stored).toHaveLength(2);
+    expect(new Set(stored.map((layer) => layer.id)).size).toBe(2);
+    expect(stored.every((layer) => layer.id.startsWith('gm-raster-layer-duplicate-'))).toBe(true);
+  });
+
   test('removes caller-supplied raster layer ids from the map and source registry', () => {
     const { layers, map } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
 

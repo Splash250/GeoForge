@@ -92,6 +92,7 @@ type RasterMap = {
 export class GeomanLayerSubsystem {
   private rasterLayers: GeomanRasterLayer[] = [];
   private rasterLayerDefaults: RasterLayerDefaults = {};
+  private rasterLayerIdSequence = 0;
 
   constructor(
     private readonly options: {
@@ -159,7 +160,7 @@ export class GeomanLayerSubsystem {
 
       return [
         {
-          id: input.id ?? createRasterLayerId(name),
+          id: input.id ?? this.createRasterLayerId(name),
           name,
           url,
           basemapLayerId: input.basemapLayerId ?? options.basemapLayerId,
@@ -248,6 +249,17 @@ export class GeomanLayerSubsystem {
       ...this.rasterLayerDefaults,
       ...options,
     };
+  }
+
+  private createRasterLayerId(name: string): string {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48);
+
+    this.rasterLayerIdSequence += 1;
+    return `${rasterLayerPrefix}${slug || 'overlay'}-${this.rasterLayerIdSequence.toString(36)}`;
   }
 }
 
@@ -662,16 +674,6 @@ function findElementsByLocalName(root: ParentNode, localName: string): Element[]
 
 function getRasterSourceId(layerId: string): string {
   return `${rasterSourcePrefix}${sanitizeIdSegment(layerId)}`;
-}
-
-function createRasterLayerId(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 48);
-
-  return `${rasterLayerPrefix}${slug || 'overlay'}-${Date.now().toString(36)}`;
 }
 
 function isRasterMap(map: unknown): map is RasterMap {
