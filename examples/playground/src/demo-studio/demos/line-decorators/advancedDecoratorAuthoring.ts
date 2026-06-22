@@ -145,6 +145,10 @@ export type AdvancedCustomSvgImageTarget<TImage = unknown> = {
 
 export type AdvancedSvgImageLoader<TImage = unknown> = (svg: string) => Promise<TImage>;
 
+export type AdvancedCustomSvgEnsureOptions = {
+  isCurrent?: () => boolean;
+};
+
 const DEFAULT_LINE_STYLE: AdvancedLineStyleState = {
   color: '#0f766e',
   width: 6,
@@ -327,6 +331,7 @@ export function createAdvancedCustomSvgImageManager<TImage>(
     async ensure(
       map: AdvancedCustomSvgImageTarget<TImage>,
       state: AdvancedDecoratorState,
+      options: AdvancedCustomSvgEnsureOptions = {},
     ): Promise<void> {
       if (state.kind !== 'symbol' || state.symbolPreset !== 'custom') {
         return;
@@ -343,6 +348,10 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       }
 
       const image = await loadImage(svg);
+
+      if (options.isCurrent && !options.isCurrent()) {
+        return;
+      }
 
       if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)) {
         if (map.updateImage) {

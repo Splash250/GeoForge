@@ -640,4 +640,98 @@ describe('advanced decorator authoring helpers', () => {
       ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
     ]);
   });
+
+  test('custom SVG image manager skips stale async registrations', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const loads = new Map<string, Deferred<{ svg: string }>>();
+    const imageManager = createAdvancedCustomSvgImageManager((svg) => {
+      const deferred = createDeferred<{ svg: string }>();
+      loads.set(svg, deferred);
+      return deferred.promise;
+    });
+    const firstState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const secondState: AdvancedDecoratorState = {
+      ...firstState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+    const firstSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>';
+    const secondSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: blue; }</style><path class="mark"/></svg>';
+
+    const firstEnsure = imageManager.ensure(map, firstState, { isCurrent: () => false });
+    const secondEnsure = imageManager.ensure(map, secondState, { isCurrent: () => true });
+
+    loads.get(secondSvg)?.resolve({ svg: secondSvg });
+    await secondEnsure;
+    loads.get(firstSvg)?.resolve({ svg: firstSvg });
+    await firstEnsure;
+
+    expect(calls).toEqual([['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: secondSvg }]]);
+    expect(images.get(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toEqual({ svg: secondSvg });
+  });
+
+  test('custom SVG image manager propagates loader failures without mutating images', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async () => {
+      throw new Error('decode failed');
+    });
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+
+    await expect(imageManager.ensure(map, state)).rejects.toThrow('decode failed');
+
+    expect(calls).toEqual([]);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
 });
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve: Deferred<T>['resolve'] = () => {};
+  let reject: Deferred<T>['reject'] = () => {};
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}

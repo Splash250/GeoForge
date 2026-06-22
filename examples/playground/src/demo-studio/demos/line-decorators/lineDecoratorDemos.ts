@@ -209,9 +209,33 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         const version = ++syncVersion;
         state = nextState;
         updateInspector(state);
-        await customSvgImageManager.ensure(map, state);
+        const isLatestState = () =>
+          !context.signal.aborted && context.isCurrent() && version === syncVersion;
 
-        if (context.signal.aborted || !context.isCurrent() || version !== syncVersion) {
+        try {
+          await customSvgImageManager.ensure(map, state, { isCurrent: isLatestState });
+        } catch (error) {
+          if (!isLatestState()) {
+            return;
+          }
+
+          const message =
+            error instanceof Error ? error.message : 'Unable to load custom SVG image.';
+          context.logEvent({
+            name: 'line-decorators-advanced-authoring:custom-svg-error',
+            category: 'demo-studio',
+            payload: { message },
+          });
+          context.notify({
+            title: 'Custom SVG failed',
+            body: message,
+            tone: 'error',
+          });
+          syncRuntime(state);
+          return;
+        }
+
+        if (!isLatestState()) {
           return;
         }
 
@@ -223,7 +247,20 @@ export const lineDecoratorDemos: DemoDefinition[] = [
           return;
         }
 
-        void applyState(nextState);
+        void applyState(nextState).catch((error) => {
+          const message =
+            error instanceof Error ? error.message : 'Unable to apply advanced decorator state.';
+          context.logEvent({
+            name: 'line-decorators-advanced-authoring:state-error',
+            category: 'demo-studio',
+            payload: { message },
+          });
+          context.notify({
+            title: 'Advanced decorators failed',
+            body: message,
+            tone: 'error',
+          });
+        });
       };
 
       syncRuntime(state);
