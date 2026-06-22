@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button, CodeBlock, ControlRow, InspectorSection, SegmentedControl } from '../../ui';
+  import { Button, CodeBlock, ControlRow, InspectorSection, SegmentedControl } from '../../ui/index.ts';
 
   export type DrawEditShapeTool =
     | 'marker'

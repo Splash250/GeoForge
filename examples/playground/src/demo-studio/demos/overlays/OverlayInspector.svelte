@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { CodeBlock, ControlRow, InspectorSection, SegmentedControl, ToggleSwitch } from '../../ui';
+  import { CodeBlock, ControlRow, InspectorSection, SegmentedControl, ToggleSwitch } from '../../ui/index.ts';
   import type { HtmlOverlayPointerMode } from 'maplibre-geoforge';
 
   type OverlayDemoState = {

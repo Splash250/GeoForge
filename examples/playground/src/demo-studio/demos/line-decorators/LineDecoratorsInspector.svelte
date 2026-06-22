@@ -7,7 +7,7 @@
     InspectorSection,
     SegmentedControl,
     ToggleSwitch,
-  } from '../../ui';
+  } from '../../ui/index.ts';
   import { createDecoratorFromState, initialLineDecoratorState } from './state.ts';
   import type { DecoratorKind, LayerPosition, LineDecoratorDemoState } from './types.ts';
 

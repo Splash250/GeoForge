@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button, CodeBlock, ControlRow, InspectorSection } from '../../ui';
+  import { Button, CodeBlock, ControlRow, InspectorSection } from '../../ui/index.ts';
 
   export type WorkflowInspectorState = {
     selectedFeatureId: string;

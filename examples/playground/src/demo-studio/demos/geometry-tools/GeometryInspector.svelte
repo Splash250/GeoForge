@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { CodeBlock, ControlRow, InspectorSection } from '../../ui';
+  import { CodeBlock, ControlRow, InspectorSection } from '../../ui/index.ts';
 
   export type GeometryTopologyIssueState = {
     rule: string;

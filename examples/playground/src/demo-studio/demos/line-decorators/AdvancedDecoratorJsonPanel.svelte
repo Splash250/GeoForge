@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button, InspectorSection } from '../../ui';
+  import { Button, InspectorSection } from '../../ui/index.ts';
   import { getAdvancedDecoratorLineFeature, type AdvancedDecoratorState } from './advancedDecoratorAuthoring.ts';
 
   type AdvancedDecoratorJsonPanelProps = {
