@@ -19,14 +19,14 @@
   );
 
   async function copyValue(kind: 'feature' | 'decorators' | 'code', value: string) {
-    const writeText = globalThis.navigator?.clipboard?.writeText;
+    const clipboard = navigator.clipboard;
 
-    if (!writeText) {
+    if (!clipboard?.writeText) {
       return;
     }
 
     try {
-      await writeText.call(globalThis.navigator.clipboard, value);
+      await clipboard.writeText.call(clipboard, value);
       copied = kind;
       clearTimeout(copyResetTimer);
       copyResetTimer = setTimeout(() => {
@@ -45,30 +45,36 @@
     <details open>
       <summary>
         <span>Feature</span>
+      </summary>
+      <div class="copy-action">
         <Button variant="utility" onclick={() => copyValue('feature', featureJson)}>
           {copied === 'feature' ? 'Copied' : 'Copy'}
         </Button>
-      </summary>
+      </div>
       <pre><code>{featureJson}</code></pre>
     </details>
 
     <details>
       <summary>
         <span>Decorators</span>
+      </summary>
+      <div class="copy-action">
         <Button variant="utility" onclick={() => copyValue('decorators', decoratorsJson)}>
           {copied === 'decorators' ? 'Copied' : 'Copy'}
         </Button>
-      </summary>
+      </div>
       <pre><code>{decoratorsJson}</code></pre>
     </details>
 
     <details>
       <summary>
         <span>Runtime snippet</span>
+      </summary>
+      <div class="copy-action">
         <Button variant="utility" onclick={() => copyValue('code', code)}>
           {copied === 'code' ? 'Copied' : 'Copy'}
         </Button>
-      </summary>
+      </div>
       <pre><code>{code}</code></pre>
     </details>
   </div>
@@ -81,6 +87,7 @@
   }
 
   details {
+    position: relative;
     min-width: 0;
     border: 1px solid color-mix(in srgb, var(--gf-line) 72%, #252a31);
     border-radius: var(--gf-radius-card);
@@ -91,9 +98,7 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px;
+    padding: 10px 82px 10px 10px;
     color: var(--gf-text);
     font-size: 12px;
     font-weight: 750;
@@ -107,7 +112,14 @@
     white-space: nowrap;
   }
 
-  summary :global(button) {
+  .copy-action {
+    position: absolute;
+    top: 7px;
+    right: 10px;
+    z-index: 1;
+  }
+
+  .copy-action :global(button) {
     min-height: 28px;
     padding-inline: 10px;
   }
