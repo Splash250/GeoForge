@@ -1,16 +1,11 @@
 <script lang="ts">
-  import {
-    buildRasterCapabilitiesRequestUrl,
-    parseRasterCapabilities,
-    type DiscoveredRasterLayer,
-    type GeomanRasterLayer
-  } from 'maplibre-geoforge';
-  import { buildCustomRasterTileUrl } from './map/customRasterLayers.ts';
+  import type { DiscoveredRasterLayer, GeomanRasterLayer } from 'maplibre-geoforge';
   import { Button, IconButton } from './ui/index.ts';
 
   type CustomRasterLayerPanelProps = {
     layers: GeomanRasterLayer[];
     disabled?: boolean;
+    onDiscover: (url: string) => Promise<DiscoveredRasterLayer[]>;
     onAdd: (input: { name: string; url: string }) => void;
     onAddMany: (layers: Array<{ name: string; url: string }>) => void;
     onMove: (layerId: string, direction: -1 | 1) => void;
@@ -20,6 +15,7 @@
   let {
     layers,
     disabled = false,
+    onDiscover,
     onAdd,
     onAddMany,
     onMove,
@@ -60,14 +56,7 @@
     selectedLayerNames = [];
 
     try {
-      const capabilitiesUrl = buildRasterCapabilitiesRequestUrl(url);
-      const response = await fetch(buildCustomRasterTileUrl(capabilitiesUrl));
-
-      if (!response.ok) {
-        throw new Error(`Capabilities request failed with HTTP ${response.status}.`);
-      }
-
-      const nextLayers = parseRasterCapabilities(await response.text(), capabilitiesUrl);
+      const nextLayers = await onDiscover(url);
       discoveredLayers = nextLayers;
       selectedLayerNames = [];
       discoveryStatus = nextLayers.length > 0 ? 'ready' : 'empty';

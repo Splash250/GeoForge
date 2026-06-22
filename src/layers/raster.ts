@@ -451,7 +451,7 @@ function parseWmsCapabilities(
   const getMapUrl = getWmsGetMapEndpoint(document, capabilitiesUrl);
 
   return findElementsByLocalName(document, 'Layer')
-    .map((layer) => {
+    .map((layer): DiscoveredRasterLayer | null => {
       const name = getDirectChildText(layer, 'Name');
 
       if (!name) {
@@ -475,7 +475,7 @@ function parseWmtsCapabilities(
   capabilitiesUrl: string,
 ): DiscoveredRasterLayer[] {
   return findElementsByLocalName(document, 'Layer')
-    .map((layer) => {
+    .map((layer): DiscoveredRasterLayer | null => {
       const name = getDirectChildText(layer, 'Identifier');
 
       if (!name) {

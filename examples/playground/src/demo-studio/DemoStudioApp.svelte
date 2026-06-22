@@ -15,7 +15,7 @@
   import { demoRegistry } from './registry/demoRegistry.ts';
   import type { DemoCategory, DemoContext, RegisteredDemoDefinition } from './registry/types.ts';
   import { ToastStack, type Toast } from './ui/index.ts';
-  import type { GeomanRasterLayer, RasterLayerSyncOptions } from 'maplibre-geoforge';
+  import type { DiscoveredRasterLayer, GeomanRasterLayer } from 'maplibre-geoforge';
 
   type ToastInput = Omit<Toast, 'id'>;
 
@@ -23,11 +23,6 @@
   const initialCategory = categories[0];
   const initialDemo = initialCategory?.demos[0];
   const toastDurationMs = 4200;
-  const rasterLayerSyncOptions: RasterLayerSyncOptions = {
-    basemapLayerId: 'dark-basemap',
-    transformTileUrl: buildCustomRasterTileUrl
-  };
-
   let activeCategoryId = $state(initialCategory?.id ?? '');
   let activeDemoId = $state(initialDemo?.id ?? '');
   let map = $state<Map | null>(null);
@@ -185,6 +180,12 @@
         handleGeoForgeLoadFailure(currentMap, new Error('GeoForge initialization did not complete.'));
         return;
       }
+
+      createdGeoForge.layers.configureRasterLayers({
+        basemapLayerId: 'dark-basemap',
+        transformRequestUrl: buildCustomRasterTileUrl,
+        transformTileUrl: buildCustomRasterTileUrl
+      });
 
       geoForge = createdGeoForge;
       mapReady = true;
@@ -395,7 +396,7 @@
       return;
     }
 
-    geoForge.layers.addRasterLayer(input, rasterLayerSyncOptions);
+    geoForge.layers.addRasterLayer(input);
     customRasterLayers = geoForge.layers.getRasterLayers();
   }
 
@@ -404,7 +405,7 @@
       return;
     }
 
-    geoForge.layers.addRasterLayers(inputs, rasterLayerSyncOptions);
+    geoForge.layers.addRasterLayers(inputs);
     customRasterLayers = geoForge.layers.getRasterLayers();
   }
 
@@ -413,7 +414,7 @@
       return;
     }
 
-    geoForge.layers.reorderRasterLayer(layerId, direction, rasterLayerSyncOptions);
+    geoForge.layers.reorderRasterLayer(layerId, direction);
     customRasterLayers = geoForge.layers.getRasterLayers();
   }
 
@@ -422,8 +423,16 @@
       return;
     }
 
-    geoForge.layers.removeRasterLayer(layerId, rasterLayerSyncOptions);
+    geoForge.layers.removeRasterLayer(layerId);
     customRasterLayers = geoForge.layers.getRasterLayers();
+  }
+
+  async function handleDiscoverCustomRasterLayers(url: string): Promise<DiscoveredRasterLayer[]> {
+    if (!geoForge) {
+      return [];
+    }
+
+    return geoForge.layers.discoverRasterLayers(url);
   }
 
   function syncMapCustomRasterLayers(currentMap: Map, currentGeoForge: DemoContext['geoForge']) {
@@ -432,7 +441,7 @@
     }
 
     try {
-      currentGeoForge.layers.syncRasterLayers(rasterLayerSyncOptions);
+      currentGeoForge.layers.syncRasterLayers();
       customRasterLayers = currentGeoForge.layers.getRasterLayers();
     } catch (error) {
       notify({
@@ -552,6 +561,7 @@
       <CustomRasterLayerPanel
         layers={customRasterLayers}
         disabled={!mapReady}
+        onDiscover={handleDiscoverCustomRasterLayers}
         onAdd={handleAddCustomRasterLayer}
         onAddMany={handleAddCustomRasterLayers}
         onMove={handleMoveCustomRasterLayer}
