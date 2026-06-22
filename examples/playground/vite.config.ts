@@ -9,6 +9,8 @@ const __dirname = path.dirname(__filename);
 const workspaceRoot = path.resolve(__dirname, '../..');
 const geoforgeRoot = workspaceRoot;
 const svelteConfigFile = path.resolve(geoforgeRoot, 'svelte.config.js');
+const rasterProxyTimeoutMs = 15000;
+const rasterProxyMaxBytes = 8 * 1024 * 1024;
 
 export default defineConfig({
   define: {
@@ -37,22 +39,49 @@ export default defineConfig({
               return;
             }
 
-            const tileResponse = await fetch(parsedRemoteUrl);
-            response.statusCode = tileResponse.status;
+            const abortController = new AbortController();
+            const timeout = setTimeout(() => abortController.abort(), rasterProxyTimeoutMs);
 
-            const contentType = tileResponse.headers.get('content-type');
-            const cacheControl = tileResponse.headers.get('cache-control');
+            let tileResponse: Response;
+            let body: Buffer;
 
-            if (contentType) {
-              response.setHeader('content-type', contentType);
+            try {
+              tileResponse = await fetch(parsedRemoteUrl, { signal: abortController.signal });
+
+              response.statusCode = tileResponse.status;
+
+              const contentType = tileResponse.headers.get('content-type');
+              const cacheControl = tileResponse.headers.get('cache-control');
+              const contentLength = Number(tileResponse.headers.get('content-length') ?? '0');
+
+              if (contentLength > rasterProxyMaxBytes) {
+                response.statusCode = 502;
+                response.end('Raster proxy response is too large.');
+                return;
+              }
+
+              if (contentType) {
+                response.setHeader('content-type', contentType);
+              }
+
+              if (cacheControl) {
+                response.setHeader('cache-control', cacheControl);
+              }
+
+              response.setHeader('access-control-allow-origin', '*');
+
+              body = Buffer.from(await tileResponse.arrayBuffer());
+            } finally {
+              clearTimeout(timeout);
             }
 
-            if (cacheControl) {
-              response.setHeader('cache-control', cacheControl);
+            if (body.byteLength > rasterProxyMaxBytes) {
+              response.statusCode = 502;
+              response.end('Raster proxy response is too large.');
+              return;
             }
 
-            response.setHeader('access-control-allow-origin', '*');
-            response.end(Buffer.from(await tileResponse.arrayBuffer()));
+            response.end(body);
           } catch (error) {
             response.statusCode = 502;
             response.end(error instanceof Error ? error.message : 'Tile proxy request failed.');

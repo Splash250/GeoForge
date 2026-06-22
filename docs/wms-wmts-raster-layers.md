@@ -90,6 +90,10 @@ geoForge.layers.addRasterLayer(
 );
 ```
 
+The playground Vite proxy is intentionally local-development-only. Production proxies should allowlist
+trusted WMS/WMTS hosts, block private-network destinations, enforce response-size limits, and set
+request timeouts.
+
 ## Reorder or Remove Layers
 
 ```ts
