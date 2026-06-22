@@ -1,11 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import {
+  ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
   addAdvancedDecorator,
+  applyAdvancedLineStyleToFeatures,
   buildDecoratorFromAdvancedState,
   clearAdvancedDecorators,
+  createAdvancedCustomSvgImageManager,
   createAdvancedDecoratorState,
   getAdvancedDecoratorCode,
   getAdvancedDecoratorLineFeature,
+  getAdvancedDecoratorRenderState,
   mergeSvgCss,
   parseIterationCount,
   removeAdvancedDecorator,
@@ -110,6 +114,13 @@ describe('advanced decorator authoring helpers', () => {
           easing: 'ease-in-out',
         },
       ],
+    });
+  });
+
+  test('uses the Demo Studio chevron image for default symbol decorators', () => {
+    expect(buildDecoratorFromAdvancedState(createAdvancedDecoratorState())).toMatchObject({
+      kind: 'symbol',
+      imageId: 'gf-demo-chevron',
     });
   });
 
@@ -380,7 +391,9 @@ describe('advanced decorator authoring helpers', () => {
     const code = getAdvancedDecoratorCode(state);
 
     expect(code).toContain('geoForge.features.importGeoJson(lineFeature');
-    expect(code).toContain('geoForge.decorators.lines.configure({ layerPosition: "below-lines" });');
+    expect(code).toContain(
+      'geoForge.decorators.lines.configure({ layerPosition: "below-lines" });',
+    );
     expect(code).toContain('geoForge.decorators.lines.syncFromFeatures(features, (feature) =>');
     expect(code).toContain('feature.properties?.decorators');
     expect(code).toContain('"decorators"');
@@ -406,6 +419,45 @@ describe('advanced decorator authoring helpers', () => {
     expect(cleared.decorators).toEqual([]);
   });
 
+  test('captures a stable image id and SVG source when adding custom SVG decorators', () => {
+    const customState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const withSavedCustom = addAdvancedDecorator(
+      customState,
+      buildDecoratorFromAdvancedState(customState),
+    );
+
+    expect(withSavedCustom.decorators?.[0]).toMatchObject({
+      kind: 'symbol',
+      imageId: 'gf-demo-custom-advanced-saved-1',
+    });
+    expect(withSavedCustom.customSymbolImages).toEqual({
+      'gf-demo-custom-advanced-saved-1': {
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>',
+      },
+    });
+  });
+
+  test('removes saved custom SVG metadata when decorators are removed or cleared', () => {
+    const customState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const withSavedCustom = addAdvancedDecorator(
+      customState,
+      buildDecoratorFromAdvancedState(customState),
+    );
+
+    expect(removeAdvancedDecorator(withSavedCustom, 0).customSymbolImages).toBeUndefined();
+    expect(clearAdvancedDecorators(withSavedCustom).customSymbolImages).toBeUndefined();
+  });
+
   test('clones added decorators so later nested mutations do not change state', () => {
     const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
     const nextState = addAdvancedDecorator(createAdvancedDecoratorState(), decorator);
@@ -418,6 +470,25 @@ describe('advanced decorator authoring helpers', () => {
       kind: 'symbol',
       rotate: { mode: 'line', angle: -90 },
     });
+  });
+
+  test('clones decorators without relying on structuredClone', () => {
+    const originalStructuredClone = globalThis.structuredClone;
+    globalThis.structuredClone = (() => {
+      throw new DOMException('could not be cloned', 'DataCloneError');
+    }) as typeof structuredClone;
+
+    try {
+      const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+      const nextState = addAdvancedDecorator(createAdvancedDecoratorState(), decorator);
+
+      expect(nextState.decorators?.[0]).toMatchObject({
+        kind: 'symbol',
+        rotate: { mode: 'line', angle: -90 },
+      });
+    } finally {
+      globalThis.structuredClone = originalStructuredClone;
+    }
   });
 
   test('clones surviving decorators when removing from state', () => {
@@ -461,11 +532,18 @@ describe('advanced decorator authoring helpers', () => {
     });
   });
 
-  test('sync adapter configures layer position and syncs decorators from features', () => {
-    const decorators = [buildDecoratorFromAdvancedState(createAdvancedDecoratorState())];
+  test('sync adapter configures layer position and syncs decorators from current state', () => {
+    const oldDecorators = [buildDecoratorFromAdvancedState(createAdvancedDecoratorState())];
+    const currentDecorators = [
+      buildDecoratorFromAdvancedState({
+        ...createAdvancedDecoratorState(),
+        kind: 'text',
+        text: 'LIVE',
+      }),
+    ];
     const feature = getAdvancedDecoratorLineFeature({
       ...createAdvancedDecoratorState(),
-      decorators,
+      decorators: oldDecorators,
     });
     const calls: unknown[] = [];
     const geoForge: AdvancedDecoratorSyncTarget = {
@@ -483,22 +561,32 @@ describe('advanced decorator authoring helpers', () => {
       state: {
         ...createAdvancedDecoratorState(),
         layerPosition: 'below-lines',
+        decorators: currentDecorators,
       },
       features: [feature],
     });
 
     expect(calls).toEqual([
       ['configure', { layerPosition: 'below-lines' }],
-      ['syncFromFeatures', [feature], decorators],
+      ['syncFromFeatures', [feature], currentDecorators],
     ]);
   });
 
-  test('sync adapter clones feature decorators before returning them to GeoForge', () => {
+  test('sync adapter clones state decorators before returning them to GeoForge', () => {
+    const oldDecorator = buildDecoratorFromAdvancedState({
+      ...createAdvancedDecoratorState(),
+      kind: 'text',
+      text: 'OLD',
+    });
     const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
     const feature = getAdvancedDecoratorLineFeature({
       ...createAdvancedDecoratorState(),
-      decorators: [decorator],
+      decorators: [oldDecorator],
     });
+    const state = {
+      ...createAdvancedDecoratorState(),
+      decorators: [decorator],
+    };
     let resolvedDecorators: unknown;
     const geoForge: AdvancedDecoratorSyncTarget = {
       decorators: {
@@ -513,11 +601,11 @@ describe('advanced decorator authoring helpers', () => {
 
     syncAdvancedDecorators({
       geoForge,
-      state: createAdvancedDecoratorState(),
+      state,
       features: [feature],
     });
 
-    const firstDecorator = feature.properties.decorators[0];
+    const firstDecorator = state.decorators[0];
     if (firstDecorator?.kind === 'symbol' && firstDecorator.rotate) {
       firstDecorator.rotate.angle = 45;
     }
@@ -529,4 +617,605 @@ describe('advanced decorator authoring helpers', () => {
       },
     ]);
   });
+
+  test('applies current line style to imported feature targets', () => {
+    const updates: unknown[] = [];
+    const featureTargets = [
+      {
+        updateProperties: (properties: unknown) => updates.push(properties),
+      },
+      {
+        updateProperties: (properties: unknown) => updates.push(properties),
+      },
+    ];
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      lineStyle: {
+        color: '#be123c',
+        width: 11,
+        opacity: 0.45,
+      },
+    };
+
+    applyAdvancedLineStyleToFeatures(featureTargets, state);
+
+    expect(updates).toEqual([
+      {
+        lineColor: '#be123c',
+        lineWidth: 11,
+        lineOpacity: 0.45,
+      },
+      {
+        lineColor: '#be123c',
+        lineWidth: 11,
+        lineOpacity: 0.45,
+      },
+    ]);
+  });
+
+  test('custom SVG image manager replaces changed content and removes image on cleanup', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const loadedSvg: string[] = [];
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => {
+      loadedSvg.push(svg);
+      return { svg };
+    });
+    const firstState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const secondState: AdvancedDecoratorState = {
+      ...firstState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+
+    await imageManager.ensure(map, firstState);
+    await imageManager.ensure(map, firstState);
+    await imageManager.ensure(map, secondState);
+    imageManager.cleanup(map);
+
+    expect(loadedSvg).toEqual([
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: blue; }</style><path class="mark"/></svg>',
+    ]);
+    expect(calls).toEqual([
+      ['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: loadedSvg[0] }],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+      ['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: loadedSvg[1] }],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+    ]);
+  });
+
+  test('custom SVG image manager skips stale async registrations', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const loads = new Map<string, Deferred<{ svg: string }>>();
+    const imageManager = createAdvancedCustomSvgImageManager((svg) => {
+      const deferred = createDeferred<{ svg: string }>();
+      loads.set(svg, deferred);
+      return deferred.promise;
+    });
+    const firstState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const secondState: AdvancedDecoratorState = {
+      ...firstState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+    const firstSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>';
+    const secondSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: blue; }</style><path class="mark"/></svg>';
+
+    const firstEnsure = imageManager.ensure(map, firstState, { isCurrent: () => false });
+    const secondEnsure = imageManager.ensure(map, secondState, { isCurrent: () => true });
+
+    loads.get(secondSvg)?.resolve({ svg: secondSvg });
+    await secondEnsure;
+    loads.get(firstSvg)?.resolve({ svg: firstSvg });
+    await firstEnsure;
+
+    expect(calls).toEqual([['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: secondSvg }]]);
+    expect(images.get(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toEqual({ svg: secondSvg });
+  });
+
+  test('custom SVG image manager propagates loader failures without mutating images', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async () => {
+      throw new Error('decode failed');
+    });
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+
+    await expect(imageManager.ensure(map, state)).rejects.toThrow('decode failed');
+
+    expect(calls).toEqual([]);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
+
+  test('custom SVG image manager removes a registered image when current SVG is invalid', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const invalidState: AdvancedDecoratorState = {
+      ...validState,
+      customSvg: '<span>not svg</span>',
+    };
+
+    await imageManager.ensure(map, validState);
+    await imageManager.ensure(map, invalidState);
+
+    expect(calls).toEqual([
+      [
+        'addImage',
+        ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+        {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>',
+        },
+      ],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+    ]);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
+
+  test('sync output falls back after a registered custom SVG becomes invalid', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const invalidState: AdvancedDecoratorState = {
+      ...validState,
+      customSvg: '<span>not svg</span>',
+      decorators: [buildDecoratorFromAdvancedState(validState)],
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    await imageManager.ensure(map, validState);
+    const result = await imageManager.ensure(map, invalidState);
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(invalidState, {
+        customImageReady: result.customImageReady,
+      }),
+      features: [getAdvancedDecoratorLineFeature(invalidState)],
+    });
+
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+    expect(resolvedDecorators).toMatchObject([{ kind: 'symbol', imageId: 'gf-demo-chevron' }]);
+    expect(resolvedDecorators).not.toMatchObject([
+      { kind: 'symbol', imageId: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID },
+    ]);
+  });
+
+  test('custom SVG image manager removes a registered image when changed SVG loading fails', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const validSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>';
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => {
+      if (svg !== validSvg) {
+        throw new Error('decode failed');
+      }
+
+      return { svg };
+    });
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const failingState: AdvancedDecoratorState = {
+      ...validState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+
+    await imageManager.ensure(map, validState);
+    await expect(imageManager.ensure(map, failingState)).rejects.toThrow('decode failed');
+
+    expect(calls).toEqual([
+      ['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: validSvg }],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+    ]);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
+
+  test('sync output falls back after a registered custom SVG replacement fails loading', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const validSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>';
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => {
+      if (svg !== validSvg) {
+        throw new Error('decode failed');
+      }
+
+      return { svg };
+    });
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const failingState: AdvancedDecoratorState = {
+      ...validState,
+      customSvgCss: '.mark { fill: blue; }',
+      decorators: [buildDecoratorFromAdvancedState(validState)],
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    await imageManager.ensure(map, validState);
+    await expect(imageManager.ensure(map, failingState)).rejects.toThrow('decode failed');
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(failingState, { customImageReady: false }),
+      features: [getAdvancedDecoratorLineFeature(failingState)],
+    });
+
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+    expect(resolvedDecorators).toMatchObject([{ kind: 'symbol', imageId: 'gf-demo-chevron' }]);
+    expect(resolvedDecorators).not.toMatchObject([
+      { kind: 'symbol', imageId: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID },
+    ]);
+  });
+
+  test('custom SVG image manager keeps saved custom decorators when draft is not custom', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const customState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const textDraftState: AdvancedDecoratorState = {
+      ...customState,
+      kind: 'text',
+      symbolPreset: 'chevron',
+      decorators: [buildDecoratorFromAdvancedState(customState)],
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    await imageManager.ensure(map, customState);
+    const result = await imageManager.ensure(map, textDraftState);
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(textDraftState, result),
+      features: [getAdvancedDecoratorLineFeature(textDraftState)],
+    });
+
+    expect(result.customImageReady).toBe(true);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(true);
+    expect(resolvedDecorators).toMatchObject([
+      { kind: 'symbol', imageId: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID },
+    ]);
+  });
+
+  test('saved custom SVG decorator keeps captured image after draft SVG changes', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+      updateImage: (id: string, image: unknown) => images.set(id, image),
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const firstState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const savedState = addAdvancedDecorator(
+      firstState,
+      buildDecoratorFromAdvancedState(firstState),
+    );
+    const changedDraftState: AdvancedDecoratorState = {
+      ...savedState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    const result = await imageManager.ensure(map, changedDraftState);
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(changedDraftState, result),
+      features: [getAdvancedDecoratorLineFeature(changedDraftState)],
+    });
+
+    expect(images.get('gf-demo-custom-advanced-saved-1')).toEqual({
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>',
+    });
+    expect(images.get(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toEqual({
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: blue; }</style><path class="mark"/></svg>',
+    });
+    expect(resolvedDecorators).toMatchObject([
+      { kind: 'symbol', imageId: 'gf-demo-custom-advanced-saved-1' },
+    ]);
+  });
+
+  test('saved custom SVG decorator remains valid when draft custom SVG is invalid', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const savedState = addAdvancedDecorator(validState, buildDecoratorFromAdvancedState(validState));
+    const invalidDraftState: AdvancedDecoratorState = {
+      ...savedState,
+      customSvg: '<span>not svg</span>',
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    const result = await imageManager.ensure(map, invalidDraftState);
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(invalidDraftState, result),
+      features: [getAdvancedDecoratorLineFeature(invalidDraftState)],
+    });
+
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+    expect(images.has('gf-demo-custom-advanced-saved-1')).toBe(true);
+    expect(resolvedDecorators).toMatchObject([
+      { kind: 'symbol', imageId: 'gf-demo-custom-advanced-saved-1' },
+    ]);
+  });
+
+  test('saved custom SVG decorator remains valid when draft custom SVG loading rejects', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const savedSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>';
+    const failingSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: blue; }</style><path class="mark"/></svg>';
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => {
+      if (svg === failingSvg) {
+        throw new Error('decode failed');
+      }
+
+      return { svg };
+    });
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const savedState = addAdvancedDecorator(validState, buildDecoratorFromAdvancedState(validState));
+    const failingDraftState: AdvancedDecoratorState = {
+      ...savedState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    let readyImageIds: string[] | undefined;
+    await imageManager.ensure(map, failingDraftState).catch((error: unknown) => {
+      readyImageIds = (error as { readyImageIds?: string[] }).readyImageIds;
+    });
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(failingDraftState, {
+        customImageReady: false,
+        readyImageIds,
+      }),
+      features: [getAdvancedDecoratorLineFeature(failingDraftState)],
+    });
+
+    expect(images.get('gf-demo-custom-advanced-saved-1')).toEqual({ svg: savedSvg });
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+    expect(readyImageIds).toContain('gf-demo-custom-advanced-saved-1');
+    expect(resolvedDecorators).toMatchObject([
+      { kind: 'symbol', imageId: 'gf-demo-custom-advanced-saved-1' },
+    ]);
+  });
+
+  test('custom SVG image manager removes saved images that are no longer referenced', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const customState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const savedState = addAdvancedDecorator(customState, buildDecoratorFromAdvancedState(customState));
+    const removedState: AdvancedDecoratorState = {
+      ...removeAdvancedDecorator(savedState, 0),
+      kind: 'text',
+      symbolPreset: 'chevron',
+    };
+
+    await imageManager.ensure(map, savedState);
+    expect(images.has('gf-demo-custom-advanced-saved-1')).toBe(true);
+
+    await imageManager.ensure(map, removedState);
+
+    expect(images.has('gf-demo-custom-advanced-saved-1')).toBe(false);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
 });
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve: Deferred<T>['resolve'] = () => {};
+  let reject: Deferred<T>['reject'] = () => {};
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, resolve, reject };
+}
