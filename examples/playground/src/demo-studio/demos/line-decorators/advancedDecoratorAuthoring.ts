@@ -241,7 +241,7 @@ export function addAdvancedDecorator(
 ): AdvancedDecoratorState {
   return {
     ...state,
-    decorators: [...(state.decorators ?? []), decorator],
+    decorators: [...(state.decorators ?? []).map(cloneLineDecorator), cloneLineDecorator(decorator)],
   };
 }
 
@@ -274,7 +274,9 @@ export function syncAdvancedDecorators({
 }
 
 function getAdvancedDecorators(state: AdvancedDecoratorState): LineDecoratorOptions[] {
-  return state.decorators ? [...state.decorators] : [buildDecoratorFromAdvancedState(state)];
+  return state.decorators
+    ? state.decorators.map(cloneLineDecorator)
+    : [cloneLineDecorator(buildDecoratorFromAdvancedState(state))];
 }
 
 export function validateSvgMarkup(svg: string): AdvancedSvgValidationResult {
@@ -516,6 +518,14 @@ function resolveAdvancedDecoratorFeatureDecorators(
   state: AdvancedDecoratorState,
 ): LineDecoratorOptions[] {
   return Array.isArray(feature.properties?.decorators)
-    ? (feature.properties.decorators as LineDecoratorOptions[])
+    ? (feature.properties.decorators as LineDecoratorOptions[]).map(cloneLineDecorator)
     : getAdvancedDecorators(state);
+}
+
+function cloneLineDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(decorator) as LineDecoratorOptions;
+  }
+
+  return JSON.parse(JSON.stringify(decorator)) as LineDecoratorOptions;
 }

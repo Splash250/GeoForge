@@ -406,6 +406,37 @@ describe('advanced decorator authoring helpers', () => {
     expect(cleared.decorators).toEqual([]);
   });
 
+  test('clones added decorators so later nested mutations do not change state', () => {
+    const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const nextState = addAdvancedDecorator(createAdvancedDecoratorState(), decorator);
+
+    if (decorator.kind === 'symbol') {
+      decorator.rotate.angle = 45;
+    }
+
+    expect(nextState.decorators?.[0]).toMatchObject({
+      kind: 'symbol',
+      rotate: { mode: 'line', angle: -90 },
+    });
+  });
+
+  test('clones line feature decorators so later nested mutations do not change output', () => {
+    const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const feature = getAdvancedDecoratorLineFeature({
+      ...createAdvancedDecoratorState(),
+      decorators: [decorator],
+    });
+
+    if (decorator.kind === 'symbol') {
+      decorator.rotate.angle = 45;
+    }
+
+    expect(feature.properties.decorators[0]).toMatchObject({
+      kind: 'symbol',
+      rotate: { mode: 'line', angle: -90 },
+    });
+  });
+
   test('sync adapter configures layer position and syncs decorators from features', () => {
     const decorators = [buildDecoratorFromAdvancedState(createAdvancedDecoratorState())];
     const feature = getAdvancedDecoratorLineFeature({
@@ -435,6 +466,42 @@ describe('advanced decorator authoring helpers', () => {
     expect(calls).toEqual([
       ['configure', { layerPosition: 'below-lines' }],
       ['syncFromFeatures', [feature], decorators],
+    ]);
+  });
+
+  test('sync adapter clones feature decorators before returning them to GeoForge', () => {
+    const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
+    const feature = getAdvancedDecoratorLineFeature({
+      ...createAdvancedDecoratorState(),
+      decorators: [decorator],
+    });
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    syncAdvancedDecorators({
+      geoForge,
+      state: createAdvancedDecoratorState(),
+      features: [feature],
+    });
+
+    if (feature.properties.decorators[0].kind === 'symbol') {
+      feature.properties.decorators[0].rotate.angle = 45;
+    }
+
+    expect(resolvedDecorators).toMatchObject([
+      {
+        kind: 'symbol',
+        rotate: { mode: 'line', angle: -90 },
+      },
     ]);
   });
 });
