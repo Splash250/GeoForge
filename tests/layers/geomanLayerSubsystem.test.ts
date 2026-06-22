@@ -79,6 +79,87 @@ function createLayerSubsystem(map = createMapStub(['base', 'gm_main-fill'])) {
 }
 
 describe('GeomanLayerSubsystem', () => {
+  test('uses configured raster defaults for discovery and layer sync', async () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => `<?xml version="1.0"?>
+        <WMS_Capabilities version="1.3.0">
+          <Capability>
+            <Layer>
+              <Layer>
+                <Name>nuts</Name>
+                <Title>NUTS</Title>
+              </Layer>
+            </Layer>
+          </Capability>
+        </WMS_Capabilities>`,
+    }));
+
+    layers.configureRasterLayers({
+      basemapLayerId: 'base',
+      fetchFn,
+      transformRequestUrl: (url) => `/capabilities?url=${encodeURIComponent(url)}`,
+      transformTileUrl: (url) => `/tiles?url=${encodeURIComponent(url)}`,
+    });
+
+    const discovered = await layers.discoverRasterLayers('https://example.test/wms?service=WMS');
+    layers.addRasterLayer({ name: discovered[0]!.title, url: discovered[0]!.url });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/capabilities?url=https%3A%2F%2Fexample.test%2Fwms%3Fservice%3DWMS%26request%3DGetCapabilities',
+    );
+    expect(map.orderedLayerIds).toEqual([
+      'base',
+      expect.stringMatching(/^gm-raster-layer-/),
+      'gm_main-fill',
+    ]);
+    expect(map.sources.values().next().value?.tiles[0]).toContain('/tiles?url=');
+  });
+
+  test('lets per-call raster sync options override configured defaults', () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'labels', 'gm_main-fill']));
+
+    layers.configureRasterLayers({ basemapLayerId: 'base' });
+    layers.addRasterLayer(
+      {
+        name: 'NUTS boundaries',
+        url: 'https://example.test/wms?service=WMS&request=GetMap&layers=nuts',
+      },
+      { basemapLayerId: 'labels' },
+    );
+
+    expect(map.orderedLayerIds).toEqual([
+      'base',
+      'labels',
+      expect.stringMatching(/^gm-raster-layer-/),
+      'gm_main-fill',
+    ]);
+  });
+
+  test('resyncs existing raster layers when configured defaults change', () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'labels']));
+
+    layers.configureRasterLayers({
+      basemapLayerId: 'base',
+      transformTileUrl: (url) => `/first?url=${encodeURIComponent(url)}`,
+    });
+    layers.addRasterLayer({
+      id: 'external-wms-nuts',
+      name: 'NUTS boundaries',
+      url: 'https://example.test/wms?service=WMS&request=GetMap&layers=nuts',
+    });
+
+    layers.configureRasterLayers({
+      basemapLayerId: 'labels',
+      transformTileUrl: (url) => `/second?url=${encodeURIComponent(url)}`,
+    });
+
+    expect(map.orderedLayerIds).toEqual(['base', 'labels', 'external-wms-nuts']);
+    expect(map.sources.values().next().value?.tiles[0]).toContain('/second?url=');
+  });
+
   test('discovers WMS layers with an injectable request URL transformer', async () => {
     const { layers } = createLayerSubsystem();
     const fetchFn = vi.fn(async () => ({
@@ -270,9 +351,7 @@ describe('raster layer helpers', () => {
       buildRasterCapabilitiesRequestUrl(
         'https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetTile&layer=population&tilematrix=4&tilerow=5&tilecol=6',
       ),
-    ).toBe(
-      'https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities',
-    );
+    ).toBe('https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities');
   });
 
   test('infers WMTS service from cased request params when building a capabilities URL', () => {
@@ -280,9 +359,7 @@ describe('raster layer helpers', () => {
       buildRasterCapabilitiesRequestUrl(
         'https://tiles.example.test/wmts?tenant=demo&SERVICE=WMTS&REQUEST=GetTile&LAYER=population&TILEMATRIX=4&TILEROW=5&TILECOL=6',
       ),
-    ).toBe(
-      'https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities',
-    );
+    ).toBe('https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities');
   });
 
   test('parses WMTS ResourceURL templates into MapLibre tiles', () => {

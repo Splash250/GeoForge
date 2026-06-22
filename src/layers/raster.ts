@@ -61,6 +61,8 @@ export type RasterLayerSyncOptions = {
   basemapLayerId?: string;
 };
 
+export type RasterLayerDefaults = DiscoverRasterLayersOptions & RasterLayerSyncOptions;
+
 type RasterMap = {
   addLayer: (
     layer: {
@@ -89,6 +91,7 @@ type RasterMap = {
 
 export class GeomanLayerSubsystem {
   private rasterLayers: GeomanRasterLayer[] = [];
+  private rasterLayerDefaults: RasterLayerDefaults = {};
 
   constructor(
     private readonly options: {
@@ -104,9 +107,10 @@ export class GeomanLayerSubsystem {
     serviceUrl: string,
     options: DiscoverRasterLayersOptions = {},
   ): Promise<DiscoveredRasterLayer[]> {
+    const mergedOptions = this.getRasterLayerOptions(options);
     const capabilitiesUrl = buildRasterCapabilitiesRequestUrl(serviceUrl);
-    const requestUrl = options.transformRequestUrl?.(capabilitiesUrl) ?? capabilitiesUrl;
-    const fetchFn = options.fetchFn ?? getGlobalFetch();
+    const requestUrl = mergedOptions.transformRequestUrl?.(capabilitiesUrl) ?? capabilitiesUrl;
+    const fetchFn = mergedOptions.fetchFn ?? getGlobalFetch();
     const response = await fetchFn(requestUrl);
 
     if (!response.ok) {
@@ -114,6 +118,22 @@ export class GeomanLayerSubsystem {
     }
 
     return parseRasterCapabilities(await response.text(), capabilitiesUrl);
+  }
+
+  configureRasterLayers(defaults: RasterLayerDefaults): void {
+    this.rasterLayerDefaults = {
+      ...this.rasterLayerDefaults,
+      ...defaults,
+    };
+
+    if (this.rasterLayers.length > 0) {
+      const map = this.getRasterMap();
+
+      this.rasterLayers.forEach((layer) => {
+        removeRasterLayerFromMap(map, layer.id);
+      });
+      syncRasterLayers(map, this.rasterLayers, this.rasterLayerDefaults);
+    }
   }
 
   addRasterLayer(
@@ -128,6 +148,7 @@ export class GeomanLayerSubsystem {
     inputs: RasterLayerInput[],
     options: RasterLayerSyncOptions = {},
   ): GeomanRasterLayer[] {
+    const mergedOptions = this.getRasterLayerOptions(options);
     const nextLayers = inputs.flatMap((input) => {
       const name = input.name.trim();
       const url = normalizeRasterTileUrl(input.url.trim());
@@ -157,7 +178,7 @@ export class GeomanLayerSubsystem {
       ...dedupeRasterLayersById(nextLayers),
       ...this.rasterLayers.filter((layer) => !replacementIds.has(layer.id)),
     ];
-    this.syncRasterLayers(options);
+    this.syncRasterLayers(mergedOptions);
     return nextLayers;
   }
 
@@ -167,7 +188,11 @@ export class GeomanLayerSubsystem {
     this.syncRasterLayers(options);
   }
 
-  reorderRasterLayer(layerId: string, direction: -1 | 1, options: RasterLayerSyncOptions = {}): void {
+  reorderRasterLayer(
+    layerId: string,
+    direction: -1 | 1,
+    options: RasterLayerSyncOptions = {},
+  ): void {
     const index = this.rasterLayers.findIndex((layer) => layer.id === layerId);
     const targetIndex = index + direction;
 
@@ -187,7 +212,7 @@ export class GeomanLayerSubsystem {
   }
 
   syncRasterLayers(options: RasterLayerSyncOptions = {}): void {
-    syncRasterLayers(this.getRasterMap(), this.rasterLayers, options);
+    syncRasterLayers(this.getRasterMap(), this.rasterLayers, this.getRasterLayerOptions(options));
   }
 
   destroy(): void {
@@ -214,6 +239,15 @@ export class GeomanLayerSubsystem {
   private getOptionalRasterMap(): RasterMap | null {
     const map = this.options.geoman.mapAdapter.getMapInstance();
     return isRasterMap(map) ? map : null;
+  }
+
+  private getRasterLayerOptions<T extends RasterLayerDefaults>(
+    options: T,
+  ): RasterLayerDefaults & T {
+    return {
+      ...this.rasterLayerDefaults,
+      ...options,
+    };
   }
 }
 
@@ -355,14 +389,27 @@ function getFeatureLayerAnchorId(
   movingLayerId?: string,
   basemapLayerId?: string,
 ): string | undefined {
+  const styleLayers = map.getStyle().layers ?? [];
   const rasterLayerIds = new Set(
-    (map.getStyle().layers ?? [])
-      .map((layer) => layer.id)
-      .filter((layerId) => layerId.startsWith(rasterLayerPrefix)),
+    styleLayers.map((layer) => layer.id).filter((layerId) => layerId.startsWith(rasterLayerPrefix)),
+  );
+  const anchorCandidates = styleLayers.filter(
+    (layer) => layer.id !== movingLayerId && !rasterLayerIds.has(layer.id),
   );
 
-  return (map.getStyle().layers ?? []).find((layer) => {
-    if (layer.id === movingLayerId || layer.id === basemapLayerId) {
+  if (basemapLayerId) {
+    const basemapIndex = styleLayers.findIndex((layer) => layer.id === basemapLayerId);
+
+    if (basemapIndex >= 0) {
+      return anchorCandidates.find((layer) => {
+        const layerIndex = styleLayers.findIndex((styleLayer) => styleLayer.id === layer.id);
+        return layerIndex > basemapIndex;
+      })?.id;
+    }
+  }
+
+  return anchorCandidates.find((layer) => {
+    if (layer.id === basemapLayerId) {
       return false;
     }
 
@@ -497,9 +544,7 @@ function decodeMapLibreTokens(url: string): string {
 }
 
 function inferRasterService(url: URL): 'WMS' | 'WMTS' {
-  return getSearchParamCaseInsensitive(url, 'service')?.toUpperCase() === 'WMTS'
-    ? 'WMTS'
-    : 'WMS';
+  return getSearchParamCaseInsensitive(url, 'service')?.toUpperCase() === 'WMTS' ? 'WMTS' : 'WMS';
 }
 
 function inferCapabilitiesService(document: Document, capabilitiesUrl: string): 'WMS' | 'WMTS' {
@@ -569,9 +614,7 @@ function getDirectChildText(element: Element, childName: string): string {
 
 function getWmsGetMapEndpoint(document: Document, capabilitiesUrl: string): string {
   const getMap = findFirstElementByLocalName(document, 'GetMap');
-  const onlineResource = getMap
-    ? findFirstElementByLocalName(getMap, 'OnlineResource')
-    : undefined;
+  const onlineResource = getMap ? findFirstElementByLocalName(getMap, 'OnlineResource') : undefined;
   const href =
     onlineResource?.getAttribute('xlink:href') ??
     onlineResource?.getAttribute('href') ??
@@ -612,7 +655,9 @@ function findFirstElementByLocalName(root: ParentNode, localName: string): Eleme
 }
 
 function findElementsByLocalName(root: ParentNode, localName: string): Element[] {
-  return Array.from(root.querySelectorAll('*')).filter((element) => element.localName === localName);
+  return Array.from(root.querySelectorAll('*')).filter(
+    (element) => element.localName === localName,
+  );
 }
 
 function getRasterSourceId(layerId: string): string {

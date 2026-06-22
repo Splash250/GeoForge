@@ -28,6 +28,20 @@ WMS `GetMap` URLs are normalized into a MapLibre tile template using
 Passing a stable `id` lets your application replace or remove the same layer later. Adding another
 raster layer with the same `id` replaces the previous layer and source URL.
 
+## Configure Once
+
+```ts
+geoForge.layers.configureRasterLayers({
+  basemapLayerId: 'dark-basemap',
+  transformRequestUrl: (url) => `/api/geoforge-raster-proxy?url=${encodeURIComponent(url)}`,
+  transformTileUrl: (url) => `/api/geoforge-raster-proxy?url=${encodeURIComponent(url)}`,
+});
+```
+
+Calls such as `discoverRasterLayers`, `addRasterLayer`, `addRasterLayers`,
+`reorderRasterLayer`, and `removeRasterLayer` can be used without repeating proxy or basemap
+options.
+
 ## Discover Available Layers
 
 ```ts

@@ -12,6 +12,7 @@ import type {
   LineDecoratorLayerPosition,
   LineDecoratorManagerOptions,
   LineDecoratorOptions,
+  RasterLayerDefaults,
   SymbolDecoratorRendererOptions,
   TextDecoratorRendererOptions,
 } from '../../src/index.ts';
@@ -299,6 +300,7 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<TextDecoratorRendererOptions>().toMatchTypeOf<object>();
   expectTypeOf<HtmlOverlayDefinition>().toMatchTypeOf<object>();
   expectTypeOf<HtmlOverlayIframeOptions>().toMatchTypeOf<object>();
+  expectTypeOf<RasterLayerDefaults>().toMatchTypeOf<object>();
 });
 
 test('exports context panel and geometry helper types', async () => {
