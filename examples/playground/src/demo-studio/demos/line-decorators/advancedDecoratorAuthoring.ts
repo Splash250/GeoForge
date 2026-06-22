@@ -149,6 +149,14 @@ export type AdvancedCustomSvgEnsureOptions = {
   isCurrent?: () => boolean;
 };
 
+export type AdvancedCustomSvgEnsureResult = {
+  customImageReady: boolean;
+};
+
+export type AdvancedDecoratorRenderStateOptions = {
+  customImageReady: boolean;
+};
+
 const DEFAULT_LINE_STYLE: AdvancedLineStyleState = {
   color: '#0f766e',
   width: 6,
@@ -322,6 +330,21 @@ export function syncAdvancedDecorators({
   geoForge.decorators.lines.syncFromFeatures(features, () => getAdvancedDecorators(state));
 }
 
+export function getAdvancedDecoratorRenderState(
+  state: AdvancedDecoratorState,
+  options: AdvancedDecoratorRenderStateOptions,
+): AdvancedDecoratorState {
+  if (options.customImageReady) {
+    return state;
+  }
+
+  return {
+    ...state,
+    symbolPreset: state.symbolPreset === 'custom' ? 'chevron' : state.symbolPreset,
+    decorators: state.decorators?.map(replaceCustomSymbolDecorator),
+  };
+}
+
 export function createAdvancedCustomSvgImageManager<TImage>(
   loadImage: AdvancedSvgImageLoader<TImage>,
 ) {
@@ -344,13 +367,13 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       map: AdvancedCustomSvgImageTarget<TImage>,
       state: AdvancedDecoratorState,
       options: AdvancedCustomSvgEnsureOptions = {},
-    ): Promise<void> {
+    ): Promise<AdvancedCustomSvgEnsureResult> {
       if (state.kind !== 'symbol' || state.symbolPreset !== 'custom') {
         if (isCurrent(options)) {
           removeRegisteredImage(map);
         }
 
-        return;
+        return { customImageReady: false };
       }
 
       if (!validateSvgMarkup(state.customSvg).valid) {
@@ -358,13 +381,13 @@ export function createAdvancedCustomSvgImageManager<TImage>(
           removeRegisteredImage(map);
         }
 
-        return;
+        return { customImageReady: false };
       }
 
       const svg = mergeSvgCss(state.customSvg, state.customSvgCss);
 
       if (registeredSvg === svg && map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)) {
-        return;
+        return { customImageReady: true };
       }
 
       let image: TImage;
@@ -376,11 +399,11 @@ export function createAdvancedCustomSvgImageManager<TImage>(
           throw error;
         }
 
-        return;
+        return { customImageReady: false };
       }
 
       if (!isCurrent(options)) {
-        return;
+        return { customImageReady: false };
       }
 
       if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)) {
@@ -395,6 +418,7 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       }
 
       registeredSvg = svg;
+      return { customImageReady: true };
     },
 
     cleanup(map: AdvancedCustomSvgImageTarget<TImage>): void {
@@ -407,6 +431,19 @@ function getAdvancedDecorators(state: AdvancedDecoratorState): LineDecoratorOpti
   return state.decorators
     ? state.decorators.map(cloneLineDecorator)
     : [cloneLineDecorator(buildDecoratorFromAdvancedState(state))];
+}
+
+function replaceCustomSymbolDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
+  const clone = cloneLineDecorator(decorator);
+
+  if (clone.kind === 'symbol' && clone.imageId === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID) {
+    return {
+      ...clone,
+      imageId: SYMBOL_IMAGE_IDS.chevron,
+    };
+  }
+
+  return clone;
 }
 
 export function validateSvgMarkup(svg: string): AdvancedSvgValidationResult {

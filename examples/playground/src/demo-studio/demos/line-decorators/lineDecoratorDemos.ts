@@ -9,6 +9,7 @@ import {
   createAdvancedDecoratorState,
   getAdvancedDecoratorCode,
   getAdvancedDecoratorLineFeature,
+  getAdvancedDecoratorRenderState,
   syncAdvancedDecorators,
   type AdvancedDecoratorSyncTarget,
   type AdvancedDecoratorState,
@@ -213,12 +214,23 @@ export const lineDecoratorDemos: DemoDefinition[] = [
           !context.signal.aborted && context.isCurrent() && version === syncVersion;
 
         try {
-          await customSvgImageManager.ensure(map, state, { isCurrent: isLatestState });
+          const imageResult = await customSvgImageManager.ensure(map, state, {
+            isCurrent: isLatestState,
+          });
+
+          if (!isLatestState()) {
+            return;
+          }
+
+          const renderState = getAdvancedDecoratorRenderState(state, imageResult);
+          context.setCode(getAdvancedDecoratorCode(renderState));
+          syncRuntime(renderState);
         } catch (error) {
           if (!isLatestState()) {
             return;
           }
 
+          const renderState = getAdvancedDecoratorRenderState(state, { customImageReady: false });
           const message =
             error instanceof Error ? error.message : 'Unable to load custom SVG image.';
           context.logEvent({
@@ -231,15 +243,10 @@ export const lineDecoratorDemos: DemoDefinition[] = [
             body: message,
             tone: 'error',
           });
-          syncRuntime(state);
+          context.setCode(getAdvancedDecoratorCode(renderState));
+          syncRuntime(renderState);
           return;
         }
-
-        if (!isLatestState()) {
-          return;
-        }
-
-        syncRuntime(state);
       };
 
       const onStateChange = (nextState: AdvancedDecoratorState) => {

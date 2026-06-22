@@ -9,6 +9,7 @@ import {
   createAdvancedDecoratorState,
   getAdvancedDecoratorCode,
   getAdvancedDecoratorLineFeature,
+  getAdvancedDecoratorRenderState,
   mergeSvgCss,
   parseIterationCount,
   removeAdvancedDecorator,
@@ -760,6 +761,54 @@ describe('advanced decorator authoring helpers', () => {
     expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
   });
 
+  test('sync output falls back after a registered custom SVG becomes invalid', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const invalidState: AdvancedDecoratorState = {
+      ...validState,
+      customSvg: '<span>not svg</span>',
+      decorators: [buildDecoratorFromAdvancedState(validState)],
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    await imageManager.ensure(map, validState);
+    const result = await imageManager.ensure(map, invalidState);
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(invalidState, {
+        customImageReady: result.customImageReady,
+      }),
+      features: [getAdvancedDecoratorLineFeature(invalidState)],
+    });
+
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+    expect(resolvedDecorators).toMatchObject([{ kind: 'symbol', imageId: 'gf-demo-chevron' }]);
+    expect(resolvedDecorators).not.toMatchObject([
+      { kind: 'symbol', imageId: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID },
+    ]);
+  });
+
   test('custom SVG image manager removes a registered image when changed SVG loading fails', async () => {
     const calls: unknown[] = [];
     const images = new Map<string, unknown>();
@@ -802,6 +851,60 @@ describe('advanced decorator authoring helpers', () => {
       ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
     ]);
     expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+  });
+
+  test('sync output falls back after a registered custom SVG replacement fails loading', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const validSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>';
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => {
+      if (svg !== validSvg) {
+        throw new Error('decode failed');
+      }
+
+      return { svg };
+    });
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const failingState: AdvancedDecoratorState = {
+      ...validState,
+      customSvgCss: '.mark { fill: blue; }',
+      decorators: [buildDecoratorFromAdvancedState(validState)],
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    await imageManager.ensure(map, validState);
+    await expect(imageManager.ensure(map, failingState)).rejects.toThrow('decode failed');
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(failingState, { customImageReady: false }),
+      features: [getAdvancedDecoratorLineFeature(failingState)],
+    });
+
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
+    expect(resolvedDecorators).toMatchObject([{ kind: 'symbol', imageId: 'gf-demo-chevron' }]);
+    expect(resolvedDecorators).not.toMatchObject([
+      { kind: 'symbol', imageId: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID },
+    ]);
   });
 });
 
