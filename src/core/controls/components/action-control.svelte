@@ -6,7 +6,7 @@
   } from '@/core/controls/components/controls-store.ts';
   import type { ControlOptions, GenericSystemControl, Geoman } from '@/main.ts';
   import DOMPurify from 'dompurify';
-  import log from 'loglevel';
+  import log from '@/utils/log';
   import { getContext } from 'svelte';
 
   const { control, controlOptions }: {

@@ -20,7 +20,7 @@ import { isMapPointerEvent } from '@/utils/guards/map.ts';
 import type { BaseMapEvent } from '@mapLib/types/events.ts';
 import type { Feature, Polygon } from 'geojson';
 import { isEqual } from 'lodash-es';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 type UpdateShapeHandler = (
   featureData: FeatureData,
@@ -67,6 +67,10 @@ export abstract class BaseDrag extends BaseEdit {
   };
 
   onMouseDown(event: BaseMapEvent): MapHandlerReturnData {
+    if (this.mode !== 'drag') {
+      return { next: true };
+    }
+
     if (!isMapPointerEvent(event)) {
       return { next: true };
     }
@@ -74,6 +78,7 @@ export abstract class BaseDrag extends BaseEdit {
 
     if (featureData && this.getUpdatedGeoJsonHandlers[featureData.shape]) {
       this.featureData = featureData;
+      this.beginEditHistoryGesture(this.featureData);
       this.featureData.changeSource({ sourceName: SOURCES.temporary, atomic: true });
       this.gm.mapAdapter.setDragPan(false);
 
@@ -93,12 +98,17 @@ export abstract class BaseDrag extends BaseEdit {
   }
 
   onMouseUp(event: BaseMapEvent): MapHandlerReturnData {
+    if (this.mode !== 'drag') {
+      return { next: true };
+    }
+
     if (!this.featureData || !isMapPointerEvent(event, { warning: true })) {
       return { next: true };
     }
 
     this.snappingHelper?.clearExcludedFeatures();
     this.featureData.changeSource({ sourceName: SOURCES.main, atomic: true });
+    this.finishEditHistoryGesture(this.featureData, 'edit.drag');
 
     this.previousLngLat = null;
     this.gm.mapAdapter.setDragPan(true);
@@ -109,6 +119,10 @@ export abstract class BaseDrag extends BaseEdit {
   }
 
   onMouseMove(event: BaseMapEvent): MapHandlerReturnData {
+    if (this.mode !== 'drag') {
+      return { next: true };
+    }
+
     if (!this.flags.actionInProgress || !isMapPointerEvent(event, { warning: true })) {
       return { next: true };
     }
@@ -150,7 +164,9 @@ export abstract class BaseDrag extends BaseEdit {
 
     const shapeUpdateMethod = this.getUpdatedGeoJsonHandlers[featureData.shape];
     if (shapeUpdateMethod) {
-      const updatedGeoJson = shapeUpdateMethod(featureData, this.previousLngLat, newLngLat);
+      const updatedGeoJson = this.suspendHistory(() =>
+        shapeUpdateMethod(featureData, this.previousLngLat as LngLatTuple, newLngLat),
+      );
       if (!updatedGeoJson) {
         log.error('BaseDrag.moveFeature: invalid updatedGeoJson', featureData);
         return;

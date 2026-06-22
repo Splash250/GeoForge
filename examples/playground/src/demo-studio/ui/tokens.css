@@ -1,0 +1,93 @@
+.gf-studio {
+  --gf-void: #0e1012;
+  --gf-panel: #15171b;
+  --gf-raised: #1c1f24;
+  --gf-overlay: #23262d;
+  --gf-line: #333943;
+  --gf-text: #ffffff;
+  --gf-body: #a0aaba;
+  --gf-muted: #566171;
+  --gf-blue: #007afc;
+  --gf-green: #228a56;
+  --gf-red: #e05252;
+  --gf-code: #0b0d10;
+  --gf-radius-pill: 100px;
+  --gf-radius-card: 24px;
+  --gf-radius-chip: 12px;
+  --gf-radius-tool: 6px;
+  --gf-radius-badge: 4px;
+  --gf-toolbar-height: 62px;
+  --gf-sidebar-width: 304px;
+  --gf-inspector-width: 364px;
+  --gf-control-height: 34px;
+  --gf-control-height-lg: 38px;
+  --gf-icon-control: 36px;
+  color: var(--gf-text);
+  background: var(--gf-void);
+  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+}
+
+.gf-studio *,
+.gf-studio *::before,
+.gf-studio *::after {
+  box-sizing: border-box;
+}
+
+.gf-studio button,
+.gf-studio input,
+.gf-studio select,
+.gf-studio textarea {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.gf-studio button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  font-weight: inherit;
+}
+
+.gf-studio button:hover {
+  background: transparent;
+  color: inherit;
+}
+
+.gf-studio input,
+.gf-studio select,
+.gf-studio textarea {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.gf-studio h1,
+.gf-studio h2,
+.gf-studio h3,
+.gf-studio p,
+.gf-studio pre {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.gf-studio fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.gf-studio :focus-visible {
+  outline: 2px solid var(--gf-blue);
+  outline-offset: 2px;
+}

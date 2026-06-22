@@ -10,7 +10,7 @@ import type { GmSystemEvent } from '@/types/events/index.ts';
 import type { ActionInstanceKey } from '@/types/modes/index.ts';
 import { isGmHelperEvent } from '@/utils/guards/events/helper.ts';
 import { isGmModeEvent } from '@/utils/guards/events/mode.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 export class HelperEventListener extends BaseEventListener {
   eventHandlers: EventHandlers = {

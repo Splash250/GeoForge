@@ -27,5 +27,10 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src", "vite.config.ts", "../../src/vite-env.d.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "../../src/vite-env.d.ts",
+    "../../src/types/**/*.d.ts"
+  ]
 }

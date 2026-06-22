@@ -5,7 +5,7 @@ import {
   type Geoman,
   type LngLatTuple,
 } from '@/main.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 export const loadStressTestFeatureCollection = (geoman: Geoman, step: number, size: number) => {
   const targetSource = geoman.features.sources.gm_main;

@@ -293,6 +293,7 @@ export class GeomanSelectionSubsystem {
       hoveredFeatureId: this.hoveredFeatureId,
       selectedFeatureId: this.selectedFeatureId,
     });
+    this.geoman.features.bringEditOverlayLayersToFront();
   }
 
   private resolveInputFeature(featureOrId: FeatureData | FeatureId | null): FeatureData | null {

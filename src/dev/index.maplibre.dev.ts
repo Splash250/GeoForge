@@ -5,7 +5,7 @@ import { registerLineEndpointTool } from '@/dev/tools/lineEndpointTool.ts';
 import { registerSegmentLengthTool } from '@/dev/tools/segmentLengthTool.ts';
 import { registerSingleFeatureEditTool } from '@/dev/tools/singleFeatureEditTool.ts';
 import { Geoman, type GmOptionsData, type MapInstanceWithGeoman } from '@/main.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import ml from 'maplibre-gl';
 import type { PartialDeep } from 'type-fest';

@@ -1,4 +1,4 @@
-import log from 'loglevel';
+import log from '@/utils/log';
 import '@/dev/styles/style.css';
 import '@/styles/map/maplibre.css';
 

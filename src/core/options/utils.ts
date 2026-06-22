@@ -1,6 +1,6 @@
 import { isPartialLayer } from '@/utils/guards/map.ts';
 import { cloneDeep, countBy, keyBy, merge, values } from 'lodash-es';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 export const mergeByTypeCustomizer = (objValue: unknown, srcValue: unknown) => {
   if (!Array.isArray(objValue) || !Array.isArray(srcValue)) {

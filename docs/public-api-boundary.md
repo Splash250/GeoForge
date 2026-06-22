@@ -20,6 +20,7 @@ These exports are the preferred public API for new application code.
 | `GeomanTransactionSubsystem` | Transaction subsystem exposed through `geoForge.transactions`. |
 | `GeomanTransaction` | Transaction object returned by `geoForge.transactions.start(...)`. |
 | `GeomanHistorySubsystem` | History subsystem exposed through `geoForge.history`. |
+| `GeomanLayerSubsystem` | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays. |
 | `defineGeomanContextPanel` | Helper for defining context panel descriptors. |
 | `createContextPanelValidationList` | Helper for rendering context panel validation content. |
 | `createContextPanelActionButton` | Helper for rendering context panel action buttons. |

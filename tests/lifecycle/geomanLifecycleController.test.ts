@@ -1,6 +1,6 @@
 import { GeomanLifecycleController } from '@/core/lifecycle/geomanLifecycleController.ts';
-import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { createGeoForgeSsrServer } from '../utils/viteSsrServer.ts';
 
 type GeomanLifecycleWrapperHost = {
   addControls(controlsElement?: HTMLElement): Promise<unknown>;
@@ -251,41 +251,10 @@ describe('GeomanLifecycleController', () => {
     });
     process.env.VITE_GEOFORGE_VERSION = 'free';
 
-    const { createServer } = await import('vite');
-    const { svelte } = await import('@sveltejs/vite-plugin-svelte');
-    const packageRoot = process.cwd();
     const layerStyleStubId = '\0lifecycle-layer-style-stub';
-    const server = await createServer({
-      configFile: false,
-      define: {
-        __GEOMAN_VERSION__: JSON.stringify('free'),
-      },
-      plugins: [
-        {
-          name: 'lifecycle-layer-style-stub',
-          enforce: 'pre',
-          resolveId(source) {
-            const normalizedSource = source.replaceAll('\\', '/');
-            return source === '@/core/options/layers/style.ts' ||
-              normalizedSource.endsWith('/src/core/options/layers/style.ts')
-              ? layerStyleStubId
-              : null;
-          },
-          load(id) {
-            return id === layerStyleStubId ? 'export default {};' : null;
-          },
-        },
-        svelte(),
-      ],
-      resolve: {
-        alias: {
-          '@': path.join(packageRoot, 'src'),
-          '@mapLib': path.join(packageRoot, 'src/core/map/maplibre'),
-          '@tests': path.join(packageRoot, 'tests'),
-        },
-      },
-      root: packageRoot,
-      server: { middlewareMode: true },
+    const server = await createGeoForgeSsrServer({
+      layerStyleStubId,
+      layerStyleStubModule: 'export default {};',
     });
     const lifecycle = {
       addControls: vi.fn(() => Promise.resolve('addControls result')),

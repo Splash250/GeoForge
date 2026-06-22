@@ -4,7 +4,7 @@ import type GmControl from '@/core/controls/index.ts';
 import type { GmControlLoadEvent, GmEventName, GmSystemEvent } from '@/types/index.ts';
 import type { AnyMapInstance } from '@/types/map/index.ts';
 import { withPromiseTimeoutRace } from '@/utils/behavior.ts';
-import log from 'loglevel';
+import log from '@/utils/log.ts';
 
 type MapWithLifecycleEvents = AnyMapInstance & {
   once(type: string, listener: (ev: unknown) => void): unknown;
@@ -35,6 +35,7 @@ type GeomanLifecycleTarget = {
   overlays: { html: { destroy(): void } };
   contextPanels: { destroy(): void };
   transactions: { destroy(): void };
+  layers?: { destroy(): void };
   tools: { destroy(): void };
   selection: { destroy(): void };
   events: {
@@ -215,6 +216,7 @@ export class GeomanLifecycleController<
     this.geoman.overlays.html.destroy();
     this.geoman.contextPanels.destroy();
     this.geoman.transactions.destroy();
+    this.geoman.layers?.destroy();
     this.geoman.tools.destroy();
     this.geoman.selection.destroy();
 

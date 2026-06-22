@@ -5,7 +5,7 @@ import { ShapeMarkersHelper } from '@/modes/helpers/shape-markers.ts';
 import { SnappingHelper } from '@/modes/helpers/snapping.ts';
 import { ZoomToFeaturesHelper } from '@/modes/helpers/zoom-to-features.ts';
 import type { HelperModeName } from '@/types/modes/index.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 type HelperClassConstructor = new (gm: Geoman) => BaseHelper;
 type HelperClassMap = {

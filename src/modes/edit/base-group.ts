@@ -10,7 +10,7 @@ import booleanIntersects from '@turf/boolean-intersects';
 import difference from '@turf/difference';
 import union from '@turf/union';
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 import { SOURCES } from '@/core/features/constants.ts';
 

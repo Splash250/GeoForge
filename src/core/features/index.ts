@@ -46,7 +46,14 @@ import type {
   Polygon,
 } from 'geojson';
 import { cloneDeep } from 'lodash-es';
-import log from 'loglevel';
+import log from '@/utils/log';
+
+const HISTORY_IGNORED_SHAPES = new Set<FeatureShape>([
+  'center_marker',
+  'vertex_marker',
+  'edge_marker',
+  'snap_guide',
+]);
 
 export class Features {
   gm: Geoman;
@@ -209,7 +216,7 @@ export class Features {
 
     this.featureStoreService.delete(featureIdOrFeatureData);
 
-    if (featureData && before) {
+    if (featureData && before && isHistoryRecordableShape(featureData.shape)) {
       this.gm.history?.record(
         [
           {
@@ -302,17 +309,19 @@ export class Features {
     });
 
     this.add(featureData);
-    this.gm.history?.record(
-      [
-        {
-          kind: 'create',
-          ref: { sourceName: featureData.sourceName, featureId: featureData.id },
-          before: null,
-          after: cloneDeep(featureData.getGeoJson()),
-        },
-      ],
-      { label: 'feature.create' },
-    );
+    if (isHistoryRecordableShape(featureData.shape)) {
+      this.gm.history?.record(
+        [
+          {
+            kind: 'create',
+            ref: { sourceName: featureData.sourceName, featureId: featureData.id },
+            before: null,
+            after: cloneDeep(featureData.getGeoJson()),
+          },
+        ],
+        { label: 'feature.create' },
+      );
+    }
     if (!featureData.temporary && !imported) {
       this.fireFeatureCreatedEvent(featureData);
     }
@@ -626,6 +635,10 @@ export class Features {
 
     return null;
   }
+}
+
+function isHistoryRecordableShape(shape: FeatureShape): boolean {
+  return !HISTORY_IGNORED_SHAPES.has(shape);
 }
 
 function isGeomanFeatureRef(value: unknown): value is GeomanFeatureRef {
