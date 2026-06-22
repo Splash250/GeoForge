@@ -8,8 +8,21 @@ import type {
   ShapeName,
 } from '@/main.ts';
 import type { Feature, GeoJSON } from 'geojson';
-import log from 'loglevel';
+import log from '@/utils/log';
 import ml from 'maplibre-gl';
+
+function isMaplibreSourceReadinessError(error: unknown, sourceId: string): boolean {
+  if (!error || typeof error !== 'object' || !('message' in error)) {
+    return false;
+  }
+
+  const { message } = error;
+  return (
+    typeof message === 'string' &&
+    (message === `There is no source with ID '${sourceId}'` ||
+      message === `There is no tile manager with ID '${sourceId}'`)
+  );
+}
 
 export class MaplibreSource extends BaseSource<ml.GeoJSONSource> {
   gm: Geoman;
@@ -37,7 +50,25 @@ export class MaplibreSource extends BaseSource<ml.GeoJSONSource> {
   }
 
   get loaded(): boolean {
-    return this.mapInstance.isSourceLoaded(this.id);
+    const source = this.sourceInstance;
+    if (!source) {
+      return false;
+    }
+
+    const sourceLoaded = source.loaded;
+    if (typeof sourceLoaded !== 'function') {
+      return true;
+    }
+
+    try {
+      return sourceLoaded.call(source);
+    } catch (error) {
+      if (isMaplibreSourceReadinessError(error, source.id)) {
+        return false;
+      }
+
+      throw error;
+    }
   }
 
   createSource({ geoJson, sourceId }: { sourceId: string; geoJson: GeoJSON }): ml.GeoJSONSource {

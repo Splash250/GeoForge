@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import log from '../../src/utils/log.ts';
 import { FeatureStoreService } from '../../src/core/features/featureStoreService.ts';
 import type { FeatureData } from '../../src/core/features/feature-data.ts';
 import type {
@@ -250,7 +251,15 @@ describe('FeatureStoreService', () => {
   it('ignores non-feature objects passed to delete', () => {
     const sources = createSources();
     const service = new FeatureStoreService({ sources });
+    const logError = vi.spyOn(log, 'error').mockImplementation(() => undefined);
 
-    expect(() => service.delete({ id: 'not-a-feature' } as never)).not.toThrow();
+    try {
+      expect(() => service.delete({ id: 'not-a-feature' } as never)).not.toThrow();
+      expect(logError).toHaveBeenCalledWith(
+        'features.delete: feature "[object Object]" not found',
+      );
+    } finally {
+      logError.mockRestore();
+    }
   });
 });

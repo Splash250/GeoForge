@@ -16,7 +16,7 @@ import type {
 } from '@/types/events/index.ts';
 import type { MapHandlerReturnData } from '@/types/events/bus.ts';
 import type { FeatureShape } from '@/types/features.ts';
-import type { PositionData, SegmentPosition } from '@/types/geojson.ts';
+import type { GeoJsonShapeFeature, PositionData, SegmentPosition } from '@/types/geojson.ts';
 import type { LngLatTuple, ScreenPoint } from '@/types/map/index.ts';
 import { BaseHelper } from '@/modes/helpers/base.ts';
 import type { SharedMarker } from '@/types/interfaces.ts';
@@ -28,8 +28,8 @@ import { isPinHelper } from '@/utils/guards/interfaces.ts';
 import { isMapPointerEvent, isPointerEventWithModifiers } from '@/utils/guards/map.ts';
 import { isGmDrawEvent, isGmEditEvent } from '@/utils/guards/modes.ts';
 import type { BaseMapEvent, BaseMapPointerEvent } from '@mapLib/types/events.ts';
-import { cloneDeep, intersection } from 'lodash-es';
-import log from 'loglevel';
+import { cloneDeep, intersection, isEqual } from 'lodash-es';
+import log from '@/utils/log';
 
 type SegmentData = {
   segment: SegmentPosition;
@@ -50,6 +50,7 @@ export class ShapeMarkersHelper extends BaseHelper {
   previousPosition: LngLatTuple | null = null;
   activeMarker: MarkerData | null = null;
   activeFeatureData: FeatureData | null = null;
+  activeHistorySnapshot: GeoJsonShapeFeature | null = null;
   sharedMarkers: Array<SharedMarker> = [];
   allowedShapes: Array<FeatureShape> = ['circle', 'line', 'rectangle', 'polygon', 'ellipse'];
   edgeMarkersAllowed: boolean = false;
@@ -136,6 +137,7 @@ export class ShapeMarkersHelper extends BaseHelper {
     }
 
     this.previousPosition = getFeatureFirstPoint(this.activeMarker.instance);
+    this.activeHistorySnapshot = cloneDeep(this.activeFeatureData.getGeoJson());
     this.gm.mapAdapter.setDragPan(false);
 
     if (this.activeMarker.type === 'edge') {
@@ -176,12 +178,39 @@ export class ShapeMarkersHelper extends BaseHelper {
 
     if (eventData.featureData && eventData.markerData) {
       this.sendMarkerEvent('marker_released', eventData.featureData, eventData.markerData);
+      this.recordMarkerGestureHistory(eventData.featureData);
       return { next: false };
     } else {
       log.debug('ShapeMarkersHelper.onMouseUp: no active marker or featureData', eventData);
     }
 
     return { next: true };
+  }
+
+  recordMarkerGestureHistory(featureData: FeatureData) {
+    const before = this.activeHistorySnapshot;
+    this.activeHistorySnapshot = null;
+
+    if (!before) {
+      return;
+    }
+
+    const after = cloneDeep(featureData.getGeoJson());
+    if (isEqual(before, after)) {
+      return;
+    }
+
+    this.gm.history?.record(
+      [
+        {
+          kind: 'update',
+          ref: { sourceName: featureData.sourceName, featureId: featureData.id },
+          before,
+          after,
+        },
+      ],
+      { label: 'edit.change' },
+    );
   }
 
   onMouseMove(event: BaseMapEvent): MapHandlerReturnData {
@@ -309,6 +338,7 @@ export class ShapeMarkersHelper extends BaseHelper {
         }
       });
     });
+    this.gm.features.bringEditOverlayLayersToFront();
   }
 
   addCenterMarker(featureData: FeatureData) {
@@ -535,6 +565,7 @@ export class ShapeMarkersHelper extends BaseHelper {
 
       featureData.markers.delete(markerKey);
     });
+    this.gm.features.bringEditOverlayLayersToFront();
   }
 
   createOrUpdateVertexMarker(position: PositionData, featureData: FeatureData) {

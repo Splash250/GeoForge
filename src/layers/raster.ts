@@ -1,0 +1,624 @@
+import { GM_PREFIX } from '@/core/constants.ts';
+
+const rasterLayerPrefix = `${GM_PREFIX}-raster-layer-`;
+const rasterSourcePrefix = `${GM_PREFIX}-raster-source-`;
+const defaultRasterTileSize = 256;
+
+export type GeomanRasterLayer = {
+  id: string;
+  name: string;
+  url: string;
+  basemapLayerId?: string;
+};
+
+export type DiscoveredRasterLayer = {
+  name: string;
+  title: string;
+  url: string;
+};
+
+export type RasterLayerInput = {
+  id?: string;
+  name: string;
+  url: string;
+  basemapLayerId?: string;
+};
+
+export type DiscoverRasterLayersOptions = {
+  fetchFn?: (url: string) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+  transformRequestUrl?: (url: string) => string;
+};
+
+export type RasterLayerSyncOptions = {
+  transformTileUrl?: (url: string) => string;
+  basemapLayerId?: string;
+};
+
+type RasterMap = {
+  addLayer: (
+    layer: {
+      id: string;
+      type: 'raster';
+      source: string;
+      paint: Record<string, never>;
+    },
+    beforeId?: string,
+  ) => unknown;
+  addSource: (
+    id: string,
+    source: {
+      type: 'raster';
+      tiles: string[];
+      tileSize: number;
+    },
+  ) => unknown;
+  getLayer: (id: string) => unknown;
+  getSource: (id: string) => unknown;
+  getStyle: () => { layers?: Array<{ id: string }> };
+  moveLayer: (id: string, beforeId?: string) => unknown;
+  removeLayer: (id: string) => unknown;
+  removeSource: (id: string) => unknown;
+};
+
+export class GeomanLayerSubsystem {
+  private rasterLayers: GeomanRasterLayer[] = [];
+
+  constructor(
+    private readonly options: {
+      geoman: {
+        mapAdapter: {
+          getMapInstance(): unknown;
+        };
+      };
+    },
+  ) {}
+
+  async discoverRasterLayers(
+    serviceUrl: string,
+    options: DiscoverRasterLayersOptions = {},
+  ): Promise<DiscoveredRasterLayer[]> {
+    const capabilitiesUrl = buildRasterCapabilitiesRequestUrl(serviceUrl);
+    const requestUrl = options.transformRequestUrl?.(capabilitiesUrl) ?? capabilitiesUrl;
+    const fetchFn = options.fetchFn ?? getGlobalFetch();
+    const response = await fetchFn(requestUrl);
+
+    if (!response.ok) {
+      throw new Error(`Capabilities request failed with HTTP ${response.status}.`);
+    }
+
+    return parseRasterCapabilities(await response.text(), capabilitiesUrl);
+  }
+
+  addRasterLayer(
+    input: RasterLayerInput,
+    options: RasterLayerSyncOptions = {},
+  ): GeomanRasterLayer | null {
+    const nextLayers = this.addRasterLayers([input], options);
+    return nextLayers[0] ?? null;
+  }
+
+  addRasterLayers(
+    inputs: RasterLayerInput[],
+    options: RasterLayerSyncOptions = {},
+  ): GeomanRasterLayer[] {
+    const nextLayers = inputs.flatMap((input) => {
+      const name = input.name.trim();
+      const url = normalizeRasterTileUrl(input.url.trim());
+
+      if (!name || !url) {
+        return [];
+      }
+
+      return [
+        {
+          id: input.id ?? createRasterLayerId(name),
+          name,
+          url,
+          basemapLayerId: input.basemapLayerId ?? options.basemapLayerId,
+        },
+      ];
+    });
+
+    const replacementIds = new Set(nextLayers.map((layer) => layer.id));
+    const map = this.getRasterMap();
+
+    replacementIds.forEach((layerId) => {
+      removeRasterLayerFromMap(map, layerId);
+    });
+
+    this.rasterLayers = [
+      ...dedupeRasterLayersById(nextLayers),
+      ...this.rasterLayers.filter((layer) => !replacementIds.has(layer.id)),
+    ];
+    this.syncRasterLayers(options);
+    return nextLayers;
+  }
+
+  removeRasterLayer(layerId: string, options: RasterLayerSyncOptions = {}): void {
+    removeRasterLayerFromMap(this.getRasterMap(), layerId);
+    this.rasterLayers = this.rasterLayers.filter((layer) => layer.id !== layerId);
+    this.syncRasterLayers(options);
+  }
+
+  reorderRasterLayer(layerId: string, direction: -1 | 1, options: RasterLayerSyncOptions = {}): void {
+    const index = this.rasterLayers.findIndex((layer) => layer.id === layerId);
+    const targetIndex = index + direction;
+
+    if (index < 0 || targetIndex < 0 || targetIndex >= this.rasterLayers.length) {
+      return;
+    }
+
+    const next = [...this.rasterLayers];
+    const [layer] = next.splice(index, 1);
+    next.splice(targetIndex, 0, layer);
+    this.rasterLayers = next;
+    this.syncRasterLayers(options);
+  }
+
+  getRasterLayers(): GeomanRasterLayer[] {
+    return [...this.rasterLayers];
+  }
+
+  syncRasterLayers(options: RasterLayerSyncOptions = {}): void {
+    syncRasterLayers(this.getRasterMap(), this.rasterLayers, options);
+  }
+
+  destroy(): void {
+    const map = this.getOptionalRasterMap();
+
+    if (map) {
+      this.rasterLayers.forEach((layer) => {
+        removeRasterLayerFromMap(map, layer.id);
+      });
+    }
+    this.rasterLayers = [];
+  }
+
+  private getRasterMap(): RasterMap {
+    const map = this.options.geoman.mapAdapter.getMapInstance();
+
+    if (!isRasterMap(map)) {
+      throw new Error('Raster layers require a MapLibre-compatible map instance.');
+    }
+
+    return map;
+  }
+
+  private getOptionalRasterMap(): RasterMap | null {
+    const map = this.options.geoman.mapAdapter.getMapInstance();
+    return isRasterMap(map) ? map : null;
+  }
+}
+
+export function buildRasterCapabilitiesRequestUrl(rawUrl: string): string {
+  let url: URL;
+
+  try {
+    url = new URL(rawUrl.trim());
+  } catch {
+    return rawUrl;
+  }
+
+  const service = inferRasterService(url);
+  const baseUrl = new URL(url.origin + url.pathname);
+
+  baseUrl.searchParams.set('service', service);
+  baseUrl.searchParams.set('request', 'GetCapabilities');
+
+  return baseUrl.toString();
+}
+
+export function normalizeRasterTileUrl(rawUrl: string): string {
+  if (!rawUrl) {
+    return '';
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return rawUrl;
+  }
+
+  if (url.searchParams.get('service')?.toLowerCase() !== 'wms') {
+    return rawUrl;
+  }
+
+  url.searchParams.set('request', 'GetMap');
+  url.searchParams.set('bbox', '{bbox-epsg-3857}');
+  url.searchParams.set('width', String(defaultRasterTileSize));
+  url.searchParams.set('height', String(defaultRasterTileSize));
+  url.searchParams.set('crs', 'EPSG:3857');
+  url.searchParams.set('srs', 'EPSG:3857');
+
+  return decodeMapLibreTokens(url.toString());
+}
+
+export function parseRasterCapabilities(
+  xmlText: string,
+  capabilitiesUrl: string,
+): DiscoveredRasterLayer[] {
+  const document = parseXmlDocument(xmlText);
+  const service = inferCapabilitiesService(document, capabilitiesUrl);
+
+  if (service === 'WMTS') {
+    return parseWmtsCapabilities(document, capabilitiesUrl);
+  }
+
+  return parseWmsCapabilities(document, capabilitiesUrl);
+}
+
+export function syncRasterLayers(
+  map: RasterMap,
+  layers: GeomanRasterLayer[],
+  options: RasterLayerSyncOptions = {},
+): void {
+  removeStaleRasterLayers(map, layers);
+
+  for (const layer of [...layers].reverse()) {
+    const sourceId = getRasterSourceId(layer.id);
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: 'raster',
+        tiles: [options.transformTileUrl?.(layer.url) ?? layer.url],
+        tileSize: defaultRasterTileSize,
+      });
+    }
+
+    if (!map.getLayer(layer.id)) {
+      map.addLayer(
+        {
+          id: layer.id,
+          type: 'raster',
+          source: sourceId,
+          paint: {},
+        },
+        getFeatureLayerAnchorId(map, layer.id, layer.basemapLayerId ?? options.basemapLayerId),
+      );
+    }
+  }
+
+  moveRasterLayersIntoOverlayStack(map, layers, options);
+}
+
+function moveRasterLayersIntoOverlayStack(
+  map: RasterMap,
+  layers: GeomanRasterLayer[],
+  options: RasterLayerSyncOptions,
+): void {
+  for (const layer of [...layers].reverse()) {
+    if (map.getLayer(layer.id)) {
+      map.moveLayer(
+        layer.id,
+        getFeatureLayerAnchorId(map, layer.id, layer.basemapLayerId ?? options.basemapLayerId),
+      );
+    }
+  }
+}
+
+function removeStaleRasterLayers(map: RasterMap, layers: GeomanRasterLayer[]): void {
+  const activeIds = new Set(layers.map((layer) => layer.id));
+  const styleLayers = map.getStyle().layers ?? [];
+
+  for (const layer of styleLayers) {
+    if (layer.id.startsWith(rasterLayerPrefix) && !activeIds.has(layer.id)) {
+      if (map.getLayer(layer.id)) {
+        map.removeLayer(layer.id);
+      }
+
+      const sourceId = getRasterSourceId(layer.id);
+
+      if (map.getSource(sourceId)) {
+        map.removeSource(sourceId);
+      }
+    }
+  }
+}
+
+function getFeatureLayerAnchorId(
+  map: RasterMap,
+  movingLayerId?: string,
+  basemapLayerId?: string,
+): string | undefined {
+  const rasterLayerIds = new Set(
+    (map.getStyle().layers ?? [])
+      .map((layer) => layer.id)
+      .filter((layerId) => layerId.startsWith(rasterLayerPrefix)),
+  );
+
+  return (map.getStyle().layers ?? []).find((layer) => {
+    if (layer.id === movingLayerId || layer.id === basemapLayerId) {
+      return false;
+    }
+
+    if (!basemapLayerId && !layer.id.startsWith(`${GM_PREFIX}_`)) {
+      return false;
+    }
+
+    return !rasterLayerIds.has(layer.id);
+  })?.id;
+}
+
+function parseWmsCapabilities(
+  document: Document,
+  capabilitiesUrl: string,
+): DiscoveredRasterLayer[] {
+  const version = document.documentElement.getAttribute('version') || '1.3.0';
+  const getMapUrl = getWmsGetMapEndpoint(document, capabilitiesUrl);
+
+  return findElementsByLocalName(document, 'Layer')
+    .map((layer) => {
+      const name = getDirectChildText(layer, 'Name');
+
+      if (!name) {
+        return null;
+      }
+
+      const title = getDirectChildText(layer, 'Title') || name;
+
+      return {
+        name,
+        title,
+        url: buildWmsTileTemplateUrl(getMapUrl, name, version),
+      };
+    })
+    .filter((layer): layer is DiscoveredRasterLayer => layer !== null);
+}
+
+function parseWmtsCapabilities(
+  document: Document,
+  capabilitiesUrl: string,
+): DiscoveredRasterLayer[] {
+  return findElementsByLocalName(document, 'Layer')
+    .map((layer) => {
+      const name = getDirectChildText(layer, 'Identifier');
+
+      if (!name) {
+        return null;
+      }
+
+      const title = getDirectChildText(layer, 'Title') || name;
+      const resourceUrl = Array.from(layer.children).find(
+        (child) =>
+          child.localName === 'ResourceURL' &&
+          child.getAttribute('resourceType')?.toLowerCase() === 'tile',
+      );
+      const template = resourceUrl?.getAttribute('template');
+
+      return {
+        name,
+        title,
+        url: template
+          ? normalizeWmtsTemplateUrl(template, capabilitiesUrl)
+          : buildWmtsKvpTileTemplateUrl(capabilitiesUrl, name),
+      };
+    })
+    .filter((layer): layer is DiscoveredRasterLayer => layer !== null);
+}
+
+function buildWmsTileTemplateUrl(
+  capabilitiesUrl: string,
+  layerName: string,
+  version: string,
+): string {
+  const url = new URL(capabilitiesUrl);
+
+  url.searchParams.set('service', 'WMS');
+  url.searchParams.set('request', 'GetMap');
+  url.searchParams.set('version', version);
+  url.searchParams.set('layers', layerName);
+  url.searchParams.set('styles', '');
+  url.searchParams.set('format', 'image/png');
+  url.searchParams.set('transparent', 'true');
+  url.searchParams.set('width', String(defaultRasterTileSize));
+  url.searchParams.set('height', String(defaultRasterTileSize));
+  url.searchParams.set('crs', 'EPSG:3857');
+  url.searchParams.set('srs', 'EPSG:3857');
+  url.searchParams.set('bbox', '{bbox-epsg-3857}');
+
+  return decodeMapLibreTokens(url.toString());
+}
+
+function buildWmtsKvpTileTemplateUrl(capabilitiesUrl: string, layerName: string): string {
+  const url = new URL(capabilitiesUrl);
+
+  url.searchParams.set('service', 'WMTS');
+  url.searchParams.set('request', 'GetTile');
+  url.searchParams.set('version', '1.0.0');
+  url.searchParams.set('layer', layerName);
+  url.searchParams.set('style', 'default');
+  url.searchParams.set('tilematrixset', 'EPSG:3857');
+  url.searchParams.set('tilematrix', '{z}');
+  url.searchParams.set('tilerow', '{y}');
+  url.searchParams.set('tilecol', '{x}');
+  url.searchParams.set('format', 'image/png');
+
+  return decodeMapLibreTokens(url.toString());
+}
+
+function normalizeWmtsTemplateUrl(template: string, capabilitiesUrl: string): string {
+  return resolveUrlTemplate(template, capabilitiesUrl)
+    .replaceAll('{TileMatrix}', '{z}')
+    .replaceAll('{TileRow}', '{y}')
+    .replaceAll('{TileCol}', '{x}')
+    .replaceAll('{tilematrix}', '{z}')
+    .replaceAll('{tilerow}', '{y}')
+    .replaceAll('{tilecol}', '{x}')
+    .replaceAll('%7BTileMatrix%7D', '{z}')
+    .replaceAll('%7BTileRow%7D', '{y}')
+    .replaceAll('%7BTileCol%7D', '{x}')
+    .replaceAll('%7Btilematrix%7D', '{z}')
+    .replaceAll('%7Btilerow%7D', '{y}')
+    .replaceAll('%7Btilecol%7D', '{x}');
+}
+
+function decodeMapLibreTokens(url: string): string {
+  return url
+    .replaceAll('%7Bbbox-epsg-3857%7D', '{bbox-epsg-3857}')
+    .replaceAll('%7bbbox-epsg-3857%7d', '{bbox-epsg-3857}')
+    .replaceAll('%7Bz%7D', '{z}')
+    .replaceAll('%7Bx%7D', '{x}')
+    .replaceAll('%7By%7D', '{y}');
+}
+
+function inferRasterService(url: URL): 'WMS' | 'WMTS' {
+  return url.searchParams.get('service')?.toUpperCase() === 'WMTS' ? 'WMTS' : 'WMS';
+}
+
+function inferCapabilitiesService(document: Document, capabilitiesUrl: string): 'WMS' | 'WMTS' {
+  const rootName = document.documentElement.localName.toLowerCase();
+
+  if (rootName.includes('wmts')) {
+    return 'WMTS';
+  }
+
+  try {
+    const url = new URL(capabilitiesUrl);
+
+    if (url.searchParams.get('service')?.toUpperCase() === 'WMTS') {
+      return 'WMTS';
+    }
+  } catch {
+    // Fall through to WMS for non-URL inputs.
+  }
+
+  return 'WMS';
+}
+
+function parseXmlDocument(xmlText: string): Document {
+  const Parser = getDomParser();
+  const document = new Parser().parseFromString(xmlText, 'application/xml');
+  const parserError = findFirstElementByLocalName(document, 'parsererror');
+
+  if (parserError) {
+    throw new Error(parserError.textContent?.trim() || 'Capabilities response is not valid XML.');
+  }
+
+  return document;
+}
+
+function getDomParser(): typeof DOMParser {
+  if (typeof DOMParser !== 'undefined') {
+    return DOMParser;
+  }
+
+  throw new Error('DOMParser is unavailable in this environment.');
+}
+
+function getGlobalFetch(): NonNullable<DiscoverRasterLayersOptions['fetchFn']> {
+  if (typeof fetch === 'function') {
+    return fetch;
+  }
+
+  throw new Error('fetch is unavailable. Pass discoverRasterLayers(..., { fetchFn }).');
+}
+
+function getDirectChildText(element: Element, childName: string): string {
+  const child = Array.from(element.children).find((candidate) => candidate.localName === childName);
+  return child?.textContent?.trim() ?? '';
+}
+
+function getWmsGetMapEndpoint(document: Document, capabilitiesUrl: string): string {
+  const getMap = findFirstElementByLocalName(document, 'GetMap');
+  const onlineResource = getMap
+    ? findFirstElementByLocalName(getMap, 'OnlineResource')
+    : undefined;
+  const href =
+    onlineResource?.getAttribute('xlink:href') ??
+    onlineResource?.getAttribute('href') ??
+    onlineResource?.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+
+  if (!href) {
+    return capabilitiesUrl;
+  }
+
+  try {
+    const resolvedUrl = new URL(href, capabilitiesUrl);
+    const sourceUrl = new URL(capabilitiesUrl);
+
+    if (
+      sourceUrl.protocol === 'https:' &&
+      resolvedUrl.protocol === 'http:' &&
+      resolvedUrl.origin !== sourceUrl.origin
+    ) {
+      return capabilitiesUrl;
+    }
+
+    return resolvedUrl.toString();
+  } catch {
+    return capabilitiesUrl;
+  }
+}
+
+function resolveUrlTemplate(template: string, baseUrl: string): string {
+  try {
+    return new URL(template, baseUrl).toString();
+  } catch {
+    return template;
+  }
+}
+
+function findFirstElementByLocalName(root: ParentNode, localName: string): Element | undefined {
+  return findElementsByLocalName(root, localName)[0];
+}
+
+function findElementsByLocalName(root: ParentNode, localName: string): Element[] {
+  return Array.from(root.querySelectorAll('*')).filter((element) => element.localName === localName);
+}
+
+function getRasterSourceId(layerId: string): string {
+  return `${rasterSourcePrefix}${sanitizeIdSegment(layerId)}`;
+}
+
+function createRasterLayerId(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+
+  return `${rasterLayerPrefix}${slug || 'overlay'}-${Date.now().toString(36)}`;
+}
+
+function isRasterMap(map: unknown): map is RasterMap {
+  return !!(
+    map &&
+    typeof map === 'object' &&
+    'addSource' in map &&
+    'addLayer' in map &&
+    'moveLayer' in map &&
+    'getStyle' in map
+  );
+}
+
+function removeRasterLayerFromMap(map: RasterMap, layerId: string): void {
+  if (map.getLayer(layerId)) {
+    map.removeLayer(layerId);
+  }
+
+  const sourceId = getRasterSourceId(layerId);
+
+  if (map.getSource(sourceId)) {
+    map.removeSource(sourceId);
+  }
+}
+
+function dedupeRasterLayersById(layers: GeomanRasterLayer[]): GeomanRasterLayer[] {
+  const seen = new Set<string>();
+  const deduped: GeomanRasterLayer[] = [];
+
+  for (const layer of layers) {
+    if (!seen.has(layer.id)) {
+      seen.add(layer.id);
+      deduped.push(layer);
+    }
+  }
+
+  return deduped;
+}
+
+function sanitizeIdSegment(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_-]+/g, '-');
+}

@@ -8,7 +8,7 @@ import type {
   SourcesStorage,
 } from '@/types/features.ts';
 import type { GeoJsonShapeFeature } from '@/types/geojson.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 type FeatureIdGenerator = (shapeGeoJson: GeoJsonShapeFeature) => FeatureId;
 

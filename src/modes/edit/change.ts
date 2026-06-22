@@ -27,7 +27,7 @@ import { isGmEditEvent } from '@/utils/guards/modes.ts';
 import { toMod } from '@/utils/number.ts';
 import type { Feature, LineString, MultiPolygon, Polygon } from 'geojson';
 import { cloneDeep, get } from 'lodash-es';
-import log from 'loglevel';
+import log from '@/utils/log';
 import { isSnapGuidesHelper } from '@/utils/guards/interfaces.ts';
 
 type UpdateShapeHandler = (event: GmEditMarkerMoveEvent) => GeoJsonShapeFeature | null;

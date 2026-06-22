@@ -128,4 +128,69 @@ describe('feature mutation records', () => {
     });
     expect(deleteOperation.before?.id).toBe('created-feature');
   });
+
+  it('does not record internal edit control marker or snap guide create, update, or delete operations', () => {
+    const { features, record } = createFeaturesWithHistory();
+
+    const parentFeature = features.createFeature({
+      featureId: 'editable-line',
+      sourceName: SOURCES.main,
+      shapeGeoJson: {
+        type: 'Feature',
+        id: 'editable-line',
+        properties: { shape: 'line' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [0, 0],
+            [1, 1],
+          ],
+        },
+      },
+    });
+    expect(parentFeature).not.toBeNull();
+    record.mockClear();
+
+    for (const markerType of ['vertex', 'edge', 'center'] as const) {
+      const marker = features.createMarkerFeature({
+        parentFeature: parentFeature!,
+        coordinate: [0, 0],
+        type: markerType,
+        sourceName: SOURCES.main,
+      });
+      marker?.updateGeoJsonGeometry({ type: 'Point', coordinates: [0.5, 0.5] });
+      if (marker) {
+        features.delete(marker);
+      }
+    }
+
+    const snapGuide = features.createFeature({
+      featureId: 'snap-guide',
+      sourceName: SOURCES.main,
+      shapeGeoJson: {
+        type: 'Feature',
+        id: 'snap-guide',
+        properties: { shape: 'snap_guide' },
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [0, 0],
+            [1, 1],
+          ],
+        },
+      },
+    });
+    snapGuide?.updateGeoJsonGeometry({
+      type: 'LineString',
+      coordinates: [
+        [0, 0],
+        [2, 2],
+      ],
+    });
+    if (snapGuide) {
+      features.delete(snapGuide);
+    }
+
+    expect(record).not.toHaveBeenCalled();
+  });
 });

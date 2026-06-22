@@ -46,6 +46,7 @@ function createGeomanStub() {
     features: {
       get: vi.fn((_sourceName: string, id: string) => features.get(id) ?? null),
       featureStore: features,
+      bringEditOverlayLayersToFront: vi.fn(),
     },
     events: {
       fire: vi.fn(),
@@ -77,6 +78,31 @@ describe('GeomanSelectionSubsystem', () => {
     expect(selection.getSelectedFeature()).toBe(line);
     expect(geoman.setEditableFeatureIds).toHaveBeenLastCalledWith(['line-1']);
     expect(geoman.editableFeatureIds).toEqual(new Set(['line-1']));
+  });
+
+  test('keeps edit marker overlay layers above selection highlight layers after selection changes', () => {
+    const geoman = createGeomanStub();
+    const line = feature('line-1', 'line');
+    geoman.features.featureStore.set('line-1', line);
+    const layerManager = {
+      configure: vi.fn(),
+      update: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const selection = new GeomanSelectionSubsystem({
+      geoman: geoman as never,
+      layerManager,
+    } as never);
+
+    selection.activate();
+    geoman.features.bringEditOverlayLayersToFront.mockClear();
+    selection.selectFeature(line as never, { reason: 'api' });
+
+    expect(layerManager.update).toHaveBeenLastCalledWith({
+      hoveredFeatureId: null,
+      selectedFeatureId: 'line-1',
+    });
+    expect(geoman.features.bringEditOverlayLayersToFront).toHaveBeenCalledTimes(1);
   });
 
   test('does not select disabled edit features', () => {

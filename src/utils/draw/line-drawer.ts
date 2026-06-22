@@ -20,7 +20,7 @@ import { isMapPointerEvent } from '@/utils/guards/map.ts';
 import type { BaseMapEvent, BaseMapPointerEvent } from '@mapLib/types/events.ts';
 import lineToPolygon from '@turf/line-to-polygon';
 import type { Position } from 'geojson';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 type LineDrawerOptions = {
   snappingMarkers: 'first' | 'last' | 'all' | 'none';

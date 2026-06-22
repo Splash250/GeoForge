@@ -19,7 +19,7 @@ import { EDIT_MODES, HELPER_MODES } from '@/modes/constants.ts';
 import { isGmDrawEvent, isGmEditEvent, isGmHelperEvent } from '@/utils/guards/modes.ts';
 import { includesWithType } from '@/utils/typing.ts';
 import mergeWith from 'lodash-es/mergeWith';
-import log from 'loglevel';
+import log from '@/utils/log';
 import type { PartialDeep } from 'type-fest';
 
 export class GmOptions {

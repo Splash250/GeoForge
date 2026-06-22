@@ -15,6 +15,7 @@ import { GeomanLineDecoratorSubsystem } from '@/decorators/line/geomanLineDecora
 import { GeomanContextPanelSubsystem } from '@/context-panels/geomanContextPanelSubsystem.ts';
 import { GeomanGeometrySubsystem } from '@/geometry/geomanGeometrySubsystem.ts';
 import { GeomanHistorySubsystem } from '@/history/index.ts';
+import { GeomanLayerSubsystem } from '@/layers/index.ts';
 import { BaseDraw } from '@/modes/draw/base.ts';
 
 import { drawClassMap } from '@/modes/draw/index.ts';
@@ -43,7 +44,7 @@ import type { GmOptionsData, ModeType } from '@/types/options.ts';
 import { MarkerPointer } from '@/utils/draw/marker-pointer.ts';
 import { isGmDrawEvent, isModeName, isModeType } from '@/utils/guards/modes.ts';
 import { typedKeys } from '@/utils/typing.ts';
-import log from 'loglevel';
+import log from '@/utils/log.ts';
 import type { PartialDeep } from 'type-fest';
 
 // declare module 'maplibre-gl' {
@@ -80,6 +81,7 @@ export class Geoman {
   history: GeomanHistorySubsystem;
   contextPanels: GeomanContextPanelSubsystem;
   transactions: GeomanTransactionSubsystem;
+  layers: GeomanLayerSubsystem;
   decorators: {
     lines: GeomanLineDecoratorSubsystem;
   };
@@ -103,6 +105,7 @@ export class Geoman {
     this.history = new GeomanHistorySubsystem({ geoman: this });
     this.contextPanels = new GeomanContextPanelSubsystem({ geoman: this });
     this.transactions = new GeomanTransactionSubsystem({ geoman: this });
+    this.layers = new GeomanLayerSubsystem({ geoman: this });
     this.tools = new GeomanToolsSubsystem({ geoman: this });
 
     const mapWithGeoman = Object.assign(map, { gm: this });
@@ -571,6 +574,9 @@ export * from '@/transactions/index.ts';
 
 // history
 export * from '@/history/index.ts';
+
+// layers
+export * from '@/layers/index.ts';
 
 // guards
 export {

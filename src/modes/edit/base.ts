@@ -27,6 +27,9 @@ export abstract class BaseEdit extends BaseAction {
   actionType: ActionType = 'edit';
   abstract mode: EditModeName;
   featureData: FeatureData | null = null;
+  private editHistoryStartSnapshot: GeoJsonShapeFeature | null = null;
+  private editHistoryRef: { sourceName: FeatureSourceName; featureId: FeatureData['id'] } | null =
+    null;
   cursorExcludedLayerIds: Array<string> = ['rectangle-line', 'polygon-line', 'circle-line'];
   layerEventHandlersData: Array<{
     eventName: PointerEventName;
@@ -113,10 +116,12 @@ export abstract class BaseEdit extends BaseAction {
 
     const sourceGeoJson = cloneDeep(featureData.getGeoJson());
 
-    featureData.updateGeoJsonGeometry(featureGeoJson.geometry);
-    if (!isEqual(featureData.getGeoJson().properties, featureGeoJson.properties)) {
-      featureData._updateAllProperties(featureGeoJson.properties);
-    }
+    this.suspendHistory(() => {
+      featureData.updateGeoJsonGeometry(featureGeoJson.geometry);
+      if (!isEqual(featureData.getGeoJson().properties, featureGeoJson.properties)) {
+        featureData._updateAllProperties(featureGeoJson.properties);
+      }
+    });
 
     this.fireFeatureUpdatedEvent({
       sourceFeatures: [featureData],
@@ -126,6 +131,48 @@ export abstract class BaseEdit extends BaseAction {
     });
 
     return true;
+  }
+
+  protected suspendHistory<T>(callback: () => T): T {
+    const history = this.gm.history as { suspend?: <TResult>(callback: () => TResult) => TResult };
+
+    return history.suspend ? history.suspend(callback) : callback();
+  }
+
+  protected beginEditHistoryGesture(featureData: FeatureData) {
+    this.editHistoryStartSnapshot = cloneDeep(featureData.getGeoJson());
+    this.editHistoryRef = {
+      sourceName: featureData.sourceName,
+      featureId: featureData.id,
+    };
+  }
+
+  protected finishEditHistoryGesture(featureData: FeatureData, label: string) {
+    const before = this.editHistoryStartSnapshot;
+    const ref = this.editHistoryRef;
+    this.editHistoryStartSnapshot = null;
+    this.editHistoryRef = null;
+
+    if (!before || !ref) {
+      return;
+    }
+
+    const after = cloneDeep(featureData.getGeoJson());
+    if (isEqual(before, after)) {
+      return;
+    }
+
+    this.gm.history?.record(
+      [
+        {
+          kind: 'update',
+          ref,
+          before,
+          after,
+        },
+      ],
+      { label },
+    );
   }
 
   fireBeforeFeatureUpdate({

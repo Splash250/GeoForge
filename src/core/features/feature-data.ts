@@ -22,13 +22,19 @@ import { includesWithType, typedKeys } from '@/utils/typing.ts';
 import centroid from '@turf/centroid';
 import type { Feature } from 'geojson';
 import { cloneDeep } from 'lodash-es';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 export const toPolygonAllowedShapes: Array<FeatureData['shape']> = [
   'circle',
   'ellipse',
   'rectangle',
 ];
+const HISTORY_IGNORED_SHAPES = new Set<FeatureShape>([
+  'center_marker',
+  'vertex_marker',
+  'edge_marker',
+  'snap_guide',
+]);
 
 function isCustomPropertyName(name: string): boolean {
   if (name.startsWith(FEATURE_PROPERTY_PREFIX) || name.startsWith(`${GM_SYSTEM_PREFIX}:`)) {
@@ -570,6 +576,10 @@ export class FeatureData {
     after: GeoJsonShapeFeature,
     label: string,
   ): void {
+    if (!this.isHistoryRecordable()) {
+      return;
+    }
+
     this.gm.history?.record(
       [
         {
@@ -581,5 +591,9 @@ export class FeatureData {
       ],
       { label },
     );
+  }
+
+  private isHistoryRecordable(): boolean {
+    return !HISTORY_IGNORED_SHAPES.has(this.shape);
   }
 }

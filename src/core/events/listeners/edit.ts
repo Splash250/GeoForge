@@ -9,7 +9,7 @@ import type { GmEditEvent } from '@/types/events/edit.ts';
 import type { GmSystemEvent } from '@/types/events/index.ts';
 import type { ActionInstanceKey } from '@/types/modes/index.ts';
 import { isGmEditEvent } from '@/utils/guards/modes.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 export class EditEventListener extends BaseEventListener {
   eventHandlers: EventHandlers = {

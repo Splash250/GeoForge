@@ -5,7 +5,7 @@ import { registerLineEndpointTool } from '@/dev/tools/lineEndpointTool.ts';
 import { registerSegmentLengthTool } from '@/dev/tools/segmentLengthTool.ts';
 import { registerSingleFeatureEditTool } from '@/dev/tools/singleFeatureEditTool.ts';
 import * as geojsonUtils from '@/utils/geojson.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 import ml from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 

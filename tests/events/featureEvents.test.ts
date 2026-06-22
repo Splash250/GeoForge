@@ -5,7 +5,7 @@ import { SOURCES } from '@/core/features/constants.ts';
 import type { FeatureData } from '@/core/features/feature-data.ts';
 import type { GeoJsonShapeFeature } from '@/types/geojson.ts';
 import type { Geoman, GmSystemEvent } from '@/main.ts';
-import log from 'loglevel';
+import log from '../../src/utils/log.ts';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/core/options/layers/style.ts', () => ({ default: {} }));

@@ -12,7 +12,7 @@ import bearing from '@turf/bearing';
 import centroid from '@turf/centroid';
 import transformRotate from '@turf/transform-rotate';
 import { cloneDeep } from 'lodash-es';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 type RotateShapeHandler = (event: GmEditMarkerMoveEvent) => GeoJsonShapeFeature | null;
 

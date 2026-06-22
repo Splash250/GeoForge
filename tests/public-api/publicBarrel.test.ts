@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, expect, expectTypeOf, it, test, vi } from 'vitest';
+import { createGeoForgeSsrServer } from '../utils/viteSsrServer.ts';
 import type {
   ArrowheadManagerOptions,
   ArrowheadOptions,
@@ -26,6 +27,7 @@ const STABLE_ROOT_EXPORTS = [
   'GeomanTransactionSubsystem',
   'GeomanTransaction',
   'GeomanHistorySubsystem',
+  'GeomanLayerSubsystem',
   'defineGeomanContextPanel',
   'createContextPanelValidationList',
   'createContextPanelActionButton',
@@ -102,41 +104,10 @@ describe('public API barrel', () => {
     });
     process.env.VITE_GEOFORGE_VERSION = 'free';
 
-    const { createServer } = await import('vite');
-    const { svelte } = await import('@sveltejs/vite-plugin-svelte');
-    const packageRoot = process.cwd();
     const layerStyleStubId = '\0public-api-layer-style-stub';
-    const server = await createServer({
-      configFile: false,
-      define: {
-        __GEOMAN_VERSION__: JSON.stringify('free'),
-      },
-      plugins: [
-        {
-          name: 'public-api-layer-style-stub',
-          enforce: 'pre',
-          resolveId(source) {
-            const normalizedSource = source.replaceAll('\\', '/');
-            return source === '@/core/options/layers/style.ts' ||
-              normalizedSource.endsWith('/src/core/options/layers/style.ts')
-              ? layerStyleStubId
-              : null;
-          },
-          load(id) {
-            return id === layerStyleStubId ? 'export default {};' : null;
-          },
-        },
-        svelte(),
-      ],
-      resolve: {
-        alias: {
-          '@': path.join(packageRoot, 'src'),
-          '@mapLib': path.join(packageRoot, 'src/core/map/maplibre'),
-          '@tests': path.join(packageRoot, 'tests'),
-        },
-      },
-      root: packageRoot,
-      server: { middlewareMode: true },
+    const server = await createGeoForgeSsrServer({
+      layerStyleStubId,
+      layerStyleStubModule: 'export default {};',
     });
 
     try {
@@ -331,41 +302,10 @@ test('exports public compatibility types from the root barrel', () => {
 });
 
 test('exports context panel and geometry helper types', async () => {
-  const { createServer } = await import('vite');
-  const { svelte } = await import('@sveltejs/vite-plugin-svelte');
-  const packageRoot = process.cwd();
   const layerStyleStubId = '\0public-api-context-panel-layer-style-stub';
-  const server = await createServer({
-    configFile: false,
-    define: {
-      __GEOMAN_VERSION__: JSON.stringify('free'),
-    },
-    plugins: [
-      {
-        name: 'public-api-context-panel-layer-style-stub',
-        enforce: 'pre',
-        resolveId(source) {
-          const normalizedSource = source.replaceAll('\\', '/');
-          return source === '@/core/options/layers/style.ts' ||
-            normalizedSource.endsWith('/src/core/options/layers/style.ts')
-            ? layerStyleStubId
-            : null;
-        },
-        load(id) {
-          return id === layerStyleStubId ? 'export default {};' : null;
-        },
-      },
-      svelte(),
-    ],
-    resolve: {
-      alias: {
-        '@': path.join(packageRoot, 'src'),
-        '@mapLib': path.join(packageRoot, 'src/core/map/maplibre'),
-        '@tests': path.join(packageRoot, 'tests'),
-      },
-    },
-    root: packageRoot,
-    server: { middlewareMode: true },
+  const server = await createGeoForgeSsrServer({
+    layerStyleStubId,
+    layerStyleStubModule: 'export default {};',
   });
 
   try {

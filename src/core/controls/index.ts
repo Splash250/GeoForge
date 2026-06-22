@@ -23,7 +23,7 @@ import {
 import type { GmHelperEvent, GmHelperToolLifecycleEvent } from '@/types/events/helper.ts';
 import { typedKeys } from '@/utils/typing.ts';
 import { cloneDeep } from 'lodash-es';
-import log from 'loglevel';
+import log from '@/utils/log';
 import { mount, unmount } from 'svelte';
 
 export default class GMControl extends BaseControl {

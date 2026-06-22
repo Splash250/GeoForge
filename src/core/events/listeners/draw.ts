@@ -9,7 +9,7 @@ import type { GmDrawEvent } from '@/types/events/draw.ts';
 import type { GmSystemEvent } from '@/types/events/index.ts';
 import type { ActionInstanceKey } from '@/types/modes/index.ts';
 import { isGmDrawEvent } from '@/utils/guards/modes.ts';
-import log from 'loglevel';
+import log from '@/utils/log';
 
 export class DrawEventListener extends BaseEventListener {
   eventHandlers: EventHandlers = {
