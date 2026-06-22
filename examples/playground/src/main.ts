@@ -1,74 +1,69 @@
 import './styles.css';
 
-type RouteFamily = 'control-board' | 'demo-studio' | 'legacy';
+type RouteFamily = 'control-board' | 'demo-studio';
 type RouteCleanup = () => void;
 
-const app = requireElement<HTMLDivElement>('#app');
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  startPlayground();
+}
 
-let currentRoute: RouteFamily | null = null;
-let currentCleanup: RouteCleanup | null = null;
-let routeStartId = 0;
+function startPlayground() {
+  const app = requireElement<HTMLDivElement>('#app');
 
-window.addEventListener('hashchange', () => {
+  let currentRoute: RouteFamily | null = null;
+  let currentCleanup: RouteCleanup | null = null;
+  let routeStartId = 0;
+
+  window.addEventListener('hashchange', () => {
+    void startRoute();
+  });
+
   void startRoute();
-});
 
-void startRoute();
+  async function startRoute() {
+    const route = resolveRouteFamily();
 
-async function startRoute() {
-  const route = resolveRouteFamily();
-
-  if (route === currentRoute) {
-    return;
-  }
-
-  const startId = ++routeStartId;
-  const cleanup = currentCleanup;
-  currentRoute = route;
-  currentCleanup = null;
-  cleanup?.();
-
-  if (route === 'control-board') {
-    const { startControlBoard } = await import('./routes/control-board');
-
-    if (startId !== routeStartId || route !== resolveRouteFamily()) {
+    if (route === currentRoute) {
       return;
     }
 
-    currentCleanup = startControlBoard(app);
-    return;
-  }
+    const startId = ++routeStartId;
+    const cleanup = currentCleanup;
+    currentRoute = route;
+    currentCleanup = null;
+    cleanup?.();
 
-  if (route === 'demo-studio') {
-    const { startDemoStudio } = await import('./routes/demo-studio');
+    if (route === 'control-board') {
+      const { startControlBoard } = await import('./routes/control-board.ts');
+
+      if (startId !== routeStartId || route !== resolveRouteFamily()) {
+        return;
+      }
+
+      currentCleanup = startControlBoard(app);
+      return;
+    }
+
+    const { startDemoStudio } = await import('./routes/demo-studio.ts');
 
     if (startId !== routeStartId || route !== resolveRouteFamily()) {
       return;
     }
 
     currentCleanup = startDemoStudio(app);
-    return;
   }
-
-  const { startLegacyPlayground } = await import('./routes/legacy-playground');
-
-  if (startId !== routeStartId || route !== resolveRouteFamily()) {
-    return;
-  }
-
-  currentCleanup = startLegacyPlayground(app);
 }
 
-function resolveRouteFamily(): RouteFamily {
-  if (window.location.hash === '#control-board') {
+export function resolveRouteFamilyFromHash(hash: string): RouteFamily {
+  if (hash === '#control-board') {
     return 'control-board';
   }
 
-  if (window.location.hash === '#demo-studio') {
-    return 'demo-studio';
-  }
+  return 'demo-studio';
+}
 
-  return 'legacy';
+function resolveRouteFamily(): RouteFamily {
+  return resolveRouteFamilyFromHash(window.location.hash);
 }
 
 function requireElement<T extends Element>(selector: string): T {
