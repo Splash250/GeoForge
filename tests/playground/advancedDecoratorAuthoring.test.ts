@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import {
+  ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
   addAdvancedDecorator,
+  applyAdvancedLineStyleToFeatures,
   buildDecoratorFromAdvancedState,
   clearAdvancedDecorators,
+  createAdvancedCustomSvgImageManager,
   createAdvancedDecoratorState,
   getAdvancedDecoratorCode,
   getAdvancedDecoratorLineFeature,
@@ -553,6 +556,88 @@ describe('advanced decorator authoring helpers', () => {
         kind: 'symbol',
         rotate: { mode: 'line', angle: -90 },
       },
+    ]);
+  });
+
+  test('applies current line style to imported feature targets', () => {
+    const updates: unknown[] = [];
+    const featureTargets = [
+      {
+        updateProperties: (properties: unknown) => updates.push(properties),
+      },
+      {
+        updateProperties: (properties: unknown) => updates.push(properties),
+      },
+    ];
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      lineStyle: {
+        color: '#be123c',
+        width: 11,
+        opacity: 0.45,
+      },
+    };
+
+    applyAdvancedLineStyleToFeatures(featureTargets, state);
+
+    expect(updates).toEqual([
+      {
+        lineColor: '#be123c',
+        lineWidth: 11,
+        lineOpacity: 0.45,
+      },
+      {
+        lineColor: '#be123c',
+        lineWidth: 11,
+        lineOpacity: 0.45,
+      },
+    ]);
+  });
+
+  test('custom SVG image manager replaces changed content and removes image on cleanup', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+    };
+    const loadedSvg: string[] = [];
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => {
+      loadedSvg.push(svg);
+      return { svg };
+    });
+    const firstState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const secondState: AdvancedDecoratorState = {
+      ...firstState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+
+    await imageManager.ensure(map, firstState);
+    await imageManager.ensure(map, firstState);
+    await imageManager.ensure(map, secondState);
+    imageManager.cleanup(map);
+
+    expect(loadedSvg).toEqual([
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: blue; }</style><path class="mark"/></svg>',
+    ]);
+    expect(calls).toEqual([
+      ['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: loadedSvg[0] }],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+      ['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: loadedSvg[1] }],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
     ]);
   });
 });

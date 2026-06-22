@@ -127,6 +127,24 @@ export type SyncAdvancedDecoratorsOptions = {
   features: GeoJsonImportFeature[];
 };
 
+export type AdvancedLineStyleFeatureTarget = {
+  updateProperties: (
+    properties: Pick<
+      AdvancedDecoratorLineFeature['properties'],
+      'lineColor' | 'lineWidth' | 'lineOpacity'
+    >,
+  ) => void;
+};
+
+export type AdvancedCustomSvgImageTarget<TImage = unknown> = {
+  hasImage: (id: string) => boolean;
+  addImage: (id: string, image: TImage) => void;
+  removeImage?: (id: string) => void;
+  updateImage?: (id: string, image: TImage) => void;
+};
+
+export type AdvancedSvgImageLoader<TImage = unknown> = (svg: string) => Promise<TImage>;
+
 const DEFAULT_LINE_STYLE: AdvancedLineStyleState = {
   color: '#0f766e',
   width: 6,
@@ -158,6 +176,8 @@ const SYMBOL_IMAGE_IDS: Record<AdvancedDecoratorSymbolPreset, string> = {
   dot: 'gf-demo-dot',
   custom: 'gf-demo-custom-advanced',
 };
+
+export const ADVANCED_CUSTOM_SYMBOL_IMAGE_ID = SYMBOL_IMAGE_IDS.custom;
 
 export function createAdvancedDecoratorState(): AdvancedDecoratorState {
   return {
@@ -274,6 +294,21 @@ export function clearAdvancedDecorators(state: AdvancedDecoratorState): Advanced
   };
 }
 
+export function applyAdvancedLineStyleToFeatures(
+  features: AdvancedLineStyleFeatureTarget[],
+  state: AdvancedDecoratorState,
+): void {
+  const properties = {
+    lineColor: state.lineStyle.color,
+    lineWidth: state.lineStyle.width,
+    lineOpacity: state.lineStyle.opacity,
+  };
+
+  features.forEach((feature) => {
+    feature.updateProperties(properties);
+  });
+}
+
 export function syncAdvancedDecorators({
   geoForge,
   state,
@@ -281,6 +316,56 @@ export function syncAdvancedDecorators({
 }: SyncAdvancedDecoratorsOptions): void {
   geoForge.decorators.lines.configure({ layerPosition: state.layerPosition });
   geoForge.decorators.lines.syncFromFeatures(features, () => getAdvancedDecorators(state));
+}
+
+export function createAdvancedCustomSvgImageManager<TImage>(
+  loadImage: AdvancedSvgImageLoader<TImage>,
+) {
+  let registeredSvg: string | undefined;
+
+  return {
+    async ensure(
+      map: AdvancedCustomSvgImageTarget<TImage>,
+      state: AdvancedDecoratorState,
+    ): Promise<void> {
+      if (state.kind !== 'symbol' || state.symbolPreset !== 'custom') {
+        return;
+      }
+
+      if (!validateSvgMarkup(state.customSvg).valid) {
+        return;
+      }
+
+      const svg = mergeSvgCss(state.customSvg, state.customSvgCss);
+
+      if (registeredSvg === svg && map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)) {
+        return;
+      }
+
+      const image = await loadImage(svg);
+
+      if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)) {
+        if (map.updateImage) {
+          map.updateImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, image);
+        } else if (map.removeImage) {
+          map.removeImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
+          map.addImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, image);
+        }
+      } else {
+        map.addImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, image);
+      }
+
+      registeredSvg = svg;
+    },
+
+    cleanup(map: AdvancedCustomSvgImageTarget<TImage>): void {
+      if (map.hasImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID) && map.removeImage) {
+        map.removeImage(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID);
+      }
+
+      registeredSvg = undefined;
+    },
+  };
 }
 
 function getAdvancedDecorators(state: AdvancedDecoratorState): LineDecoratorOptions[] {

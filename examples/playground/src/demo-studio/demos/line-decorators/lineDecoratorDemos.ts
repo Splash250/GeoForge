@@ -1,15 +1,15 @@
 import type { GeoJsonImportFeature } from 'maplibre-geoforge';
 import type { DemoContext, DemoDefinition } from '../../registry/types.ts';
-import { ensureBaseSymbolImages, ensureSvgImage } from '../shared/symbolImages.ts';
+import { ensureBaseSymbolImages } from '../shared/symbolImages.ts';
 import AdvancedDecoratorInspector from './AdvancedDecoratorInspector.svelte';
 import LineDecoratorsInspector from './LineDecoratorsInspector.svelte';
 import {
+  applyAdvancedLineStyleToFeatures,
+  createAdvancedCustomSvgImageManager,
   createAdvancedDecoratorState,
   getAdvancedDecoratorCode,
   getAdvancedDecoratorLineFeature,
-  mergeSvgCss,
   syncAdvancedDecorators,
-  validateSvgMarkup,
   type AdvancedDecoratorSyncTarget,
   type AdvancedDecoratorState,
 } from './advancedDecoratorAuthoring.ts';
@@ -152,13 +152,14 @@ export const lineDecoratorDemos: DemoDefinition[] = [
       const { map, geoForge } = context;
       let state = createAdvancedDecoratorState();
       let syncVersion = 0;
+      const customSvgImageManager = createAdvancedCustomSvgImageManager(svgToImage);
 
       if (context.signal.aborted || !context.isCurrent()) {
         return { teardown: () => {} };
       }
 
       await ensureBaseSymbolImages(map);
-      await ensureCustomSymbolImage(context, state);
+      await customSvgImageManager.ensure(map, state);
 
       if (context.signal.aborted || !context.isCurrent()) {
         return { teardown: () => {} };
@@ -185,6 +186,9 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         importedLineFeatures.map((featureData) => featureData.getGeoJson());
 
       const syncRuntime = (nextState: AdvancedDecoratorState) => {
+        runWithoutHistory(geoForge, () => {
+          applyAdvancedLineStyleToFeatures(importedLineFeatures, nextState);
+        });
         syncAdvancedDecorators({
           geoForge: geoForge as AdvancedDecoratorSyncTarget,
           state: nextState,
@@ -205,7 +209,7 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         const version = ++syncVersion;
         state = nextState;
         updateInspector(state);
-        await ensureCustomSymbolImage(context, state);
+        await customSvgImageManager.ensure(map, state);
 
         if (context.signal.aborted || !context.isCurrent() || version !== syncVersion) {
           return;
@@ -248,6 +252,7 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         teardown: () => {
           syncVersion++;
           geoForge.decorators.lines.destroy();
+          customSvgImageManager.cleanup(map);
           runWithoutHistory(geoForge, () => {
             importedLineFeatures.forEach((featureData) => {
               geoForge.features.delete(featureData);
@@ -272,21 +277,22 @@ function runWithoutHistory<T>(geoForge: DemoContext['geoForge'], callback: () =>
   return history.suspend ? history.suspend(callback) : callback();
 }
 
-async function ensureCustomSymbolImage(
-  context: Pick<DemoContext, 'map' | 'signal' | 'isCurrent'>,
-  state: AdvancedDecoratorState,
-): Promise<void> {
-  if (state.kind !== 'symbol' || state.symbolPreset !== 'custom') {
-    return;
-  }
+function svgToImage(svg: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image(32, 32);
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
 
-  if (!validateSvgMarkup(state.customSvg).valid || context.signal.aborted || !context.isCurrent()) {
-    return;
-  }
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
 
-  await ensureSvgImage(
-    context.map,
-    'gf-demo-custom-advanced',
-    mergeSvgCss(state.customSvg, state.customSvgCss),
-  );
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Unable to load SVG image'));
+    };
+
+    image.src = url;
+  });
 }
