@@ -117,14 +117,14 @@
   }
 
   async function copyCode(value: string) {
-    const writeText = globalThis.navigator?.clipboard?.writeText;
+    const clipboard = navigator.clipboard;
 
-    if (!writeText) {
+    if (!clipboard?.writeText) {
       return;
     }
 
     try {
-      await writeText.call(globalThis.navigator.clipboard, value);
+      await clipboard.writeText.call(clipboard, value);
       copied = true;
       clearTimeout(copyResetTimer);
       copyResetTimer = setTimeout(() => {
