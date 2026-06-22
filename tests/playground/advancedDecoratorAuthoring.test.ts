@@ -3,6 +3,7 @@ import {
   buildDecoratorFromAdvancedState,
   createAdvancedDecoratorState,
   mergeSvgCss,
+  parseIterationCount,
   validateSvgMarkup,
   type AdvancedDecoratorState,
 } from '../../examples/playground/src/demo-studio/demos/line-decorators/advancedDecoratorAuthoring.ts';
@@ -179,6 +180,77 @@ describe('advanced decorator authoring helpers', () => {
       fillOpacity: 0.45,
       proportionalToTotal: true,
     });
+  });
+
+  test('normalizes whitespace around distance values and iteration keywords', () => {
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      kind: 'symbol',
+      frequency: ' 80px ',
+      startOffset: ' 5m ',
+      endOffset: ' 12px ',
+      animationEnabled: true,
+      animationIterationCount: ' infinite ',
+    };
+
+    expect(buildDecoratorFromAdvancedState(state)).toMatchObject({
+      kind: 'symbol',
+      frequency: '80px',
+      offsets: { start: '5m', end: '12px' },
+      animation: [expect.objectContaining({ iterationCount: 'infinite' })],
+    });
+    expect(parseIterationCount(' 4 ')).toBe(4);
+    expect(parseIterationCount(' garbage ')).toBe(1);
+  });
+
+  test('omits invalid optional placement fields instead of emitting invalid API values', () => {
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      kind: 'text',
+      frequency: ' sometimes ',
+      startOffset: '10%',
+      endOffset: 'eventually',
+    };
+
+    expect(buildDecoratorFromAdvancedState(state)).toMatchObject({
+      kind: 'text',
+      text: 'DN 300',
+      segment: 'middle',
+      anchor: 'middle',
+    });
+    expect(buildDecoratorFromAdvancedState(state)).not.toHaveProperty('frequency');
+    expect(buildDecoratorFromAdvancedState(state)).not.toHaveProperty('offsets');
+  });
+
+  test('normalizes arrowhead frequency, size, and offsets against public units', () => {
+    const validState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      kind: 'arrowhead',
+      frequency: ' 40m ',
+      startOffset: ' 2px ',
+      endOffset: ' 3m ',
+      arrowSize: ' 50% ',
+    };
+    const invalidState: AdvancedDecoratorState = {
+      ...validState,
+      frequency: 'single',
+      startOffset: '-2px',
+      endOffset: '10%',
+      arrowSize: 'huge',
+    };
+
+    expect(buildDecoratorFromAdvancedState(validState)).toMatchObject({
+      kind: 'arrowhead',
+      frequency: '40m',
+      offsets: { start: '2px', end: '3m' },
+      size: '50%',
+    });
+    expect(buildDecoratorFromAdvancedState(invalidState)).toMatchObject({
+      kind: 'arrowhead',
+      frequency: 'endonly',
+    });
+    expect(buildDecoratorFromAdvancedState(invalidState)).not.toHaveProperty('offsets');
+    expect(buildDecoratorFromAdvancedState(invalidState)).not.toHaveProperty('size');
   });
 
   test('creates defaults covering the legacy advanced controls', () => {

@@ -1,5 +1,7 @@
 import type {
   ArrowFrequencyUnit,
+  ArrowOffsetUnit,
+  ArrowSizeUnit,
   LineDecoratorAnimationDirection,
   LineDecoratorAnimationEasing,
   LineDecoratorAnimationOptions,
@@ -30,8 +32,8 @@ export type AdvancedSvgValidationResult =
   | { valid: false; message: 'Paste SVG markup' | 'Invalid SVG' };
 
 export type AdvancedDecoratorPlacement = {
-  frequency: LinePlacementFrequency;
-  offsets: ReturnType<typeof buildOffsets>;
+  frequency?: LinePlacementFrequency;
+  offsets?: NonNullable<ReturnType<typeof buildOffsets>>;
   segment: AdvancedDecoratorState['segment'];
   anchor: AdvancedDecoratorState['anchor'];
   offsetPercent: number;
@@ -40,7 +42,7 @@ export type AdvancedDecoratorPlacement = {
     mode: LineDecoratorRotationMode;
     angle: number;
   };
-  animation: LineDecoratorAnimationOptions[] | undefined;
+  animation?: LineDecoratorAnimationOptions[];
 };
 
 export type AdvancedDecoratorState = {
@@ -192,21 +194,20 @@ export function buildDecoratorFromAdvancedState(
   form: AdvancedDecoratorState,
   imageId = 'lab-chevron',
 ): LineDecoratorOptions {
-  const frequency = parseFrequency(form.frequency);
   const offsets = buildOffsets(form);
 
   if (form.kind === 'arrowhead') {
-    const arrowFrequency: ArrowFrequencyUnit =
-      form.frequency === 'single' ? 'endonly' : (frequency as ArrowFrequencyUnit);
+    const arrowFrequency = parseArrowFrequency(form.frequency);
+    const arrowSize = parseArrowSize(form.arrowSize);
 
     return {
       kind: 'arrowhead',
-      frequency: arrowFrequency,
-      offsets,
+      ...(arrowFrequency ? { frequency: arrowFrequency } : {}),
+      ...(offsets ? { offsets } : {}),
       color: form.arrowColor,
       fillColor: form.arrowFillColor,
       fill: form.arrowFill,
-      size: form.arrowSize as never,
+      ...(arrowSize ? { size: arrowSize } : {}),
       yawn: form.arrowYawn,
       weight: form.arrowWeight,
       opacity: form.arrowOpacity,
@@ -242,9 +243,13 @@ export function buildDecoratorFromAdvancedState(
 }
 
 export function buildSegmentPlacement(form: AdvancedDecoratorState): AdvancedDecoratorPlacement {
+  const frequency = parsePlacementFrequency(form.frequency);
+  const offsets = buildOffsets(form);
+  const animation = buildAnimations(form);
+
   return {
-    frequency: parseFrequency(form.frequency),
-    offsets: buildOffsets(form),
+    ...(frequency ? { frequency } : {}),
+    ...(offsets ? { offsets } : {}),
     segment: form.segment,
     anchor: form.anchor,
     offsetPercent: form.offsetPercent,
@@ -253,7 +258,7 @@ export function buildSegmentPlacement(form: AdvancedDecoratorState): AdvancedDec
       mode: form.rotateMode,
       angle: form.rotateAngle,
     },
-    animation: buildAnimations(form),
+    ...(animation ? { animation } : {}),
   };
 }
 
@@ -286,26 +291,79 @@ export function buildAnimations(
   });
 }
 
-export function buildOffsets(form: Pick<AdvancedDecoratorState, 'startOffset' | 'endOffset'>) {
-  const start = form.startOffset.trim();
-  const end = form.endOffset.trim();
-
-  return {
-    ...(start ? { start: start as never } : {}),
-    ...(end ? { end: end as never } : {}),
+export function buildOffsets(
+  form: Pick<AdvancedDecoratorState, 'startOffset' | 'endOffset'>,
+): { start?: ArrowOffsetUnit; end?: ArrowOffsetUnit } | undefined {
+  const start = parseArrowOffset(form.startOffset);
+  const end = parseArrowOffset(form.endOffset);
+  const offsets = {
+    ...(start ? { start } : {}),
+    ...(end ? { end } : {}),
   };
+
+  return start || end ? offsets : undefined;
 }
 
-export function parseFrequency(value: string): LinePlacementFrequency {
-  const numeric = Number(value);
+export function parsePlacementFrequency(value: string): LinePlacementFrequency | undefined {
+  const trimmed = value.trim().toLowerCase();
+  const numeric = Number(trimmed);
 
-  return Number.isFinite(numeric) && value.trim() !== ''
-    ? numeric
-    : (value as LinePlacementFrequency);
+  if (trimmed === 'single' || trimmed === 'allvertices' || trimmed === 'endonly') {
+    return trimmed;
+  }
+
+  if (isArrowDistanceUnit(trimmed)) {
+    return trimmed;
+  }
+
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
+}
+
+export function parseArrowFrequency(value: string): ArrowFrequencyUnit | undefined {
+  const frequency = parsePlacementFrequency(value);
+
+  if (frequency === 'single') {
+    return 'endonly';
+  }
+
+  return frequency;
+}
+
+export function parseArrowOffset(value: string): ArrowOffsetUnit | undefined {
+  const trimmed = value.trim();
+
+  return isArrowDistanceUnit(trimmed) ? trimmed : undefined;
+}
+
+export function parseArrowSize(value: string): ArrowSizeUnit | undefined {
+  const trimmed = value.trim();
+
+  return isArrowSizeUnit(trimmed) ? trimmed : undefined;
 }
 
 export function parseIterationCount(value: string): number | 'infinite' {
-  return value === 'infinite' ? 'infinite' : Number(value) || 1;
+  const trimmed = value.trim().toLowerCase();
+  const numeric = Number(trimmed);
+
+  if (trimmed === 'infinite') {
+    return 'infinite';
+  }
+
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+}
+
+function isArrowDistanceUnit(value: string): value is ArrowOffsetUnit {
+  return isNonNegativeUnit(value, ['m', 'px']);
+}
+
+function isArrowSizeUnit(value: string): value is ArrowSizeUnit {
+  return isNonNegativeUnit(value, ['m', 'px', '%']);
+}
+
+function isNonNegativeUnit(value: string, units: string[]): boolean {
+  const match = value.match(/^(\d+|\d*\.\d+)([a-z%]+)$/);
+
+  return Boolean(match && Number(match[1]) >= 0 && units.includes(match[2]));
 }
 
 function validateSvgMarkupWithoutDomParser(svg: string): AdvancedSvgValidationResult {
