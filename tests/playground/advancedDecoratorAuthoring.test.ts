@@ -906,6 +906,53 @@ describe('advanced decorator authoring helpers', () => {
       { kind: 'symbol', imageId: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID },
     ]);
   });
+
+  test('custom SVG image manager keeps saved custom decorators when draft is not custom', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => images.set(id, image),
+      removeImage: (id: string) => images.delete(id),
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const customState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const textDraftState: AdvancedDecoratorState = {
+      ...customState,
+      kind: 'text',
+      symbolPreset: 'chevron',
+      decorators: [buildDecoratorFromAdvancedState(customState)],
+    };
+    let resolvedDecorators: unknown;
+    const geoForge: AdvancedDecoratorSyncTarget = {
+      decorators: {
+        lines: {
+          configure: () => {},
+          syncFromFeatures: (features, getDecorators) => {
+            resolvedDecorators = getDecorators(features[0]);
+          },
+        },
+      },
+    };
+
+    await imageManager.ensure(map, customState);
+    const result = await imageManager.ensure(map, textDraftState);
+    syncAdvancedDecorators({
+      geoForge,
+      state: getAdvancedDecoratorRenderState(textDraftState, result),
+      features: [getAdvancedDecoratorLineFeature(textDraftState)],
+    });
+
+    expect(result.customImageReady).toBe(true);
+    expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(true);
+    expect(resolvedDecorators).toMatchObject([
+      { kind: 'symbol', imageId: ADVANCED_CUSTOM_SYMBOL_IMAGE_ID },
+    ]);
+  });
 });
 
 type Deferred<T> = {

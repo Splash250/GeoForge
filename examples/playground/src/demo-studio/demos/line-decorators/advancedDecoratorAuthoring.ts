@@ -368,7 +368,7 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       state: AdvancedDecoratorState,
       options: AdvancedCustomSvgEnsureOptions = {},
     ): Promise<AdvancedCustomSvgEnsureResult> {
-      if (state.kind !== 'symbol' || state.symbolPreset !== 'custom') {
+      if (!stateNeedsAdvancedCustomSymbolImage(state)) {
         if (isCurrent(options)) {
           removeRegisteredImage(map);
         }
@@ -444,6 +444,20 @@ function replaceCustomSymbolDecorator(decorator: LineDecoratorOptions): LineDeco
   }
 
   return clone;
+}
+
+function stateNeedsAdvancedCustomSymbolImage(state: AdvancedDecoratorState): boolean {
+  if (state.kind === 'symbol' && state.symbolPreset === 'custom') {
+    return true;
+  }
+
+  return Boolean(
+    state.decorators?.some(
+      (decorator) =>
+        decorator.kind === 'symbol' &&
+        decorator.imageId === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+    ),
+  );
 }
 
 export function validateSvgMarkup(svg: string): AdvancedSvgValidationResult {
