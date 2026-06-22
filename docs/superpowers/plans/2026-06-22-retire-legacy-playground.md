@@ -678,7 +678,7 @@ Use this topology for autonomous work:
 - Base branch: whatever branch the user started from, recorded as `$BaseBranch`.
 - Integration branch: `codex/retire-legacy-playground`.
 - Integration worktree: `.worktrees/retire-legacy-playground`.
-- Per-card branch: `codex/retire-legacy-playground/<card-slug>`.
+- Per-card branch: `codex/retire-legacy-playground-card-<card-slug>`.
 - Per-card worktree: `.worktrees/retire-legacy-playground-<card-slug>`.
 
 Per-card worktrees are required for implementation cards. Review-only subagents do not need their own worktree because they should inspect the diff range and report findings without editing files.
@@ -688,7 +688,7 @@ Create a card worktree like this:
 ```powershell
 Set-Location $Root
 $CardSlug = "advanced-decorator-helpers"
-$CardBranch = "codex/retire-legacy-playground/$CardSlug"
+$CardBranch = "codex/retire-legacy-playground-card-$CardSlug"
 $CardPath = Join-Path $WorktreeRoot "retire-legacy-playground-$CardSlug"
 
 git worktree add $CardPath -b $CardBranch $IntegrationBranch
@@ -779,7 +779,7 @@ If a card grows beyond three files or a reviewer reports scope drift, split it i
 Each live card must also include these execution fields before dispatch:
 
 ```md
-**Card branch:** `codex/retire-legacy-playground/<card-slug>`
+**Card branch:** `codex/retire-legacy-playground-card-<card-slug>`
 **Card worktree:** `.worktrees/retire-legacy-playground-<card-slug>`
 **Base for diff review:** commit SHA from `codex/retire-legacy-playground` before the card branch was created.
 **Expected commit count:** 1 focused implementation commit, plus optional review-fix commits.
