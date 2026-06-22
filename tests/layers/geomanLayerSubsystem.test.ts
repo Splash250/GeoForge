@@ -2,6 +2,7 @@
 import {
   GeomanLayerSubsystem,
   buildRasterCapabilitiesRequestUrl,
+  normalizeRasterTileUrl,
   parseRasterCapabilities,
 } from '@/layers/index.ts';
 import { describe, expect, test, vi } from 'vitest';
@@ -405,6 +406,21 @@ describe('raster layer helpers', () => {
     ).toBe('https://tiles.example.test/wmts?tenant=demo&service=WMTS&request=GetCapabilities');
   });
 
+  test('normalizes direct WMS tile URLs with cased service params', () => {
+    const url = normalizeRasterTileUrl(
+      'https://example.test/wms?SERVICE=WMS&REQUEST=GetMap&LAYERS=nuts',
+    );
+
+    expect(url).toContain('service=WMS');
+    expect(url).toContain('request=GetMap');
+    expect(url).toContain('LAYERS=nuts');
+    expect(url).toContain('bbox={bbox-epsg-3857}');
+    expect(url).toContain('width=256');
+    expect(url).toContain('height=256');
+    expect(decodeURIComponent(url)).toContain('crs=EPSG:3857');
+    expect(decodeURIComponent(url)).toContain('srs=EPSG:3857');
+  });
+
   test('parses WMTS ResourceURL templates into MapLibre tiles', () => {
     const layers = parseRasterCapabilities(
       `<?xml version="1.0"?>
@@ -465,6 +481,34 @@ describe('raster layer helpers', () => {
     expect(layers[0]?.url).toContain('style=bright');
     expect(layers[0]?.url).toContain('format=image%2Fjpeg');
     expect(layers[0]?.url).toContain('tilematrixset=GoogleMapsCompatible');
+  });
+
+  test('substitutes WMTS ResourceURL style and matrix set placeholders', () => {
+    const layers = parseRasterCapabilities(
+      `<?xml version="1.0"?>
+      <Capabilities xmlns="http://www.opengis.net/wmts/1.0">
+        <Contents>
+          <Layer>
+            <Title>Population</Title>
+            <Identifier>population</Identifier>
+            <Style isDefault="true">
+              <Identifier>bright</Identifier>
+            </Style>
+            <TileMatrixSetLink>
+              <TileMatrixSet>GoogleMapsCompatible</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL resourceType="tile" template="https://tiles.test/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png" />
+          </Layer>
+        </Contents>
+      </Capabilities>`,
+      'https://tiles.test/wmts?service=WMTS&request=GetCapabilities',
+    );
+
+    expect(layers[0]?.url).toBe(
+      'https://tiles.test/bright/GoogleMapsCompatible/{z}/{y}/{x}.png',
+    );
+    expect(layers[0]?.url).not.toContain('{Style}');
+    expect(layers[0]?.url).not.toContain('{TileMatrixSet}');
   });
 
   test('resolves WMS GetMap OnlineResource endpoints from capabilities', () => {

@@ -304,11 +304,12 @@ export function normalizeRasterTileUrl(rawUrl: string): string {
     return rawUrl;
   }
 
-  if (url.searchParams.get('service')?.toLowerCase() !== 'wms') {
+  if (getSearchParamCaseInsensitive(url, 'service')?.toLowerCase() !== 'wms') {
     return rawUrl;
   }
 
-  url.searchParams.set('request', 'GetMap');
+  setSearchParamCaseInsensitive(url, 'service', 'WMS');
+  setSearchParamCaseInsensitive(url, 'request', 'GetMap');
   url.searchParams.set('bbox', '{bbox-epsg-3857}');
   url.searchParams.set('width', String(defaultRasterTileSize));
   url.searchParams.set('height', String(defaultRasterTileSize));
@@ -497,7 +498,7 @@ function parseWmtsCapabilities(
         title,
         ...metadata,
         url: template
-          ? normalizeWmtsTemplateUrl(template, capabilitiesUrl)
+          ? normalizeWmtsTemplateUrl(template, capabilitiesUrl, metadata)
           : buildWmtsKvpTileTemplateUrl(capabilitiesUrl, name, metadata),
       };
     })
@@ -570,14 +571,29 @@ function buildWmtsKvpTileTemplateUrl(
   return decodeMapLibreTokens(url.toString());
 }
 
-function normalizeWmtsTemplateUrl(template: string, capabilitiesUrl: string): string {
+function normalizeWmtsTemplateUrl(
+  template: string,
+  capabilitiesUrl: string,
+  metadata: { style: string; tileMatrixSet: string },
+): string {
+  const style = encodeURIComponent(metadata.style);
+  const tileMatrixSet = encodeURIComponent(metadata.tileMatrixSet);
+
   return resolveUrlTemplate(template, capabilitiesUrl)
+    .replaceAll('{Style}', style)
+    .replaceAll('{style}', style)
+    .replaceAll('{TileMatrixSet}', tileMatrixSet)
+    .replaceAll('{tilematrixset}', tileMatrixSet)
     .replaceAll('{TileMatrix}', '{z}')
     .replaceAll('{TileRow}', '{y}')
     .replaceAll('{TileCol}', '{x}')
     .replaceAll('{tilematrix}', '{z}')
     .replaceAll('{tilerow}', '{y}')
     .replaceAll('{tilecol}', '{x}')
+    .replaceAll('%7BStyle%7D', style)
+    .replaceAll('%7Bstyle%7D', style)
+    .replaceAll('%7BTileMatrixSet%7D', tileMatrixSet)
+    .replaceAll('%7Btilematrixset%7D', tileMatrixSet)
     .replaceAll('%7BTileMatrix%7D', '{z}')
     .replaceAll('%7BTileRow%7D', '{y}')
     .replaceAll('%7BTileCol%7D', '{x}')
@@ -629,6 +645,21 @@ function getSearchParamCaseInsensitive(url: URL, name: string): string | null {
   }
 
   return null;
+}
+
+function setSearchParamCaseInsensitive(url: URL, name: string, value: string): void {
+  if (url.searchParams.has(name)) {
+    url.searchParams.set(name, value);
+    return;
+  }
+
+  for (const key of Array.from(url.searchParams.keys())) {
+    if (key.toLowerCase() === name.toLowerCase()) {
+      url.searchParams.delete(key);
+    }
+  }
+
+  url.searchParams.set(name, value);
 }
 
 function parseXmlDocument(xmlText: string): Document {
