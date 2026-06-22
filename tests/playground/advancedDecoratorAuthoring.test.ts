@@ -410,7 +410,7 @@ describe('advanced decorator authoring helpers', () => {
     const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
     const nextState = addAdvancedDecorator(createAdvancedDecoratorState(), decorator);
 
-    if (decorator.kind === 'symbol') {
+    if (decorator.kind === 'symbol' && decorator.rotate) {
       decorator.rotate.angle = 45;
     }
 
@@ -427,7 +427,7 @@ describe('advanced decorator authoring helpers', () => {
       decorators: [decorator],
     });
 
-    if (decorator.kind === 'symbol') {
+    if (decorator.kind === 'symbol' && decorator.rotate) {
       decorator.rotate.angle = 45;
     }
 
@@ -493,8 +493,9 @@ describe('advanced decorator authoring helpers', () => {
       features: [feature],
     });
 
-    if (feature.properties.decorators[0].kind === 'symbol') {
-      feature.properties.decorators[0].rotate.angle = 45;
+    const firstDecorator = feature.properties.decorators[0];
+    if (firstDecorator?.kind === 'symbol' && firstDecorator.rotate) {
+      firstDecorator.rotate.angle = 45;
     }
 
     expect(resolvedDecorators).toMatchObject([
