@@ -11,6 +11,7 @@ import {
   getAdvancedDecoratorLineFeature,
   getAdvancedDecoratorRenderState,
   syncAdvancedDecorators,
+  type AdvancedCustomSvgEnsureError,
   type AdvancedDecoratorSyncTarget,
   type AdvancedDecoratorState,
 } from './advancedDecoratorAuthoring.ts';
@@ -230,7 +231,11 @@ export const lineDecoratorDemos: DemoDefinition[] = [
             return;
           }
 
-          const renderState = getAdvancedDecoratorRenderState(state, { customImageReady: false });
+          const readyImageIds = (error as AdvancedCustomSvgEnsureError).readyImageIds;
+          const renderState = getAdvancedDecoratorRenderState(state, {
+            customImageReady: false,
+            readyImageIds,
+          });
           const message =
             error instanceof Error ? error.message : 'Unable to load custom SVG image.';
           context.logEvent({

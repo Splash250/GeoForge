@@ -160,6 +160,10 @@ export type AdvancedDecoratorRenderStateOptions = {
   readyImageIds?: string[];
 };
 
+export type AdvancedCustomSvgEnsureError = Error & {
+  readyImageIds?: string[];
+};
+
 type AdvancedCustomSymbolImageSource = {
   id: string;
   svg: string | null;
@@ -415,6 +419,7 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       const sources = getAdvancedCustomSymbolImageSources(state);
       const sourceIds = new Set(sources.map((source) => source.id));
       const readyImageIds: string[] = [];
+      let pendingError: unknown;
 
       for (const imageId of [...registeredSvgs.keys()]) {
         if (!sourceIds.has(imageId) && isCurrent(options)) {
@@ -451,7 +456,7 @@ export function createAdvancedCustomSvgImageManager<TImage>(
           if (isCurrent(options)) {
             removeRegisteredImageById(map, source.id);
             if (source.throwOnFailure) {
-              throw error;
+              pendingError = error;
             }
           }
 
@@ -475,6 +480,10 @@ export function createAdvancedCustomSvgImageManager<TImage>(
 
         registeredSvgs.set(source.id, source.svg);
         readyImageIds.push(source.id);
+      }
+
+      if (pendingError) {
+        throw attachReadyImageIds(pendingError, readyImageIds);
       }
 
       return {
@@ -603,6 +612,14 @@ function captureSavedCustomSymbolDecorator(
     ...decorator,
     imageId,
   };
+}
+
+function attachReadyImageIds(error: unknown, readyImageIds: string[]): AdvancedCustomSvgEnsureError {
+  const ensureError: AdvancedCustomSvgEnsureError =
+    error instanceof Error ? error : new Error('Unable to load custom SVG image.');
+  ensureError.readyImageIds = readyImageIds;
+
+  return ensureError;
 }
 
 function getNextSavedCustomSymbolImageId(state: AdvancedDecoratorState): string {
