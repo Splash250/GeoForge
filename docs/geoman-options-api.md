@@ -13,11 +13,11 @@ const gmOptions = gm.options;
 
 ## Mode Management
 
-| Method                                                     | Returns | Description                                  |
-|------------------------------------------------------------|---------|----------------------------------------------|
-| `enableMode(actionType: ActionType, modeName: ModeName)`   | `void`  | Enable a specific mode for the action type.  |
-| `disableMode(actionType: ActionType, modeName: ModeName)`  | `void`  | Disable the specified mode.                  |
-| `toggleMode(actionType: ActionType, modeName: ModeName)`   | `void`  | Toggle the mode on or off.                   |
+| Method                                                    | Returns | Description                                 |
+| --------------------------------------------------------- | ------- | ------------------------------------------- |
+| `enableMode(actionType: ActionType, modeName: ModeName)`  | `void`  | Enable a specific mode for the action type. |
+| `disableMode(actionType: ActionType, modeName: ModeName)` | `void`  | Disable the specified mode.                 |
+| `toggleMode(actionType: ActionType, modeName: ModeName)`  | `void`  | Toggle the mode on or off.                  |
 
 ```ts
 gm.options.enableMode('draw', 'polygon');
@@ -29,10 +29,10 @@ gm.options.toggleMode('edit', 'rotate');
 
 ## Mode State Queries
 
-| Method                                                       | Returns  | Description                                   |
-|--------------------------------------------------------------|----------|-----------------------------------------------|
-| `isModeEnabled(actionType: ActionType, modeName: ModeName)`  | `boolean` | Check whether a mode is currently active.     |
-| `isModeAvailable(actionType: ActionType, modeName: ModeName)` | `boolean` | Check whether a mode is available to enable.  |
+| Method                                                        | Returns   | Description                                  |
+| ------------------------------------------------------------- | --------- | -------------------------------------------- |
+| `isModeEnabled(actionType: ActionType, modeName: ModeName)`   | `boolean` | Check whether a mode is currently active.    |
+| `isModeAvailable(actionType: ActionType, modeName: ModeName)` | `boolean` | Check whether a mode is available to enable. |
 
 ```ts
 const isDrawing = gm.options.isModeEnabled('draw', 'polygon');
@@ -49,6 +49,10 @@ const polygonOptions = gm.options.getControlOptions({
 ```
 
 `getControlOptions` returns the control configuration or `null` if the control is not defined.
+Use it for inspection and low-level compatibility. For workflow-specific
+runtime visibility, prefer `geoForge.control.applyProfile(...)` or
+`geoForge.control.setModeVisibility(...)` instead of mutating
+`gm.options.controls` directly.
 
 ## Dynamic Configuration Example
 

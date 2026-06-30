@@ -10,15 +10,17 @@ type DrawEditInspectorProps = {
 
 type FeatureDouble = Pick<FeatureData, 'id'> & { temporary: boolean };
 
-vi.mock('../../examples/playground/src/demo-studio/demos/draw-edit/DrawEditInspector.svelte', () => ({
-  default: {},
-}));
+vi.mock(
+  '../../examples/playground/src/demo-studio/demos/draw-edit/DrawEditInspector.svelte',
+  () => ({
+    default: {},
+  }),
+);
 
 describe('drawEditDemos', () => {
   test('counts seeded features from the in-memory feature store immediately after import', async () => {
-    const { drawEditDemos } = await import(
-      '../../examples/playground/src/demo-studio/demos/draw-edit/drawEditDemos.ts'
-    );
+    const { drawEditDemos } =
+      await import('../../examples/playground/src/demo-studio/demos/draw-edit/drawEditDemos.ts');
     const featureStore = new Map<string, FeatureDouble>([
       ['main:seed-1', { id: 'seed-1', temporary: false }],
       ['main:seed-2', { id: 'seed-2', temporary: false }],

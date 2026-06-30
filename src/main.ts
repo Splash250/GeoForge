@@ -525,6 +525,10 @@ export { customShapeRectangle, customShapeTriangle } from '@/core/options/shapes
 
 // core classes
 export { GmOptions } from '@/core/options/index.ts';
+export type {
+  GeomanControlProfile,
+  GeomanControlVisibilityOptions,
+} from '@/core/controls/index.ts';
 export { drawClassMap, editClassMap, helperClassMap };
 
 // utils

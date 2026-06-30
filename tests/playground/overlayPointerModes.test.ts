@@ -12,12 +12,9 @@ type OverlayPointerInspectorProps = {
   onReset: () => void;
 };
 
-vi.mock(
-  '../../examples/playground/src/demo-studio/demos/overlays/OverlayInspector.svelte',
-  () => ({
-    default: {},
-  }),
-);
+vi.mock('../../examples/playground/src/demo-studio/demos/overlays/OverlayInspector.svelte', () => ({
+  default: {},
+}));
 vi.mock(
   '../../examples/playground/src/demo-studio/demos/overlays/OverlayPointerInspector.svelte',
   () => ({
@@ -27,9 +24,8 @@ vi.mock(
 
 describe('overlay pointer modes demo', () => {
   test('registers a Demo Studio replacement for the legacy pointer mode controls', async () => {
-    const { overlayDemos } = await import(
-      '../../examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts'
-    );
+    const { overlayDemos } =
+      await import('../../examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts');
 
     expect(overlayDemos.map((demo) => demo.id)).toContain('overlays-pointer-modes');
     expect(overlayDemos.find((demo) => demo.id === 'overlays-pointer-modes')).toMatchObject({
@@ -38,9 +34,8 @@ describe('overlay pointer modes demo', () => {
   });
 
   test('syncs pointer state, pitches the map, resets defaults, and tears down overlay state', async () => {
-    const { overlayDemos } = await import(
-      '../../examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts'
-    );
+    const { overlayDemos } =
+      await import('../../examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts');
     const demo = overlayDemos.find((candidate) => candidate.id === 'overlays-pointer-modes');
     expect(demo).toBeDefined();
 

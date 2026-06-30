@@ -5,6 +5,7 @@ import type { BaseSource } from '../map/base/source.ts';
 import { SHAPE_NAMES } from '../../modes/constants.ts';
 import type {
   FeatureId,
+  FeatureOwnerId,
   FeatureShape,
   FeatureSourceName,
   ImportGeoJsonOptions,
@@ -22,6 +23,7 @@ import log from '@/utils/log';
 
 type CreateFeatureOptions = {
   featureId?: FeatureId;
+  ownerId?: FeatureOwnerId;
   shapeGeoJson: GeoJsonShapeFeature;
   sourceName: FeatureSourceName;
   imported?: boolean;
@@ -95,7 +97,7 @@ export class FeatureGeoJsonIO {
           }
         }
 
-        featureData = this.importGeoJsonFeature(featureGeoJson);
+        featureData = this.importGeoJsonFeature(featureGeoJson, { ownerId: opts.ownerId });
       }
 
       if (featureData) {
@@ -109,7 +111,10 @@ export class FeatureGeoJsonIO {
     return result;
   }
 
-  importGeoJsonFeature(shapeGeoJson: GeoJsonImportFeature): FeatureData | null {
+  importGeoJsonFeature(
+    shapeGeoJson: GeoJsonImportFeature,
+    options: Pick<ImportGeoJsonOptions, 'ownerId'> = {},
+  ): FeatureData | null {
     const sourceName = this.defaultSourceName();
 
     const shape = this.getShape(shapeGeoJson);
@@ -120,6 +125,7 @@ export class FeatureGeoJsonIO {
 
     return this.createFeature({
       featureId: shapeGeoJson.id as FeatureId | undefined,
+      ownerId: options.ownerId,
       shapeGeoJson,
       sourceName,
       imported: true,

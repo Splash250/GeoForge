@@ -7,6 +7,7 @@ import type { GmEditFeatureUpdatedEvent } from '@/types/events/edit.ts';
 import type { FeatureDataParameters } from '@/types/features.ts';
 import {
   type FeatureId,
+  type FeatureOwnerId,
   type FeatureShape,
   type FeatureShapeProperties,
   type FeatureSourceName,
@@ -49,6 +50,7 @@ function isCustomPropertyName(name: string): boolean {
 export class FeatureData {
   gm: Geoman;
   id: FeatureId = 'no-id';
+  ownerId: FeatureOwnerId | undefined = undefined;
   parent: FeatureData | null = null;
   markers: Map<MarkerId, MarkerData>;
   source: BaseSource;
@@ -57,6 +59,7 @@ export class FeatureData {
   constructor(parameters: FeatureDataParameters) {
     this.gm = parameters.gm;
     this.id = parameters.id;
+    this.ownerId = parameters.ownerId;
     this.source = parameters.source;
     this.parent = parameters.parent;
     this.markers = new Map();

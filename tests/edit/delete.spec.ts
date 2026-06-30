@@ -51,7 +51,7 @@ const performDeleteAndVerify = async (page: Page, feature: FeatureCustomData) =>
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await waitForGeoman(page);
-  await expect(page).toHaveTitle('Geoman plugin');
+  await expect(page).toHaveTitle('GeoForge Dev Harness');
 
   const geoJsonFeatures = await loadGeoJson('one-shape-of-each-type');
   expect(geoJsonFeatures, 'GeoJSON features should be loaded').not.toBeNull();

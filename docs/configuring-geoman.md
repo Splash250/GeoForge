@@ -97,6 +97,10 @@ const gmOptions: GmOptionsPartial = {
 
 ## Controls Configuration
 
+Constructor `controls.*.*.uiEnabled` values define initial visibility. For
+runtime workflow switching, use `geoForge.control.applyProfile(...)` so the
+control panel refresh and hidden active-mode cleanup are handled by GeoForge.
+
 ### Draw Controls
 
 Draw controls manage the creation of new geometries. Implemented draw modes are `marker`, `circle`, `ellipse`, `circle_marker`, `text_marker`, `line`, `rectangle`, and `polygon`. The `freehand` and `custom_shape` keys are reserved in the type surface but do not have runtime mode classes in this package today.

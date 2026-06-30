@@ -5,6 +5,9 @@ import { createGeoForgeSsrServer } from '../utils/viteSsrServer.ts';
 import type {
   ArrowheadManagerOptions,
   ArrowheadOptions,
+  FeatureOwnerId,
+  GeomanControlProfile,
+  GeomanControlVisibilityOptions,
   GeomanLineDecoratorSubsystemOptions,
   HtmlOverlayDefinition,
   HtmlOverlayIframeOptions,
@@ -291,6 +294,9 @@ test('documents public API boundary guidance and unsupported subpaths', async ()
 test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<ArrowheadOptions>().toMatchTypeOf<object>();
   expectTypeOf<ArrowheadManagerOptions>().toMatchTypeOf<object>();
+  expectTypeOf<FeatureOwnerId>().toMatchTypeOf<string | number>();
+  expectTypeOf<GeomanControlProfile>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanControlVisibilityOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorLayerPosition>().toMatchTypeOf<string>();
   expectTypeOf<LineDecoratorManagerOptions>().toMatchTypeOf<object>();

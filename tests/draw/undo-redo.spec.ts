@@ -128,5 +128,4 @@ test.describe('Generic history undo/redo', () => {
     expect(state.history.canUndo).toBe(true);
     expect(state.history.canRedo).toBe(false);
   });
-
 });

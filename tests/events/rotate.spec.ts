@@ -4,8 +4,9 @@ import type {
   FeatureUpdatedFwdEvent,
   ShapeName,
 } from '@/types/index.ts';
+import type { Page } from '@playwright/test';
 import test, { expect } from '@playwright/test';
-import { dragAndDrop, enableMode, type ScreenCoordinates } from '@tests/utils/basic.ts';
+import { enableMode, type ScreenCoordinates, waitForMapIdle } from '@tests/utils/basic.ts';
 import {
   clearGeomanEventResult,
   getGeomanEventResultById,
@@ -39,6 +40,29 @@ const ROTATE_END_SHAPE_MAP: { [key in string]: ShapeName } = {
   polygon: 'polygon',
 };
 
+const rotateDragAndDrop = async (
+  page: Page,
+  startPoint: ScreenCoordinates,
+  targetPoint: ScreenCoordinates,
+) => {
+  await page.mouse.move(startPoint[0], startPoint[1]);
+  await page.waitForTimeout(100);
+  await page.mouse.down();
+  await page.waitForTimeout(100);
+
+  const steps = 16;
+  for (let i = 1; i <= steps; i++) {
+    const x = startPoint[0] + (targetPoint[0] - startPoint[0]) * (i / steps);
+    const y = startPoint[1] + (targetPoint[1] - startPoint[1]) * (i / steps);
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(20);
+  }
+
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await waitForMapIdle(page);
+};
+
 test.describe('Rotate Events', () => {
   test.beforeEach(async ({ page }) => {
     await setupGeomanTest(page, { loadFixture: 'one-shape-of-each-type' });
@@ -56,8 +80,10 @@ test.describe('Rotate Events', () => {
     const features = await getRenderedFeaturesData({ page, temporary: false });
     expect(features.length).toBeGreaterThan(0);
 
+    const testedShapes = new Set<string>();
     for (const feature of features) {
-      if (rotatableShapes.includes(feature.shape)) {
+      if (rotatableShapes.includes(feature.shape) && !testedShapes.has(feature.shape)) {
+        testedShapes.add(feature.shape);
         // Get a vertex marker to drag for rotation
         const markers = await getFeatureMarkersData({
           page,
@@ -89,7 +115,7 @@ test.describe('Rotate Events', () => {
         await page.waitForTimeout(50);
 
         // Perform rotation operation
-        await dragAndDrop(page, initialScreenPoint, targetScreenPoint);
+        await rotateDragAndDrop(page, initialScreenPoint, targetScreenPoint);
 
         // Wait a bit for events to be processed
         await page.waitForTimeout(100);
@@ -142,5 +168,6 @@ test.describe('Rotate Events', () => {
         await page.waitForTimeout(100);
       }
     }
+    expect([...testedShapes].sort()).toEqual([...rotatableShapes].sort());
   });
 });

@@ -23,9 +23,12 @@ type LineFeatureDouble = {
   };
 };
 
-vi.mock('../../examples/playground/src/demo-studio/demos/geometry-tools/GeometryInspector.svelte', () => ({
-  default: {},
-}));
+vi.mock(
+  '../../examples/playground/src/demo-studio/demos/geometry-tools/GeometryInspector.svelte',
+  () => ({
+    default: {},
+  }),
+);
 
 function createLineFeature(id: string, coordinates: number[][]): LineFeatureDouble {
   return {
@@ -47,9 +50,8 @@ function createLineFeature(id: string, coordinates: number[][]): LineFeatureDoub
 
 describe('geometryDemos', () => {
   test('recomputes network topology after live geometry mutation events', async () => {
-    const { geometryDemos } = await import(
-      '../../examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts'
-    );
+    const { geometryDemos } =
+      await import('../../examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts');
     const lineA = createLineFeature('geometry-network-a', [
       [0, 0],
       [1, 0],
@@ -73,13 +75,18 @@ describe('geometryDemos', () => {
           },
         },
         features: {
-          get: vi.fn((_sourceName: string, featureId: string) => featureStore.get(featureId) ?? null),
+          getByOwner: vi.fn(() => Array.from(featureStore.values())),
           importGeoJson: vi.fn(() => ({
             stats: { total: 2, success: 2, failed: 0, overwritten: 0 },
             addedFeatures: [lineA, lineB],
           })),
-          delete: vi.fn((feature: LineFeatureDouble) => {
-            featureStore.delete(feature.id);
+          deleteByOwner: vi.fn(() => {
+            const deletedRefs = Array.from(featureStore.values()).map((feature) => ({
+              sourceName: feature.sourceName,
+              featureId: feature.id,
+            }));
+            featureStore.clear();
+            return deletedRefs;
           }),
         },
         geometry: {

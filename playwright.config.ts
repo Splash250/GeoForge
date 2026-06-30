@@ -12,6 +12,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.ts',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Timeout for a test - increased for CI */
@@ -25,7 +26,7 @@ export default defineConfig({
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html', { open: 'never' }], // never launch a browser to show the report
-    ['list'],                    // you can still keep the console-list reporter
+    ['list'], // you can still keep the console-list reporter
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -54,10 +55,10 @@ export default defineConfig({
               '--disable-setuid-sandbox',
               '--disable-dev-shm-usage',
               '--disable-web-security',
-              '--disable-features=VizDisplayCompositor'
-            ]
-          }
-        })
+              '--disable-features=VizDisplayCompositor',
+            ],
+          },
+        }),
       },
     },
 

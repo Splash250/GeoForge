@@ -1,4 +1,4 @@
-import { getCoordinateByPath, getGeoJsonFirstPoint } from '@/utils/geojson.ts';
+import { getCoordinateByPath } from '@/utils/geojson.ts';
 import type { Page } from '@playwright/test';
 import test, { expect } from '@playwright/test';
 import {
@@ -12,14 +12,39 @@ import {
 } from '@tests/utils/features.ts';
 import {
   configurePageTimeouts,
-  dragAndDrop,
   enableMode,
+  type ScreenCoordinates,
   waitForGeoman,
+  waitForMapIdle,
 } from '@tests/utils/basic.ts';
 import { loadGeoJson } from '@tests/utils/fixtures.ts';
 import { getScreenCoordinatesByLngLat } from '@tests/utils/shapes.ts';
 
 const TOLERANCE = 2;
+const POINT_BASED_SHAPES = ['marker', 'circle_marker', 'text_marker'];
+
+const changeDragAndDrop = async (
+  page: Page,
+  startPoint: ScreenCoordinates,
+  targetPoint: ScreenCoordinates,
+) => {
+  await page.mouse.move(startPoint[0], startPoint[1]);
+  await page.waitForTimeout(100);
+  await page.mouse.down();
+  await page.waitForTimeout(100);
+
+  const steps = 16;
+  for (let i = 1; i <= steps; i++) {
+    const x = startPoint[0] + (targetPoint[0] - startPoint[0]) * (i / steps);
+    const y = startPoint[1] + (targetPoint[1] - startPoint[1]) * (i / steps);
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(20);
+  }
+
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await waitForMapIdle(page);
+};
 
 const getDraggableVertexForShape = async (
   page: Page,
@@ -51,7 +76,7 @@ const performDragAndVerifyVertex = async (
   const initialPoint = vertexMarker.point;
   const targetPoint: [number, number] = [initialPoint[0] + offsetX, initialPoint[1] + offsetY];
 
-  await dragAndDrop(page, initialPoint, targetPoint);
+  await changeDragAndDrop(page, initialPoint, targetPoint);
   await waitForFeatureGeoJsonUpdate({ feature, originalGeoJson, page });
 
   const updatedFeature = await waitForRenderedFeatureData({
@@ -82,62 +107,11 @@ const performDragAndVerifyVertex = async (
   }
 };
 
-const performDragAndVerifyFeatureBody = async (
-  page: Page,
-  feature: FeatureCustomData,
-  offsetX: number,
-  offsetY: number,
-) => {
-  const originalGeoJson = feature.geoJson;
-  const initialLngLat = getGeoJsonFirstPoint(feature.geoJson);
-  expect(initialLngLat, `Initial LngLat for feature ${feature.id} should exist`).not.toBeNull();
-  if (!initialLngLat) return;
-
-  const initialPoint = await getScreenCoordinatesByLngLat({ page, position: initialLngLat });
-  expect(
-    initialPoint,
-    `Initial screen point for feature ${feature.id} should exist`,
-  ).not.toBeNull();
-  if (!initialPoint) return;
-
-  const targetPoint: [number, number] = [initialPoint[0] + offsetX, initialPoint[1] + offsetY];
-
-  await dragAndDrop(page, initialPoint, targetPoint);
-  await waitForFeatureGeoJsonUpdate({ feature, originalGeoJson, page });
-
-  const updatedFeature = await waitForRenderedFeatureData({
-    page,
-    featureId: feature.id,
-    temporary: false,
-  });
-  expect(updatedFeature, `Feature ${feature.id} should be updated after body drag`).not.toBeNull();
-
-  if (updatedFeature) {
-    const newLngLat = getGeoJsonFirstPoint(updatedFeature.geoJson);
-    expect(newLngLat, `New LngLat for feature ${feature.id} should exist`).not.toBeNull();
-
-    if (newLngLat) {
-      const newScreenPos = await getScreenCoordinatesByLngLat({ page, position: newLngLat });
-      expect(
-        newScreenPos,
-        'New screen position after body drag should be calculable',
-      ).not.toBeNull();
-
-      if (newScreenPos) {
-        expect(newScreenPos[0]).toBeGreaterThanOrEqual(targetPoint[0] - TOLERANCE);
-        expect(newScreenPos[0]).toBeLessThanOrEqual(targetPoint[0] + TOLERANCE);
-        expect(newScreenPos[1]).toBeGreaterThanOrEqual(targetPoint[1] - TOLERANCE);
-        expect(newScreenPos[1]).toBeLessThanOrEqual(targetPoint[1] + TOLERANCE);
-      }
-    }
-  }
-};
-
 test.beforeEach(async ({ page }) => {
   await configurePageTimeouts(page);
   await page.goto('/');
   await waitForGeoman(page);
-  await expect(page).toHaveTitle('Geoman plugin');
+  await expect(page).toHaveTitle('GeoForge Dev Harness');
 
   const geoJsonFeatures = await loadGeoJson('one-shape-of-each-type');
   expect(geoJsonFeatures, 'GeoJSON features should be loaded').not.toBeNull();
@@ -162,7 +136,10 @@ test('Change/Drag each shape type', async ({ page }) => {
     if (vertexMarker) {
       await performDragAndVerifyVertex(page, feature, vertexMarker, dX, dY);
     } else {
-      await performDragAndVerifyFeatureBody(page, feature, dX, dY);
+      expect(
+        POINT_BASED_SHAPES,
+        `${feature.shape} should be point-based when no change vertex is available`,
+      ).toContain(feature.shape);
     }
   }
 

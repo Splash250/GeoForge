@@ -74,18 +74,21 @@ test.describe('Playground segment length custom tool', () => {
 
     await page.getByRole('button', { name: 'Segment length', exact: true }).click();
 
-    const linePoint = await page.evaluate(() => {
-      type ProjectableMap = {
-        project(lngLat: [number, number]): { x: number; y: number };
-      };
-      const map = window.customData!.map as unknown as ProjectableMap;
-      const point = map.project([0.005, 51]);
-      return { x: point.x, y: point.y };
-    });
-    await page.mouse.move(linePoint.x, linePoint.y);
+    const linePoint = await getScreenCoordinatesByLngLat({ page, position: [0.005, 51] });
+    expect(linePoint).not.toBeNull();
+    if (!linePoint) {
+      return;
+    }
 
     await expect
-      .poll(() => page.evaluate(() => window.geoman.selection.getState().hoveredFeatureId))
+      .poll(
+        async () => {
+          await page.mouse.move(linePoint[0], linePoint[1]);
+          await page.waitForTimeout(50);
+          return page.evaluate(() => window.geoman.selection.getState().hoveredFeatureId);
+        },
+        { timeout: 10000 },
+      )
       .toBe('segment-measure-line');
     await expect
       .poll(() =>
@@ -96,15 +99,12 @@ test.describe('Playground segment length custom tool', () => {
       )
       .toBe('pointer');
 
-    const blankPoint = await page.evaluate(() => {
-      type ProjectableMap = {
-        project(lngLat: [number, number]): { x: number; y: number };
-      };
-      const map = window.customData!.map as unknown as ProjectableMap;
-      const point = map.project([2, 49]);
-      return { x: point.x, y: point.y };
-    });
-    await page.mouse.move(blankPoint.x, blankPoint.y);
+    const blankPoint = await getScreenCoordinatesByLngLat({ page, position: [2, 49] });
+    expect(blankPoint).not.toBeNull();
+    if (!blankPoint) {
+      return;
+    }
+    await page.mouse.move(blankPoint[0], blankPoint[1]);
 
     await expect
       .poll(() => page.evaluate(() => window.geoman.selection.getState().hoveredFeatureId))

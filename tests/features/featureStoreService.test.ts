@@ -255,9 +255,7 @@ describe('FeatureStoreService', () => {
 
     try {
       expect(() => service.delete({ id: 'not-a-feature' } as never)).not.toThrow();
-      expect(logError).toHaveBeenCalledWith(
-        'features.delete: feature "[object Object]" not found',
-      );
+      expect(logError).toHaveBeenCalledWith('features.delete: feature "[object Object]" not found');
     } finally {
       logError.mockRestore();
     }

@@ -133,6 +133,38 @@ Built-in controls target built-in draw, edit, and helper modes. Custom
 interaction tools are controlled through `gm.tools` and can be connected to
 app-owned UI or rendered as optional built-in tool controls.
 
+### Control Profiles
+
+Use `geoForge.control` to switch visible controls at runtime for workflow-,
+role-, or route-specific toolbars. This is the preferred public API for dynamic
+control visibility; do not mutate `geoForge.options.controls.*.*.uiEnabled` or
+call `geoForge.control.updateReactivePanel()` from application code.
+
+| Method                                                              | Returns                        | Description                                             |
+| ------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------- |
+| `geoForge.control.applyProfile(profile)`                            | `GeomanControlProfile`         | Apply visible controls by mode type and refresh once.   |
+| `geoForge.control.setModeVisibility(type, mode, visible, options?)` | `void`                         | Show or hide one mode control and refresh the panel.    |
+| `geoForge.control.getProfile()`                                     | `Record<ModeType, ModeName[]>` | Return a copied snapshot of currently visible controls. |
+
+```ts
+geoForge.control.applyProfile({
+  draw: ['line', 'polygon'],
+  edit: ['change', 'drag'],
+  helper: ['snapping', 'zoom_to_features'],
+});
+
+geoForge.control.setModeVisibility('edit', 'cut', false, {
+  deactivateIfActive: true,
+});
+
+const visibleControls = geoForge.control.getProfile();
+```
+
+`applyProfile(...)` treats omitted mode sections as empty visible sets. Hidden
+active modes are deactivated by default; pass `deactivateHidden: false` to hide
+controls without changing active mode state. `getProfile()` returns copied
+arrays, not mutable internal option state.
+
 ## Custom Interaction Tools
 
 ```ts
