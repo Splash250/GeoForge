@@ -608,7 +608,7 @@ These changes make GeoForge easier to use in route-based apps, demos, wizards, a
 1. Add a public `geoForge.helpers` facade or equivalent helper-specific APIs for snapping configuration.
 2. Add a feature property editor or transaction helper for common forms. (Implemented as `geoForge.transactions.featureProperties(...)`.)
 3. Add decorator authoring helpers for interactive editors.
-4. Clarify overlay `add` versus `upsert` semantics.
+4. Clarify overlay `add` versus `upsert` semantics. (Implemented as `geoForge.overlays.html.upsert(...)`; `add(...)` remains a compatibility alias.)
 5. Add raster layer subscription and proxy configuration helpers. (Implemented)
 
 These changes turn the most complex demo flows into reusable production patterns.
