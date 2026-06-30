@@ -1,5 +1,6 @@
 import type { FeatureData } from '@/core/features/feature-data.ts';
-import type { FeatureShape, FeatureSourceName } from '@/types/features.ts';
+import type { FeatureShape } from '@/types/features.ts';
+import type { GeomanEndpointSnappingConfigureOptions } from '@/geometry/types.ts';
 import type { LngLatTuple, ScreenPoint } from '@/types/map/index.ts';
 import type { HelperModeName } from '@/types/modes/index.ts';
 import { BaseHelper } from '@/modes/helpers/base.ts';
@@ -14,14 +15,6 @@ type ShapeSnappingHandler = (
   lngLat: LngLatTuple,
   point: ScreenPoint,
 ) => { lngLat: LngLatTuple; distance: number };
-
-type LineEndpointSnappingOptions = {
-  enabled: boolean;
-  maxPixelDistance?: number;
-  endpoints?: Array<'start' | 'end'>;
-  excludeFeatures?: Iterable<FeatureData>;
-  sourceNames?: Array<FeatureSourceName>;
-};
 
 export class SnappingHelper extends BaseHelper {
   mode: HelperModeName = 'snapping';
@@ -48,7 +41,7 @@ export class SnappingHelper extends BaseHelper {
   private customSnappingLngLats = new Map<string, Array<LngLatTuple>>();
   private customSnappingFeatures = new Set<FeatureData>();
   private lineSnappingEnabled = false;
-  private lineEndpointSnappingOptions: LineEndpointSnappingOptions = {
+  private lineEndpointSnappingOptions: GeomanEndpointSnappingConfigureOptions = {
     enabled: false,
   };
 
@@ -92,7 +85,7 @@ export class SnappingHelper extends BaseHelper {
     this.customSnappingLngLats.delete(sectionKey);
   }
 
-  configureLineEndpointSnapping(options: LineEndpointSnappingOptions) {
+  configureLineEndpointSnapping(options: GeomanEndpointSnappingConfigureOptions) {
     this.lineEndpointSnappingOptions = {
       enabled: options.enabled,
       maxPixelDistance: options.maxPixelDistance,

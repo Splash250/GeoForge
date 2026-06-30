@@ -1,5 +1,6 @@
 export { GeomanGeometrySubsystem } from './geomanGeometrySubsystem.ts';
 export type { GeomanGeometrySubsystemOptions } from './geomanGeometrySubsystem.ts';
+export type * from './types.ts';
 export {
   LineEndpointConnectionPreviewRenderer,
   resolveLineEndpointConnectionPreviewIds,

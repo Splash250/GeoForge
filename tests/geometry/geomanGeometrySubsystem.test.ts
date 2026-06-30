@@ -1,4 +1,5 @@
 import { GeomanGeometrySubsystem } from '@/geometry/geomanGeometrySubsystem.ts';
+import { SOURCES } from '@/core/features/constants.ts';
 import type { FeatureData } from '@/core/features/feature-data.ts';
 import type { Geoman } from '@/main.ts';
 import type { LngLatTuple } from '@/types/map/index.ts';
@@ -100,6 +101,87 @@ const createStatefulFeature = (
 };
 
 describe('GeomanGeometrySubsystem', () => {
+  test('configures line endpoint snapping through the public geometry facade', () => {
+    const configureLineEndpointSnapping = vi.fn();
+    const subsystem = new GeomanGeometrySubsystem({
+      geoman: {
+        ...createGeoman(),
+        actionInstances: {
+          helper__snapping: {
+            configureLineEndpointSnapping,
+          },
+        },
+      } as unknown as Geoman,
+    });
+    const excludedFeature = createFeature([
+      [0, 0],
+      [1, 0],
+    ]);
+    const options = {
+      enabled: true,
+      maxPixelDistance: 18,
+      endpoints: ['start' as const],
+      excludeFeatures: [excludedFeature],
+      sourceNames: [SOURCES.main],
+    };
+
+    expect(subsystem.endpointSnapping.configure(options)).toBe(true);
+
+    expect(configureLineEndpointSnapping).toHaveBeenCalledWith(options);
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      ...options,
+      available: true,
+      applied: true,
+    });
+  });
+
+  test('disables line endpoint snapping through the public geometry facade', () => {
+    const configureLineEndpointSnapping = vi.fn();
+    const subsystem = new GeomanGeometrySubsystem({
+      geoman: {
+        ...createGeoman(),
+        actionInstances: {
+          helper__snapping: {
+            configureLineEndpointSnapping,
+          },
+        },
+      } as unknown as Geoman,
+    });
+
+    expect(subsystem.endpointSnapping.disable()).toBe(true);
+
+    expect(configureLineEndpointSnapping).toHaveBeenCalledWith({ enabled: false });
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      enabled: false,
+      available: true,
+      applied: true,
+    });
+  });
+
+  test('endpoint snapping facade no-ops safely when the snapping helper is unavailable', () => {
+    const subsystem = new GeomanGeometrySubsystem({ geoman: createGeoman() });
+
+    expect(
+      subsystem.endpointSnapping.configure({
+        enabled: true,
+        maxPixelDistance: 18,
+      }),
+    ).toBe(false);
+
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      enabled: true,
+      maxPixelDistance: 18,
+      available: false,
+      applied: false,
+    });
+    expect(subsystem.endpointSnapping.disable()).toBe(false);
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      enabled: false,
+      available: false,
+      applied: false,
+    });
+  });
+
   test('extracts line string segments with indexes and midpoints', () => {
     const subsystem = new GeomanGeometrySubsystem({ geoman: createGeoman() });
     const feature = createFeature([

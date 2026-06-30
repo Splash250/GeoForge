@@ -67,7 +67,11 @@ describe('geometryDemos', () => {
     const inspectorProps: GeometryInspectorProps[] = [];
     const mutationHandlers = new Map<string, () => void>();
     const unsubscribeFeatures = vi.fn();
-    const configureLineEndpointSnapping = vi.fn();
+    const configureEndpointSnapping = vi.fn(() => true);
+    const disableEndpointSnapping = vi.fn(() => true);
+    const configureLineEndpointSnapping = vi.fn(() => {
+      throw new Error('Demo should use geoForge.geometry.endpointSnapping.');
+    });
     const context: DemoContext = {
       geoForge: {
         actionInstances: {
@@ -130,6 +134,16 @@ describe('geometryDemos', () => {
             })),
           })),
           clearLineEndpointConnectionPreview: vi.fn(),
+          endpointSnapping: {
+            configure: configureEndpointSnapping,
+            disable: disableEndpointSnapping,
+            getState: vi.fn(() => ({
+              enabled: true,
+              maxPixelDistance: 18,
+              available: true,
+              applied: true,
+            })),
+          },
         },
         history: {
           suspend: vi.fn(<TResult>(callback: () => TResult) => callback()),
@@ -153,10 +167,11 @@ describe('geometryDemos', () => {
     const initialInspectorProps = result.inspectorProps as GeometryInspectorProps;
 
     expect(initialInspectorProps.state.danglingEndpointCount).toBe(4);
-    expect(configureLineEndpointSnapping).toHaveBeenCalledWith({
+    expect(configureEndpointSnapping).toHaveBeenCalledWith({
       enabled: true,
       maxPixelDistance: 18,
     });
+    expect(configureLineEndpointSnapping).not.toHaveBeenCalled();
 
     lineA.getGeoJson = () => ({
       type: 'Feature',
@@ -176,7 +191,8 @@ describe('geometryDemos', () => {
 
     result.teardown();
 
-    expect(configureLineEndpointSnapping).toHaveBeenLastCalledWith({ enabled: false });
+    expect(disableEndpointSnapping).toHaveBeenCalledTimes(1);
+    expect(configureLineEndpointSnapping).not.toHaveBeenCalled();
     expect(unsubscribeFeatures).toHaveBeenCalledTimes(1);
   });
 });

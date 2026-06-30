@@ -17,6 +17,9 @@ import { buildLineNetworkGraph } from './networkGraph.ts';
 import { validateLineNetworkTopology } from './topologyValidators.ts';
 import type {
   GeomanDistanceFormatOptions,
+  GeomanEndpointSnappingConfigureOptions,
+  GeomanEndpointSnappingFacade,
+  GeomanEndpointSnappingState,
   GeomanLineEdgeHit,
   GeomanLineEndpointConnectionOptions,
   GeomanLineEndpointConnectionPreview,
@@ -56,15 +59,31 @@ export type GeomanGeometrySubsystemOptions = {
 
 type ProjectedPoint = { x: number; y: number };
 
+type LineEndpointSnappingHelper = {
+  configureLineEndpointSnapping(options: GeomanEndpointSnappingConfigureOptions): void;
+};
+
 export class GeomanGeometrySubsystem {
   private readonly geoman: Geoman;
   private readonly lineEndpointConnectionPreviewRenderer: LineEndpointConnectionPreviewRenderer;
+  private endpointSnappingState: GeomanEndpointSnappingState = {
+    enabled: false,
+    available: false,
+    applied: false,
+  };
+  readonly endpointSnapping: GeomanEndpointSnappingFacade;
 
   constructor(options: GeomanGeometrySubsystemOptions) {
     this.geoman = options.geoman;
     this.lineEndpointConnectionPreviewRenderer = new LineEndpointConnectionPreviewRenderer({
       getMap: () => this.geoman.mapAdapterInstance?.getMapInstance() as never,
     });
+    this.endpointSnapping = {
+      configure: (endpointSnappingOptions) =>
+        this.configureEndpointSnapping(endpointSnappingOptions),
+      disable: () => this.configureEndpointSnapping({ enabled: false }),
+      getState: () => this.getEndpointSnappingState(),
+    };
   }
 
   getLineSegments(feature: FeatureData): Array<GeomanLineSegment> {
@@ -689,6 +708,70 @@ export class GeomanGeometrySubsystem {
 
     return callback();
   }
+
+  private configureEndpointSnapping(options: GeomanEndpointSnappingConfigureOptions): boolean {
+    const nextOptions = cloneEndpointSnappingOptions(options);
+    const helper = this.getLineEndpointSnappingHelper();
+    const available = helper !== null;
+
+    if (helper) {
+      helper.configureLineEndpointSnapping(nextOptions);
+    }
+
+    this.endpointSnappingState = {
+      ...nextOptions,
+      available,
+      applied: available,
+    };
+
+    return available;
+  }
+
+  private getEndpointSnappingState(): GeomanEndpointSnappingState {
+    const available = this.getLineEndpointSnappingHelper() !== null;
+
+    return {
+      ...this.endpointSnappingState,
+      available,
+      applied: this.endpointSnappingState.applied && available,
+    };
+  }
+
+  private getLineEndpointSnappingHelper(): LineEndpointSnappingHelper | null {
+    const candidate = this.geoman.actionInstances?.helper__snapping as unknown;
+
+    if (!isLineEndpointSnappingHelper(candidate)) {
+      return null;
+    }
+
+    return candidate;
+  }
+}
+
+function cloneEndpointSnappingOptions(
+  options: GeomanEndpointSnappingConfigureOptions,
+): GeomanEndpointSnappingConfigureOptions {
+  const nextOptions: GeomanEndpointSnappingConfigureOptions = {
+    enabled: options.enabled,
+  };
+
+  if (options.maxPixelDistance !== undefined) {
+    nextOptions.maxPixelDistance = options.maxPixelDistance;
+  }
+
+  if (options.endpoints !== undefined) {
+    nextOptions.endpoints = [...options.endpoints];
+  }
+
+  if (options.excludeFeatures !== undefined) {
+    nextOptions.excludeFeatures = options.excludeFeatures;
+  }
+
+  if (options.sourceNames !== undefined) {
+    nextOptions.sourceNames = [...options.sourceNames];
+  }
+
+  return nextOptions;
 }
 
 function normalizePoint(pointInput: GeomanSegmentPointInput): ProjectedPoint {
@@ -709,6 +792,14 @@ function isLineSegmentMetadata(item: unknown): item is GeomanLineSegmentMetadata
 
 function isObjectRecord(item: unknown): item is Record<string, unknown> {
   return item !== null && typeof item === 'object' && !Array.isArray(item);
+}
+
+function isLineEndpointSnappingHelper(item: unknown): item is LineEndpointSnappingHelper {
+  return (
+    isObjectRecord(item) &&
+    typeof (item as { configureLineEndpointSnapping?: unknown }).configureLineEndpointSnapping ===
+      'function'
+  );
 }
 
 function getNextInsertedSegmentMetadata(

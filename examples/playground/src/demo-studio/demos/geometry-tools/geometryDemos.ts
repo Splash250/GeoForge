@@ -2,7 +2,6 @@ import type {
   GeoJsonImportFeatureCollection,
   GeomanLineNetworkGraph,
   GeomanLineTopologyValidationIssue,
-  SnappingHelper,
 } from 'maplibre-geoforge';
 import type { DemoContext, DemoDefinition } from '../../registry/types.ts';
 import { sampleNetworkGeoJson } from '../shared/sampleGeoJson.ts';
@@ -77,8 +76,7 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
           history: false,
         },
       );
-      const lineEndpointSnapping = getLineEndpointSnappingConfigurator(geoForge);
-      lineEndpointSnapping?.configureLineEndpointSnapping({ enabled: true, maxPixelDistance: 18 });
+      geoForge.geometry.endpointSnapping.configure({ enabled: true, maxPixelDistance: 18 });
       const state = createLiveTopologyState(geoForge, GEOMETRY_TOPOLOGY_OWNER_ID);
       const code = buildGeometryTopologySnippet();
       const updateRuntime = () => {
@@ -93,7 +91,7 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
       const unsubscribeFeatures = geoForge.features.subscribe(updateRuntime);
       const cleanup = () => {
         unsubscribeFeatures();
-        lineEndpointSnapping?.configureLineEndpointSnapping({ enabled: false });
+        geoForge.geometry.endpointSnapping.disable();
         geoForge.geometry.clearLineEndpointConnectionPreview();
         getOwnedFeatureApi(geoForge).deleteByOwner(GEOMETRY_TOPOLOGY_OWNER_ID, {
           history: false,
@@ -176,16 +174,6 @@ function getOwnedFeatureApi(geoForge: DemoContext['geoForge']): OwnedFeatureApi 
   return geoForge.features as OwnedFeatureApi;
 }
 
-function getLineEndpointSnappingConfigurator(geoForge: DemoContext['geoForge']) {
-  const snapping = geoForge.actionInstances.helper__snapping;
-
-  if (!snapping || !('configureLineEndpointSnapping' in snapping)) {
-    return null;
-  }
-
-  return snapping as SnappingHelper;
-}
-
 function buildGeometryTopologySnippet() {
   return `import { sampleNetworkGeoJson } from '../shared/sampleGeoJson';
 
@@ -202,6 +190,11 @@ const ownerId = 'demo:geometry-tools-network-topology';
 const importResult = geoForge.features.importGeoJson(geometrySampleNetworkGeoJson, {
   ownerId,
   history: false,
+});
+
+geoForge.geometry.endpointSnapping.configure({
+  enabled: true,
+  maxPixelDistance: 18,
 });
 
 const getLiveLines = () => geoForge.features
@@ -245,6 +238,7 @@ const unsubscribeFeatures = geoForge.features.subscribe(() => {
 });
 
 // Demo cleanup removes the preview layer and only features owned by this setup.
+geoForge.geometry.endpointSnapping.disable();
 geoForge.geometry.clearLineEndpointConnectionPreview();
 unsubscribeFeatures();
 geoForge.features.deleteByOwner(ownerId, { history: false });`;
