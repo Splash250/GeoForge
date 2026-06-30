@@ -101,6 +101,28 @@ describe('FeatureGeoJsonIO', () => {
     expect(deleteFeature).toHaveBeenCalledWith('same-id');
   });
 
+  it('forwards history false through import create and overwrite delete operations', () => {
+    const createFeature = vi.fn((options: { featureId?: FeatureId }) =>
+      createFeatureData({ id: options.featureId ?? 'created' }),
+    );
+    const deleteFeature = vi.fn();
+    const hasFeature = vi.fn(() => true);
+    const io = createIO({ createFeature, deleteFeature, hasFeature });
+
+    io.importGeoJson(createPointFeature({ id: 'same-id' }), {
+      overwrite: true,
+      history: false,
+    });
+
+    expect(deleteFeature).toHaveBeenCalledWith('same-id', { history: false });
+    expect(createFeature).toHaveBeenCalledWith(
+      expect.objectContaining({
+        featureId: 'same-id',
+        history: false,
+      }),
+    );
+  });
+
   it('uses idPropertyName as the imported feature id', () => {
     const createFeature = vi.fn(() => createFeatureData({ id: 'external-id' }));
     const io = createIO({ createFeature });

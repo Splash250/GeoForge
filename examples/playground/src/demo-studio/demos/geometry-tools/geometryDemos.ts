@@ -29,12 +29,15 @@ type GeometryInspectorProps = {
 type OwnedFeatureApi = DemoContext['geoForge']['features'] & {
   importGeoJson(
     geoJson: GeoJsonImportFeatureCollection,
-    options?: { ownerId?: string },
+    options?: { ownerId?: string; history?: boolean },
   ): ReturnType<DemoContext['geoForge']['features']['importGeoJson']>;
   getByOwner(
     ownerId: string,
   ): ReturnType<DemoContext['geoForge']['features']['importGeoJson']>['addedFeatures'];
-  deleteByOwner(ownerId: string): Array<{ sourceName: string; featureId: string | number }>;
+  deleteByOwner(
+    ownerId: string,
+    options?: { history?: boolean },
+  ): Array<{ sourceName: string; featureId: string | number }>;
 };
 
 const geometryMutationEventNames = [
@@ -74,10 +77,12 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
         return { teardown: () => {} };
       }
 
-      const importResult = runWithoutHistory(geoForge, () =>
-        getOwnedFeatureApi(geoForge).importGeoJson(geometrySampleNetworkGeoJson, {
+      const importResult = getOwnedFeatureApi(geoForge).importGeoJson(
+        geometrySampleNetworkGeoJson,
+        {
           ownerId: GEOMETRY_TOPOLOGY_OWNER_ID,
-        }),
+          history: false,
+        },
       );
       const lineEndpointSnapping = getLineEndpointSnappingConfigurator(geoForge);
       lineEndpointSnapping?.configureLineEndpointSnapping({ enabled: true, maxPixelDistance: 18 });
@@ -98,8 +103,8 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
         });
         lineEndpointSnapping?.configureLineEndpointSnapping({ enabled: false });
         geoForge.geometry.clearLineEndpointConnectionPreview();
-        runWithoutHistory(geoForge, () => {
-          getOwnedFeatureApi(geoForge).deleteByOwner(GEOMETRY_TOPOLOGY_OWNER_ID);
+        getOwnedFeatureApi(geoForge).deleteByOwner(GEOMETRY_TOPOLOGY_OWNER_ID, {
+          history: false,
         });
       };
 
@@ -182,12 +187,6 @@ function getOwnedFeatureApi(geoForge: DemoContext['geoForge']): OwnedFeatureApi 
   return geoForge.features as OwnedFeatureApi;
 }
 
-function runWithoutHistory<T>(geoForge: DemoContext['geoForge'], callback: () => T): T {
-  const history = geoForge.history as { suspend?: <TResult>(callback: () => TResult) => TResult };
-
-  return history.suspend ? history.suspend(callback) : callback();
-}
-
 function getLineEndpointSnappingConfigurator(geoForge: DemoContext['geoForge']) {
   const snapping = geoForge.actionInstances.helper__snapping;
 
@@ -211,14 +210,10 @@ const geometrySampleNetworkGeoJson = {
 };
 const ownerId = 'demo:geometry-tools-network-topology';
 
-function runWithoutHistory(callback) {
-  const suspend = geoForge.history.suspend?.bind(geoForge.history);
-  return suspend ? suspend(callback) : callback();
-}
-
-const importResult = runWithoutHistory(() =>
-  geoForge.features.importGeoJson(geometrySampleNetworkGeoJson, { ownerId }),
-);
+const importResult = geoForge.features.importGeoJson(geometrySampleNetworkGeoJson, {
+  ownerId,
+  history: false,
+});
 
 const getLiveLines = () => geoForge.features
   .getByOwner(ownerId)
@@ -265,7 +260,5 @@ geoForge.geometry.clearLineEndpointConnectionPreview();
 ['gm:create', 'gm:edit', 'gm:drag', 'gm:remove', 'gm:historychange'].forEach((eventName) => {
   map.off(eventName, refreshTopology);
 });
-runWithoutHistory(() => {
-  geoForge.features.deleteByOwner(ownerId);
-});`;
+geoForge.features.deleteByOwner(ownerId, { history: false });`;
 }

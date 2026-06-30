@@ -5,6 +5,7 @@ import type { BaseSource } from '../map/base/source.ts';
 import { SHAPE_NAMES } from '../../modes/constants.ts';
 import type {
   FeatureId,
+  FeatureMutationOptions,
   FeatureOwnerId,
   FeatureShape,
   FeatureSourceName,
@@ -27,12 +28,12 @@ type CreateFeatureOptions = {
   shapeGeoJson: GeoJsonShapeFeature;
   sourceName: FeatureSourceName;
   imported?: boolean;
-};
+} & FeatureMutationOptions;
 
 export type FeatureGeoJsonIOOptions = {
   defaultSourceName: () => FeatureSourceName;
   createFeature: (options: CreateFeatureOptions) => FeatureData | null;
-  deleteFeature: (featureId: FeatureId) => void;
+  deleteFeature: (featureId: FeatureId, options?: FeatureMutationOptions) => void;
   hasFeature: (featureId: FeatureId) => boolean;
   getFeature: (sourceName: FeatureSourceName, featureId: FeatureId) => FeatureData | null;
   getSource: (sourceName: FeatureSourceName) => BaseSource | null;
@@ -42,7 +43,7 @@ export type FeatureGeoJsonIOOptions = {
 export class FeatureGeoJsonIO {
   private defaultSourceName: () => FeatureSourceName;
   private createFeature: (options: CreateFeatureOptions) => FeatureData | null;
-  private deleteFeature: (featureId: FeatureId) => void;
+  private deleteFeature: (featureId: FeatureId, options?: FeatureMutationOptions) => void;
   private hasFeature: (featureId: FeatureId) => boolean;
   private getFeature: (sourceName: FeatureSourceName, featureId: FeatureId) => FeatureData | null;
   private getSource: (sourceName: FeatureSourceName) => BaseSource | null;
@@ -92,12 +93,20 @@ export class FeatureGeoJsonIO {
           const featureId = (featureGeoJson.id ??
             featureGeoJson.properties?.[FEATURE_ID_PROPERTY]) as FeatureId | undefined;
           if (featureId && this.hasFeature(featureId)) {
-            this.deleteFeature(featureId);
+            const mutationOptions = getFeatureMutationOptions(opts);
+            if (mutationOptions) {
+              this.deleteFeature(featureId, mutationOptions);
+            } else {
+              this.deleteFeature(featureId);
+            }
             result.stats.overwritten += 1;
           }
         }
 
-        featureData = this.importGeoJsonFeature(featureGeoJson, { ownerId: opts.ownerId });
+        featureData = this.importGeoJsonFeature(featureGeoJson, {
+          ownerId: opts.ownerId,
+          ...getFeatureMutationOptions(opts),
+        });
       }
 
       if (featureData) {
@@ -113,7 +122,7 @@ export class FeatureGeoJsonIO {
 
   importGeoJsonFeature(
     shapeGeoJson: GeoJsonImportFeature,
-    options: Pick<ImportGeoJsonOptions, 'ownerId'> = {},
+    options: Pick<ImportGeoJsonOptions, 'ownerId' | 'history'> = {},
   ): FeatureData | null {
     const sourceName = this.defaultSourceName();
 
@@ -126,6 +135,7 @@ export class FeatureGeoJsonIO {
     return this.createFeature({
       featureId: shapeGeoJson.id as FeatureId | undefined,
       ownerId: options.ownerId,
+      ...getFeatureMutationOptions(options),
       shapeGeoJson,
       sourceName,
       imported: true,
@@ -220,4 +230,10 @@ export class FeatureGeoJsonIO {
 
     return resultFeatureCollection;
   }
+}
+
+function getFeatureMutationOptions(
+  options: Pick<ImportGeoJsonOptions, 'history'>,
+): FeatureMutationOptions | undefined {
+  return options.history === false ? { history: false } : undefined;
 }

@@ -68,9 +68,10 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         return { teardown: () => {} };
       }
 
-      const importResult = runWithoutHistory(geoForge, () =>
-        geoForge.features.importGeoJson(routeFeature, { overwrite: true }),
-      );
+      const importResult = geoForge.features.importGeoJson(routeFeature, {
+        overwrite: true,
+        history: false,
+      });
       const importedRouteFeatures = importResult.addedFeatures;
 
       if (!importedRouteFeatures.length) {
@@ -175,11 +176,10 @@ export const lineDecoratorDemos: DemoDefinition[] = [
 
       let importResult: ReturnType<typeof geoForge.features.importGeoJson>;
       try {
-        importResult = runWithoutHistory(geoForge, () =>
-          geoForge.features.importGeoJson(getAdvancedDecoratorLineFeature(state), {
-            overwrite: true,
-          }),
-        );
+        importResult = geoForge.features.importGeoJson(getAdvancedDecoratorLineFeature(state), {
+          overwrite: true,
+          history: false,
+        });
       } catch (error) {
         customSvgImageManager.cleanup(map);
         throw error;

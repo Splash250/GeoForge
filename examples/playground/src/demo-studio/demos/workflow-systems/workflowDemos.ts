@@ -99,9 +99,9 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
       }
 
       try {
-        const importResult = runWithoutHistory(geoForge, () =>
-          geoForge.features.importGeoJson(workflowSampleNetworkGeoJson),
-        );
+        const importResult = geoForge.features.importGeoJson(workflowSampleNetworkGeoJson, {
+          history: false,
+        });
         importedFeatures = importResult.addedFeatures;
         const selectedFeature = importedFeatures.find((feature) => feature.shape === 'line');
 
@@ -121,7 +121,9 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           }
 
           if (geoForge.transactions.getActive()?.status === 'active') {
-            throw new Error('Workflow transaction demo cannot start while another transaction is active.');
+            throw new Error(
+              'Workflow transaction demo cannot start while another transaction is active.',
+            );
           }
 
           activeTransaction = geoForge.transactions.start({ id: transactionId });
@@ -368,7 +370,8 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
         if (isActive()) {
           context.notify({
             title: 'Transactions setup failed',
-            body: error instanceof Error ? error.message : 'Workflow transaction demo setup failed.',
+            body:
+              error instanceof Error ? error.message : 'Workflow transaction demo setup failed.',
             tone: 'error',
           });
         }
@@ -444,9 +447,9 @@ let addedFeatures = [];
 let feature;
 
 try {
-  const importResult = runWithoutHistory(() =>
-    geoForge.features.importGeoJson(workflowSampleNetworkGeoJson),
-  );
+  const importResult = geoForge.features.importGeoJson(workflowSampleNetworkGeoJson, {
+    history: false,
+  });
   addedFeatures = importResult.addedFeatures;
   feature = addedFeatures.find((candidate) => candidate.shape === 'line');
 
