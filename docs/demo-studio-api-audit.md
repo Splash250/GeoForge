@@ -441,14 +441,18 @@ Implemented API:
 const authoring = geoForge.decorators.lines.createAuthoringSession({
   features,
   layerPosition: 'above-lines',
-  symbolImages: {
-    registerSvg: true,
-  },
+});
+
+const result = await authoring.registerSvgSymbolImage({
+  id: 'custom-flow-arrow',
+  svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+  loadImage: svgToImage,
 });
 
 authoring.setLineStyle({ color, width, opacity });
 authoring.setDecorators(decorators);
 authoring.sync();
+authoring.unregisterSvgSymbolImage('custom-flow-arrow');
 authoring.dispose();
 ```
 
@@ -462,7 +466,7 @@ Implemented notes:
 - `authoring.setLineStyle({ color, width, opacity })` updates imported feature targets that expose `updateProperties(...)`, using `geoForge.history.suspend(...)` when available.
 - `authoring.setDecorators(decoratorsOrResolver)` clones decorator arrays before sync so later external mutation does not change rendered output.
 - `authoring.setLayerPosition(...)` reconfigures decorator layer placement before sync.
-- `authoring.registerSvgSymbolImage({ id, svg, loadImage, isCurrent })` validates SVG markup, loads the image through the supplied loader or browser image APIs, then adds or updates session-owned MapLibre images. `authoring.unregisterSvgSymbolImage(id)` and `dispose()` remove session-owned images when the map exposes `removeImage(...)`.
+- `authoring.registerSvgSymbolImage({ id, svg, loadImage, isCurrent })` is the explicit SVG custom-symbol path. It validates SVG markup, loads the image through the supplied loader or browser image APIs, then adds or updates session-owned MapLibre images. `authoring.unregisterSvgSymbolImage(id)` and `dispose()` remove session-owned images when the map exposes `removeImage(...)`.
 - The line decorator subsystem still has one shared manual renderer, so authoring sessions are guarded to one active session per `geoForge.decorators.lines` instance. `dispose()` clears this session's render output and releases the guard without destroying unrelated Geoman state.
 
 ### 11. Overlay lifecycle is clean, but add/update semantics should be clearer

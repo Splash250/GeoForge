@@ -281,6 +281,36 @@ export function getAdvancedDecoratorCode(state: AdvancedDecoratorState): string 
   const lineFeatureJson = JSON.stringify(getAdvancedDecoratorLineFeature(state), null, 2);
   const layerPositionJson = JSON.stringify(state.layerPosition);
   const lineStyleJson = JSON.stringify(state.lineStyle, null, 2);
+  const customSymbolRegistrations = getAdvancedCustomSymbolImageSources(state).filter(
+    (source): source is AdvancedCustomSymbolImageSource & { svg: string } => Boolean(source.svg),
+  );
+  const customSymbolRegistrationCode = customSymbolRegistrations.length
+    ? `
+
+const svgToImage = async (svg) => {
+  const image = new Image(32, 32);
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('Unable to load SVG image'));
+      image.src = url;
+    });
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+${customSymbolRegistrations
+  .map(
+    (source) => `await authoring.registerSvgSymbolImage({
+  id: ${JSON.stringify(source.id)},
+  svg: ${JSON.stringify(source.svg)},
+  loadImage: svgToImage,
+});`,
+  )
+  .join('\n')}`
+    : '';
 
   return `const lineFeature = ${lineFeatureJson};
 const importResult = geoForge.features.importGeoJson(lineFeature, {
@@ -291,8 +321,7 @@ const authoring = geoForge.decorators.lines.createAuthoringSession({
   features: importResult.addedFeatures,
   layerPosition: ${layerPositionJson},
   decorators: lineFeature.properties.decorators,
-  symbolImages: { registerSvg: true },
-});
+});${customSymbolRegistrationCode}
 
 authoring.setLineStyle(${lineStyleJson});
 authoring.sync();

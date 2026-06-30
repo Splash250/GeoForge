@@ -394,9 +394,29 @@ describe('advanced decorator authoring helpers', () => {
     expect(code).toContain('features: importResult.addedFeatures');
     expect(code).toContain('layerPosition: "below-lines"');
     expect(code).toContain('decorators: lineFeature.properties.decorators');
+    expect(code).not.toContain('symbolImages');
     expect(code).toContain('authoring.setLineStyle({');
     expect(code).toContain('authoring.sync();');
     expect(code).toContain('"decorators"');
+  });
+
+  test('builds explicit custom SVG registration in advanced decorator snippets', () => {
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const code = getAdvancedDecoratorCode(state);
+
+    expect(code).toContain('const svgToImage = async (svg)');
+    expect(code).toContain('await authoring.registerSvgSymbolImage({');
+    expect(code).toContain('id: "gf-demo-custom-advanced"');
+    expect(code).toContain(
+      'svg: "<svg xmlns=\\"http://www.w3.org/2000/svg\\"><style>.mark { fill: red; }</style><path class=\\"mark\\"/></svg>"',
+    );
+    expect(code).toContain('loadImage: svgToImage');
+    expect(code).not.toContain('symbolImages');
   });
 
   test('adds, removes, and clears decorators without mutating the original state', () => {

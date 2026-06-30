@@ -189,7 +189,6 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         features: importedLineFeatures,
         layerPosition: state.layerPosition,
         decorators: getAdvancedDecoratorLineFeature(state).properties.decorators,
-        symbolImages: { registerSvg: true },
       });
 
       await customSvgImageManager.ensure(authoring, state, { isCurrent: isLatestSetup });

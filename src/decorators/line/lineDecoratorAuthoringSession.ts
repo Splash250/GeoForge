@@ -34,9 +34,6 @@ export type LineDecoratorAuthoringSessionOptions = {
   features: LineDecoratorAuthoringFeatureInput;
   decorators?: LineDecoratorAuthoringDecoratorInput;
   layerPosition?: LineDecoratorLayerPosition;
-  symbolImages?: {
-    registerSvg?: boolean;
-  };
 };
 
 export type SvgSymbolImageMap = {
