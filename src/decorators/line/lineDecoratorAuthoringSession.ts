@@ -186,6 +186,11 @@ export class GeomanLineDecoratorAuthoringSession implements LineDecoratorAuthori
       };
     }
 
+    const staleSessionResult = this.getStaleRegistrationResult(registration.id);
+    if (staleSessionResult) {
+      return staleSessionResult;
+    }
+
     if (registration.isCurrent && !registration.isCurrent()) {
       return {
         ok: false,
@@ -275,6 +280,19 @@ export class GeomanLineDecoratorAuthoringSession implements LineDecoratorAuthori
     if (!this.sessionOptions.isActive()) {
       throw new Error('Line decorator authoring session is no longer active.');
     }
+  }
+
+  private getStaleRegistrationResult(id: string): SvgSymbolImageRegistrationResult | null {
+    if (!this.disposed && this.sessionOptions.isActive()) {
+      return null;
+    }
+
+    return {
+      ok: false,
+      id,
+      reason: 'stale',
+      error: new Error(`Symbol image "${id}" registration is stale.`),
+    };
   }
 }
 

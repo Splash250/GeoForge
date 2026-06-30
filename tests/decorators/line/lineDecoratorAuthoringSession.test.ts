@@ -246,4 +246,55 @@ describe('line decorator authoring session', () => {
     ]);
     expect(images.has('custom-arrow')).toBe(false);
   });
+
+  it('does not mutate map images when SVG loading resolves after session disposal', async () => {
+    const calls: unknown[] = [];
+    const map = {
+      hasImage: vi.fn(() => false),
+      addImage: vi.fn((id: string, image: unknown) => calls.push(['addImage', id, image])),
+      updateImage: vi.fn((id: string, image: unknown) => calls.push(['updateImage', id, image])),
+      removeImage: vi.fn((id: string) => calls.push(['removeImage', id])),
+    };
+    const subsystem = createSubsystem({ map });
+    const authoring = subsystem.createAuthoringSession({ features: [] });
+    const deferred = createDeferred<{
+      width: number;
+      height: number;
+      data: Uint8Array;
+      svg: string;
+    }>();
+
+    const registration = authoring.registerSvgSymbolImage({
+      id: 'late-arrow',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+      loadImage: () => deferred.promise,
+    });
+
+    authoring.dispose();
+    deferred.resolve({
+      width: 1,
+      height: 1,
+      data: new Uint8Array(4),
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+    });
+
+    await expect(registration).resolves.toMatchObject({ ok: false, reason: 'stale' });
+    expect(calls).toEqual([]);
+    expect(map.addImage).not.toHaveBeenCalled();
+    expect(map.updateImage).not.toHaveBeenCalled();
+  });
 });
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve: Deferred<T>['resolve'] = () => {};
+  const promise = new Promise<T>((innerResolve) => {
+    resolve = innerResolve;
+  });
+
+  return { promise, resolve };
+}
