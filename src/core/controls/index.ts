@@ -26,11 +26,20 @@ import { cloneDeep } from 'lodash-es';
 import log from '@/utils/log';
 import { mount, unmount } from 'svelte';
 
+export type GeomanControlProfile = Partial<Record<ModeType, readonly ModeName[]>> & {
+  deactivateHidden?: boolean;
+};
+
+export type GeomanControlVisibilityOptions = {
+  deactivateIfActive?: boolean;
+};
+
 export default class GMControl extends BaseControl {
   controls: SystemControls = cloneDeep(systemControls);
   controlsStore: ControlsStore = createControlsStore();
   reactiveControls: Record<string, unknown> | null = null;
   container: HTMLElement | undefined = undefined;
+  private reactivePanelUpdateDepth = 0;
   eventHandlers: EventHandlers = {
     [`${GM_SYSTEM_PREFIX}:draw`]: this.handleModeEvent.bind(this),
     [`${GM_SYSTEM_PREFIX}:edit`]: this.handleModeEvent.bind(this),
@@ -81,7 +90,7 @@ export default class GMControl extends BaseControl {
 
     const trackModes: Array<ModeAction> = ['mode_started', 'mode_ended'];
 
-    if (trackModes.includes(event.action)) {
+    if (trackModes.includes(event.action) && this.canUpdateReactivePanel()) {
       this.updateReactivePanel();
     }
 
@@ -99,7 +108,10 @@ export default class GMControl extends BaseControl {
       'tool_cancel',
     ];
 
-    if (trackTools.includes(event.action as GmHelperToolLifecycleEvent['action'])) {
+    if (
+      trackTools.includes(event.action as GmHelperToolLifecycleEvent['action']) &&
+      this.canUpdateReactivePanel()
+    ) {
       this.updateReactivePanel();
     }
 
@@ -131,12 +143,105 @@ export default class GMControl extends BaseControl {
   }
 
   updateReactivePanel() {
+    if (!this.canUpdateReactivePanel()) {
+      return;
+    }
+
     this.controlsStore.update(() => ({
       controls: this.controls,
       options: this.gm.options.controls,
       settings: this.gm.options.settings,
       toolControls: this.gm.tools.getToolControls(),
     }));
+  }
+
+  applyProfile(profile: GeomanControlProfile): GeomanControlProfile {
+    const deactivateHidden = profile.deactivateHidden ?? true;
+
+    this.batchReactivePanelUpdates(() => {
+      typedKeys(this.controls).forEach((modeType) => {
+        const visibleModes = new Set<ModeName>(profile[modeType] ?? []);
+        const section = this.controls[modeType];
+
+        Object.keys(section).forEach((modeName) => {
+          const mode = modeName as ModeName;
+          this.setModeVisibilityInternal(modeType, mode, visibleModes.has(mode), {
+            deactivateIfActive: deactivateHidden,
+          });
+        });
+      });
+    });
+
+    this.updateReactivePanel();
+
+    return this.getProfile();
+  }
+
+  setModeVisibility(
+    modeType: ModeType,
+    modeName: ModeName,
+    visible: boolean,
+    options: GeomanControlVisibilityOptions = {},
+  ): void {
+    this.batchReactivePanelUpdates(() => {
+      this.setModeVisibilityInternal(modeType, modeName, visible, options);
+    });
+    this.updateReactivePanel();
+  }
+
+  getProfile(): Record<ModeType, ModeName[]> {
+    return typedKeys(this.controls).reduce(
+      (profile, modeType) => {
+        const section = this.controls[modeType];
+        profile[modeType] = Object.keys(section).filter((modeName): modeName is ModeName => {
+          const controlOptions = this.gm.options.getControlOptions({
+            modeType,
+            modeName: modeName as ModeName,
+          });
+          return controlOptions?.uiEnabled === true;
+        });
+
+        return profile;
+      },
+      { draw: [], edit: [], helper: [] } as Record<ModeType, ModeName[]>,
+    );
+  }
+
+  private setModeVisibilityInternal(
+    modeType: ModeType,
+    modeName: ModeName,
+    visible: boolean,
+    options: GeomanControlVisibilityOptions,
+  ): void {
+    const controlOptions = this.gm.options.getControlOptions({ modeType, modeName });
+
+    if (!controlOptions) {
+      return;
+    }
+
+    controlOptions.uiEnabled = visible;
+
+    if (
+      !visible &&
+      options.deactivateIfActive === true &&
+      this.gm.options.isModeEnabled(modeType, modeName)
+    ) {
+      this.gm.options.disableMode(modeType, modeName);
+    }
+  }
+
+  private batchReactivePanelUpdates(callback: () => void): void {
+    this.reactivePanelUpdateDepth += 1;
+
+    try {
+      callback();
+    } finally {
+      this.reactivePanelUpdateDepth -= 1;
+    }
+  }
+
+  private canUpdateReactivePanel(): boolean {
+    return this.reactivePanelUpdateDepth === 0;
   }
 
   createHtmlContainer() {
