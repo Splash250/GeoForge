@@ -42,6 +42,18 @@ Calls such as `discoverRasterLayers`, `addRasterLayer`, `addRasterLayers`,
 `reorderRasterLayer`, and `removeRasterLayer` can be used without repeating proxy or basemap
 options.
 
+## Subscribe to Raster Layer State
+
+```ts
+const unsubscribe = geoForge.layers.subscribeRasterLayers((layers) => {
+  renderRasterLayerPanel(layers);
+});
+```
+
+The callback runs immediately with the current raster layer snapshot and runs again after layer
+state changes such as add, remove, reorder, configure resync, and destroy. Each callback receives a
+fresh array, so UI code should render from the snapshot instead of mutating it.
+
 ## Discover Available Layers
 
 ```ts
@@ -72,7 +84,10 @@ Browsers require WMS/WMTS servers to allow cross-origin tile requests. If a serv
 CORS headers, proxy the capabilities and tile URLs through your application server:
 
 ```ts
-const proxied = (url: string) => `/api/tile-proxy?url=${encodeURIComponent(url)}`;
+const proxied = createRasterProxyTransformer({
+  path: '/api/tile-proxy',
+  origin: window.location.origin,
+});
 
 const discovered = await geoForge.layers.discoverRasterLayers(serviceUrl, {
   transformRequestUrl: proxied,
@@ -89,6 +104,11 @@ geoForge.layers.addRasterLayer(
   },
 );
 ```
+
+`buildRasterProxyUrl(url, { path, origin, parameterName })` is also available when a one-off
+transformation is more convenient. The helper proxies only cross-origin `http` and `https` URLs,
+preserves MapLibre template tokens such as `{z}`, `{x}`, `{y}`, and `{bbox-epsg-3857}`, and returns
+the original URL for same-origin, non-HTTP, invalid, or origin-less inputs.
 
 The playground Vite proxy is intentionally local-development-only. Production proxies should allowlist
 trusted WMS/WMTS hosts, block private-network destinations, enforce response-size limits, and set

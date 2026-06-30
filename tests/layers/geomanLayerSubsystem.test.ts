@@ -2,6 +2,8 @@
 import {
   GeomanLayerSubsystem,
   buildRasterCapabilitiesRequestUrl,
+  buildRasterProxyUrl,
+  createRasterProxyTransformer,
   normalizeRasterTileUrl,
   parseRasterCapabilities,
 } from '@/layers/index.ts';
@@ -358,6 +360,107 @@ describe('GeomanLayerSubsystem', () => {
     expect(layers.getRasterLayers()).toEqual([]);
   });
 
+  test('notifies raster layer subscribers with fresh snapshots after state changes', () => {
+    const { layers } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+    const subscriber = vi.fn();
+
+    const unsubscribe = layers.subscribeRasterLayers(subscriber);
+
+    expect(subscriber).toHaveBeenCalledTimes(1);
+    expect(subscriber).toHaveBeenLastCalledWith([], { type: 'initial' });
+
+    layers.addRasterLayer(
+      {
+        id: 'external-wms-nuts',
+        name: 'NUTS boundaries',
+        url: 'https://example.test/wms?service=WMS&request=GetMap&layers=nuts',
+      },
+      { basemapLayerId: 'base' },
+    );
+
+    const addSnapshot = subscriber.mock.calls.at(-1)?.[0] as Array<{ id: string; name: string }>;
+    expect(subscriber).toHaveBeenCalledTimes(2);
+    expect(subscriber).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({
+          id: 'external-wms-nuts',
+          name: 'NUTS boundaries',
+        }),
+      ],
+      { type: 'add' },
+    );
+
+    addSnapshot[0]!.name = 'Mutated by consumer';
+    expect(layers.getRasterLayers()[0]?.name).toBe('NUTS boundaries');
+
+    layers.configureRasterLayers({
+      transformTileUrl: (url) => `/proxy?url=${encodeURIComponent(url)}`,
+    });
+
+    expect(subscriber).toHaveBeenCalledTimes(3);
+    expect(subscriber).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ name: 'NUTS boundaries' })],
+      { type: 'configure' },
+    );
+
+    layers.removeRasterLayer('external-wms-nuts', { basemapLayerId: 'base' });
+
+    expect(subscriber).toHaveBeenCalledTimes(4);
+    expect(subscriber).toHaveBeenLastCalledWith([], { type: 'remove' });
+
+    unsubscribe();
+    unsubscribe();
+    layers.addRasterLayer({
+      id: 'external-wms-roads',
+      name: 'Roads',
+      url: 'https://example.test/wms?service=WMS&request=GetMap&layers=roads',
+    });
+
+    expect(subscriber).toHaveBeenCalledTimes(4);
+  });
+
+  test('does not notify raster subscribers for no-op remove or reorder calls', () => {
+    const { layers } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+    const subscriber = vi.fn();
+
+    layers.addRasterLayer({ id: 'a', name: 'A', url: 'https://example.test/a/{z}/{x}/{y}.png' });
+    layers.addRasterLayer({ id: 'b', name: 'B', url: 'https://example.test/b/{z}/{x}/{y}.png' });
+    layers.subscribeRasterLayers(subscriber);
+
+    layers.removeRasterLayer('missing');
+    layers.reorderRasterLayer('missing', 1);
+    layers.reorderRasterLayer('b', -1);
+
+    expect(subscriber).toHaveBeenCalledTimes(1);
+
+    layers.reorderRasterLayer('b', 1);
+
+    expect(subscriber).toHaveBeenCalledTimes(2);
+    expect(subscriber).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ id: 'a' }), expect.objectContaining({ id: 'b' })],
+      { type: 'reorder' },
+    );
+  });
+
+  test('does not notify raster subscribers for unchanged sync calls and notifies when destroy clears state', () => {
+    const { layers } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+    const subscriber = vi.fn();
+
+    layers.addRasterLayer({ id: 'a', name: 'A', url: 'https://example.test/a/{z}/{x}/{y}.png' });
+    layers.subscribeRasterLayers(subscriber);
+    layers.syncRasterLayers({ basemapLayerId: 'base' });
+
+    expect(subscriber).toHaveBeenCalledTimes(1);
+
+    layers.syncRasterLayers();
+    expect(subscriber).toHaveBeenCalledTimes(1);
+
+    layers.destroy();
+
+    expect(subscriber).toHaveBeenCalledTimes(2);
+    expect(subscriber).toHaveBeenLastCalledWith([], { type: 'destroy' });
+  });
+
   test('destroy is best-effort when the map is no longer available', () => {
     const layers = new GeomanLayerSubsystem({
       geoman: {
@@ -587,5 +690,55 @@ describe('raster layer helpers', () => {
     );
 
     expect(layers[0]?.url).toBe('https://tiles.test/tiles/{z}/{y}/{x}.png');
+  });
+
+  test('builds raster proxy URLs for cross-origin HTTP requests while preserving MapLibre tokens', () => {
+    const tileUrl =
+      'https://geoserver.citiwatts.net/geoserver/hotmaps/wms?service=WMS&bbox={bbox-epsg-3857}&tile={z}/{x}/{y}';
+
+    expect(
+      buildRasterProxyUrl(tileUrl, {
+        path: '/__geoforge_tile_proxy',
+        origin: 'http://127.0.0.1:5178',
+      }),
+    ).toBe(
+      '/__geoforge_tile_proxy?url=https%3A%2F%2Fgeoserver.citiwatts.net%2Fgeoserver%2Fhotmaps%2Fwms%3Fservice%3DWMS%26bbox%3D{bbox-epsg-3857}%26tile%3D{z}%2F{x}%2F{y}',
+    );
+  });
+
+  test('does not proxy same-origin, non-http, invalid, or origin-less raster URLs', () => {
+    expect(
+      buildRasterProxyUrl('http://127.0.0.1:5178/tiles/{z}/{x}/{y}.png', {
+        path: '/proxy',
+        origin: 'http://127.0.0.1:5178',
+      }),
+    ).toBe('http://127.0.0.1:5178/tiles/{z}/{x}/{y}.png');
+    expect(
+      buildRasterProxyUrl('data:image/png;base64,abc', {
+        path: '/proxy',
+        origin: 'http://127.0.0.1:5178',
+      }),
+    ).toBe('data:image/png;base64,abc');
+    expect(
+      buildRasterProxyUrl('not a url', {
+        path: '/proxy',
+        origin: 'http://127.0.0.1:5178',
+      }),
+    ).toBe('not a url');
+    expect(buildRasterProxyUrl('https://tiles.test/{z}/{x}/{y}.png', { path: '/proxy' })).toBe(
+      'https://tiles.test/{z}/{x}/{y}.png',
+    );
+  });
+
+  test('creates reusable raster proxy transformers with custom parameter names', () => {
+    const transform = createRasterProxyTransformer({
+      origin: 'https://app.example.test',
+      parameterName: 'target',
+      path: '/api/raster-proxy',
+    });
+
+    expect(transform('https://tiles.example.test/{z}/{x}/{y}.png')).toBe(
+      '/api/raster-proxy?target=https%3A%2F%2Ftiles.example.test%2F{z}%2F{x}%2F{y}.png',
+    );
   });
 });

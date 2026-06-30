@@ -23,6 +23,8 @@ These exports are the preferred public API for new application code.
 | `GeomanHistorySubsystem`           | History subsystem exposed through `geoForge.history`.                                                                   |
 | `GeomanSessionSubsystem`           | Session lifecycle subsystem exposed through `geoForge.sessions` for scoped setup and cleanup.                           |
 | `GeomanLayerSubsystem`             | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays.           |
+| `buildRasterProxyUrl`              | Helper for routing cross-origin WMS/WMTS request URLs through an application-owned proxy path.                          |
+| `createRasterProxyTransformer`     | Helper for creating reusable raster proxy transformers for `transformRequestUrl` and `transformTileUrl`.                |
 | `GeomanControlProfile`             | Type for runtime control visibility profiles used by `geoForge.control.applyProfile(...)`.                              |
 | `GeomanControlVisibilityOptions`   | Type for granular control visibility updates.                                                                           |
 | `FeatureOwnerId`                   | Runtime owner identifier for scoped feature imports and cleanup.                                                        |

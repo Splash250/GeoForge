@@ -18,13 +18,17 @@ import type {
   GeomanFeaturePropertyEditorOptions,
   GeomanFeaturePropertyEditorState,
   GeomanLineDecoratorSubsystemOptions,
+  GeomanRasterLayer,
   HtmlOverlayDefinition,
   HtmlOverlayIframeOptions,
   LineDecoratorGeomanSyncOptions,
   LineDecoratorLayerPosition,
   LineDecoratorManagerOptions,
   LineDecoratorOptions,
+  RasterLayerSubscriptionCallback,
+  RasterLayerSubscriptionEvent,
   RasterLayerDefaults,
+  RasterProxyOptions,
   SymbolDecoratorRendererOptions,
   TextDecoratorRendererOptions,
 } from '../../src/index.ts';
@@ -43,6 +47,8 @@ const STABLE_ROOT_EXPORTS = [
   'GeomanHistorySubsystem',
   'GeomanSessionSubsystem',
   'GeomanLayerSubsystem',
+  'buildRasterProxyUrl',
+  'createRasterProxyTransformer',
   'defineGeomanContextPanel',
   'createContextPanelValidationList',
   'createContextPanelActionButton',
@@ -328,6 +334,14 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<HtmlOverlayDefinition>().toMatchTypeOf<object>();
   expectTypeOf<HtmlOverlayIframeOptions>().toMatchTypeOf<object>();
   expectTypeOf<RasterLayerDefaults>().toMatchTypeOf<object>();
+  expectTypeOf<RasterLayerSubscriptionCallback>().parameters.toEqualTypeOf<
+    [GeomanRasterLayer[], RasterLayerSubscriptionEvent]
+  >();
+  expectTypeOf<RasterLayerSubscriptionEvent>().toMatchTypeOf<object>();
+  expectTypeOf<RasterLayerSubscriptionEvent['type']>().toEqualTypeOf<
+    'initial' | 'configure' | 'add' | 'remove' | 'reorder' | 'destroy'
+  >();
+  expectTypeOf<RasterProxyOptions>().toMatchTypeOf<object>();
 });
 
 test('exports context panel and geometry helper types', async () => {

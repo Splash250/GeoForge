@@ -67,6 +67,21 @@ export type RasterLayerSyncOptions = {
 
 export type RasterLayerDefaults = DiscoverRasterLayersOptions & RasterLayerSyncOptions;
 
+export type RasterLayerSubscriptionEvent = {
+  type: 'initial' | 'configure' | 'add' | 'remove' | 'reorder' | 'destroy';
+};
+
+export type RasterLayerSubscriptionCallback = (
+  layers: GeomanRasterLayer[],
+  event: RasterLayerSubscriptionEvent,
+) => void;
+
+export type RasterProxyOptions = {
+  path: string;
+  origin?: string;
+  parameterName?: string;
+};
+
 type RasterMap = {
   addLayer: (
     layer: {
@@ -97,6 +112,8 @@ export class GeomanLayerSubsystem {
   private rasterLayers: GeomanRasterLayer[] = [];
   private rasterLayerDefaults: RasterLayerDefaults = {};
   private rasterLayerIdSequence = 0;
+  private rasterLayerSubscriberIdSequence = 0;
+  private readonly rasterLayerSubscribers = new Map<number, RasterLayerSubscriptionCallback>();
 
   constructor(
     private readonly options: {
@@ -138,6 +155,7 @@ export class GeomanLayerSubsystem {
         removeRasterLayerFromMap(map, layer.id);
       });
       syncRasterLayers(map, this.rasterLayers, this.rasterLayerDefaults);
+      this.notifyRasterLayerSubscribers({ type: 'configure' });
     }
   }
 
@@ -173,6 +191,11 @@ export class GeomanLayerSubsystem {
     });
 
     const replacementIds = new Set(nextLayers.map((layer) => layer.id));
+
+    if (replacementIds.size === 0) {
+      return [];
+    }
+
     const map = this.getRasterMap();
 
     replacementIds.forEach((layerId) => {
@@ -184,13 +207,19 @@ export class GeomanLayerSubsystem {
       ...this.rasterLayers.filter((layer) => !replacementIds.has(layer.id)),
     ];
     this.syncRasterLayers(mergedOptions);
+    this.notifyRasterLayerSubscribers({ type: 'add' });
     return nextLayers;
   }
 
   removeRasterLayer(layerId: string, options: RasterLayerSyncOptions = {}): void {
+    if (!this.rasterLayers.some((layer) => layer.id === layerId)) {
+      return;
+    }
+
     removeRasterLayerFromMap(this.getRasterMap(), layerId);
     this.rasterLayers = this.rasterLayers.filter((layer) => layer.id !== layerId);
     this.syncRasterLayers(options);
+    this.notifyRasterLayerSubscribers({ type: 'remove' });
   }
 
   reorderRasterLayer(
@@ -210,10 +239,28 @@ export class GeomanLayerSubsystem {
     next.splice(targetIndex, 0, layer);
     this.rasterLayers = next;
     this.syncRasterLayers(options);
+    this.notifyRasterLayerSubscribers({ type: 'reorder' });
   }
 
   getRasterLayers(): GeomanRasterLayer[] {
-    return [...this.rasterLayers];
+    return this.createRasterLayerSnapshot();
+  }
+
+  subscribeRasterLayers(callback: RasterLayerSubscriptionCallback): () => void {
+    const subscriberId = ++this.rasterLayerSubscriberIdSequence;
+    let subscribed = true;
+
+    this.rasterLayerSubscribers.set(subscriberId, callback);
+    callback(this.createRasterLayerSnapshot(), { type: 'initial' });
+
+    return () => {
+      if (!subscribed) {
+        return;
+      }
+
+      subscribed = false;
+      this.rasterLayerSubscribers.delete(subscriberId);
+    };
   }
 
   syncRasterLayers(options: RasterLayerSyncOptions = {}): void {
@@ -228,7 +275,12 @@ export class GeomanLayerSubsystem {
         removeRasterLayerFromMap(map, layer.id);
       });
     }
+    const hadRasterLayers = this.rasterLayers.length > 0;
     this.rasterLayers = [];
+
+    if (hadRasterLayers) {
+      this.notifyRasterLayerSubscribers({ type: 'destroy' });
+    }
   }
 
   private getRasterMap(): RasterMap {
@@ -264,6 +316,16 @@ export class GeomanLayerSubsystem {
 
     this.rasterLayerIdSequence += 1;
     return `${rasterLayerPrefix}${slug || 'overlay'}-${this.rasterLayerIdSequence.toString(36)}`;
+  }
+
+  private createRasterLayerSnapshot(): GeomanRasterLayer[] {
+    return this.rasterLayers.map((layer) => ({ ...layer }));
+  }
+
+  private notifyRasterLayerSubscribers(event: RasterLayerSubscriptionEvent): void {
+    for (const subscriber of this.rasterLayerSubscribers.values()) {
+      subscriber(this.createRasterLayerSnapshot(), event);
+    }
   }
 }
 
@@ -317,6 +379,40 @@ export function normalizeRasterTileUrl(rawUrl: string): string {
   url.searchParams.set('srs', 'EPSG:3857');
 
   return decodeMapLibreTokens(url.toString());
+}
+
+export function buildRasterProxyUrl(tileUrl: string, options: RasterProxyOptions): string {
+  if (!options.origin) {
+    return tileUrl;
+  }
+
+  let targetUrl: URL;
+  let originUrl: URL;
+
+  try {
+    targetUrl = new URL(tileUrl);
+    originUrl = new URL(options.origin);
+  } catch {
+    return tileUrl;
+  }
+
+  if (!['http:', 'https:'].includes(targetUrl.protocol) || targetUrl.origin === originUrl.origin) {
+    return tileUrl;
+  }
+
+  const parameterName = encodeURIComponent(options.parameterName ?? 'url');
+  const encodedTarget = encodeRasterProxyTarget(tileUrl);
+  const [proxyPath, proxyHash = ''] = options.path.split('#', 2);
+  const separator = proxyPath.includes('?') ? '&' : '?';
+  const hash = proxyHash ? `#${proxyHash}` : '';
+
+  return `${proxyPath}${separator}${parameterName}=${encodedTarget}${hash}`;
+}
+
+export function createRasterProxyTransformer(
+  options: RasterProxyOptions,
+): (tileUrl: string) => string {
+  return (tileUrl) => buildRasterProxyUrl(tileUrl, options);
 }
 
 export function parseRasterCapabilities(
@@ -609,6 +705,18 @@ function decodeMapLibreTokens(url: string): string {
     .replaceAll('%7Bz%7D', '{z}')
     .replaceAll('%7Bx%7D', '{x}')
     .replaceAll('%7By%7D', '{y}');
+}
+
+function encodeRasterProxyTarget(tileUrl: string): string {
+  return encodeURIComponent(tileUrl)
+    .replaceAll('%7Bbbox-epsg-3857%7D', '{bbox-epsg-3857}')
+    .replaceAll('%7bbbox-epsg-3857%7d', '{bbox-epsg-3857}')
+    .replaceAll('%7Bz%7D', '{z}')
+    .replaceAll('%7bz%7d', '{z}')
+    .replaceAll('%7Bx%7D', '{x}')
+    .replaceAll('%7bx%7d', '{x}')
+    .replaceAll('%7By%7D', '{y}')
+    .replaceAll('%7by%7d', '{y}');
 }
 
 function inferRasterService(url: URL): 'WMS' | 'WMTS' {
