@@ -6,6 +6,9 @@ import type {
   ArrowheadManagerOptions,
   ArrowheadOptions,
   FeatureOwnerId,
+  GeomanSession,
+  GeomanSessionOptions,
+  GeomanSessionSubsystemOptions,
   GeomanEndpointSnappingConfigureOptions,
   GeomanEndpointSnappingFacade,
   GeomanEndpointSnappingState,
@@ -34,6 +37,7 @@ const STABLE_ROOT_EXPORTS = [
   'GeomanTransactionSubsystem',
   'GeomanTransaction',
   'GeomanHistorySubsystem',
+  'GeomanSessionSubsystem',
   'GeomanLayerSubsystem',
   'defineGeomanContextPanel',
   'createContextPanelValidationList',
@@ -298,6 +302,9 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<ArrowheadOptions>().toMatchTypeOf<object>();
   expectTypeOf<ArrowheadManagerOptions>().toMatchTypeOf<object>();
   expectTypeOf<FeatureOwnerId>().toMatchTypeOf<string | number>();
+  expectTypeOf<GeomanSession>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanSessionOptions>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanSessionSubsystemOptions>().toMatchTypeOf<object>();
   expectTypeOf<GeomanEndpointSnappingConfigureOptions>().toMatchTypeOf<object>();
   expectTypeOf<GeomanEndpointSnappingFacade>().toMatchTypeOf<object>();
   expectTypeOf<GeomanEndpointSnappingState>().toMatchTypeOf<object>();

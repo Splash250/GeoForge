@@ -29,19 +29,19 @@ These would reduce repeated consumer code, hide internal implementation details,
 
 ## Functionality Inventory
 
-| Demo area            | What it demonstrates                                                                              | Current implementation                                                                                                                                        | API maturity                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Runtime boot         | MapLibre map creation, GeoForge construction, load waiting, raster defaults                       | `createDemoGeoForge(...)`, `waitForGeomanLoaded()`, `layers.configureRasterLayers(...)` in `DemoStudioApp.svelte`                                             | Good core API, but setup orchestration is app-owned                   |
-| Demo switching/reset | Per-demo teardown, abort handling, history clearing, code/inspector updates                       | `setupActiveDemo(...)` owns run ids, `AbortController`, teardown, and `history.clear()`                                                                       | Demo-only orchestration; no package-level session primitive           |
-| Control profiles     | Show only relevant controls per category                                                          | Directly mutates `geoForge.options.controls[modeType][modeName].uiEnabled`, disables hidden active modes, then calls `geoForge.control.updateReactivePanel()` | Weak public API boundary                                              |
-| Custom raster layers | Add, remove, reorder, discover WMS/WMTS layers                                                    | `geoForge.layers.*` plus demo-specific `/__geoforge_tile_proxy` transform                                                                                     | Mostly strong API; missing reactive state and proxy guidance          |
-| Draw/edit modes      | Activate draw shapes and global edit modes, clear seeded features                                 | `disableAllModes()`, `enableDraw(...)`, compatibility helpers like `enableGlobalEditMode()`                                                                   | Works, but mode activation API is split across old and new surfaces   |
-| Feature data         | Import GeoJSON, export feature store, show stats                                                  | `features.importGeoJson(...)`, `features.exportGeoJson()`                                                                                                     | Strong core API; cleanup and history suppression are repetitive       |
-| Line decorators      | Sync arrowheads/symbols/text from line features and state controls                                | `decorators.lines.configure(...)`, `syncFromFeatures(...)`, custom symbol image management                                                                    | Strong renderer API; authoring ergonomics need a preset/builder layer |
-| HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.add(...)`, `setSelected(...)`, `destroy()`                                                                                                     | Strong API; app still owns map camera/pointer test orchestration      |
-| Geometry topology    | Import network, build graph, validate topology, enable endpoint snapping                          | `geometry.getLineNetworkGraph(...)`, `validateLineNetworkTopology(...)`, `geometry.endpointSnapping.configure(...)`                                           | Strong public geometry API                                            |
-| Workflow systems     | Single-feature edit, transaction preview/commit/cancel, history undo/redo                         | `enableSingleFeatureEditMode(...)`, `selection.selectFeature(...)`, `transactions.start(...)`, `history.*`                                                    | Powerful but too manual for common production forms                   |
-| Studio shell         | Search demos, select demos, reset, copy docs path, show example count, copy snippets, show toasts | `DemoSidebar.svelte`, `DemoTopToolbar.svelte`, `InspectorPanel.svelte`, local handlers in `DemoStudioApp.svelte`                                              | Useful demo wrapper; docs/GitHub actions are placeholders             |
+| Demo area            | What it demonstrates                                                                              | Current implementation                                                                                                                                             | API maturity                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Runtime boot         | MapLibre map creation, GeoForge construction, load waiting, raster defaults                       | `createDemoGeoForge(...)`, `waitForGeomanLoaded()`, `layers.configureRasterLayers(...)` in `DemoStudioApp.svelte`                                                  | Good core API, but setup orchestration is app-owned                   |
+| Demo switching/reset | Per-demo teardown, abort handling, history clearing, code/inspector updates                       | `setupActiveDemo(...)` owns run ids, `AbortController`, teardown, and `history.clear()`; demos can now use `geoForge.sessions.start(...)` for scoped feature setup | Shell orchestration remains app-owned; feature sessions are public    |
+| Control profiles     | Show only relevant controls per category                                                          | Directly mutates `geoForge.options.controls[modeType][modeName].uiEnabled`, disables hidden active modes, then calls `geoForge.control.updateReactivePanel()`      | Weak public API boundary                                              |
+| Custom raster layers | Add, remove, reorder, discover WMS/WMTS layers                                                    | `geoForge.layers.*` plus demo-specific `/__geoforge_tile_proxy` transform                                                                                          | Mostly strong API; missing reactive state and proxy guidance          |
+| Draw/edit modes      | Activate draw shapes and global edit modes, clear seeded features                                 | `disableAllModes()`, `enableDraw(...)`, compatibility helpers like `enableGlobalEditMode()`                                                                        | Works, but mode activation API is split across old and new surfaces   |
+| Feature data         | Import GeoJSON, export feature store, show stats                                                  | `features.importGeoJson(...)`, `features.exportGeoJson()`                                                                                                          | Strong core API; cleanup and history suppression are repetitive       |
+| Line decorators      | Sync arrowheads/symbols/text from line features and state controls                                | `decorators.lines.configure(...)`, `syncFromFeatures(...)`, custom symbol image management                                                                         | Strong renderer API; authoring ergonomics need a preset/builder layer |
+| HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.add(...)`, `setSelected(...)`, `destroy()`                                                                                                          | Strong API; app still owns map camera/pointer test orchestration      |
+| Geometry topology    | Import network, build graph, validate topology, enable endpoint snapping                          | `geometry.getLineNetworkGraph(...)`, `validateLineNetworkTopology(...)`, `geometry.endpointSnapping.configure(...)`                                                | Strong public geometry API                                            |
+| Workflow systems     | Single-feature edit, transaction preview/commit/cancel, history undo/redo                         | `enableSingleFeatureEditMode(...)`, `selection.selectFeature(...)`, `transactions.start(...)`, `history.*`                                                         | Powerful but too manual for common production forms                   |
+| Studio shell         | Search demos, select demos, reset, copy docs path, show example count, copy snippets, show toasts | `DemoSidebar.svelte`, `DemoTopToolbar.svelte`, `InspectorPanel.svelte`, local handlers in `DemoStudioApp.svelte`                                                   | Useful demo wrapper; docs/GitHub actions are placeholders             |
 
 ## Findings
 
@@ -102,32 +102,24 @@ References:
 
 Why this matters:
 
-Production apps need temporary imports, preview data, wizard state, and scoped cleanup. The current package provides primitives but no ownership/session abstraction, so every integration has to write fragile bookkeeping.
+Production apps need temporary imports, preview data, wizard state, and scoped cleanup. GeoForge now provides a small public session facade for owner-scoped feature work, while broader route/demo orchestration such as abort controllers, mode cleanup, overlay cleanup, and shell reset behavior remains application-owned.
 
-Recommended API:
+Implemented API:
 
 ```ts
 const session = geoForge.sessions.start({
-  id: 'network-topology-demo',
-  history: 'suspend',
-  cleanup: {
-    features: 'owned',
-    modes: 'disable',
-    decorators: 'clear',
-    overlays: 'clear-owned',
-  },
+  ownerId: 'network-topology-demo',
+  history: false,
 });
 
-const { addedFeatures, stats } = session.features.importGeoJson(sample, {
-  overwrite: true,
-});
+const { addedFeatures, stats } = session.features.importGeoJson(sample, { overwrite: true });
 
-session.onFeatureChange(() => refresh());
+session.features.subscribe(() => refresh());
 
 session.dispose();
 ```
 
-Smaller alternative:
+Lower-level alternative:
 
 ```ts
 const result = geoForge.features.importGeoJson(sample, {
@@ -141,7 +133,15 @@ geoForge.features.deleteByOwner('network-topology-demo', { history: false });
 
 Production outcome:
 
-Apps can stage or demonstrate data safely without broad `deleteAll()` cleanup, repeated `history.suspend(...)`, or manual feature reference tracking.
+Apps can stage or demonstrate feature data safely without broad `deleteAll()` cleanup, repeated `history.suspend(...)`, or manual feature reference tracking. `session.dispose()` is idempotent, unsubscribes session feature subscriptions, and deletes only the session owner by default with cleanup history suppressed unless configured otherwise.
+
+Implemented in Phase 2:
+
+- `geoForge.sessions.start({ ownerId?, history?, cleanup?, cleanupHistory? })` returns a session with stable `ownerId`, `disposed`, `features`, and `dispose()`.
+- `session.features.importGeoJson(...)` and `importGeoJsonFeature(...)` default to the session owner and session history option.
+- `session.features.query(...)`, `count(...)`, `getAll()`, `deleteAll(...)`/`clear(...)`, and `subscribe(...)` scope to the session owner by default.
+- Session subscriptions are automatically unsubscribed on dispose.
+- The geometry topology demo now uses a session for seeded import, topology refresh subscriptions, and cleanup.
 
 ### 3. History suppression is repeatedly wrapped instead of expressed at the operation site
 
@@ -559,19 +559,19 @@ Demo Studio becomes a stronger external integration reference without changing G
 
 Use this matrix to turn the audit into implementation work. Each solution should be accepted only if it removes demo-side glue and keeps existing compatibility exports working.
 
-| Problem                        | Best next solution                                                       | Minimum acceptance criteria                                                                                                       | Avoid                                                                          |
-| ------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Control profile mutation       | Add `geoForge.control.applyProfile(...)` and granular visibility setters | Demo Studio no longer writes `control.uiEnabled` directly or calls `updateReactivePanel()` after profile changes                  | Adding another demo-only wrapper around `options.controls`                     |
-| Repeated seeded-data cleanup   | Add owned feature imports or workflow sessions                           | A caller can import features, dispose them by owner/session, and opt out of history without storing every `FeatureData` reference | Making `deleteAll()` the recommended cleanup path                              |
-| History suppression wrappers   | Add `history: false` to feature mutating APIs                            | Import/delete/update snippets no longer need `runWithoutHistory(...)` for single operations                                       | Deprecating `history.suspend(...)`; it is still useful for batches             |
-| Manual event-name lists        | Add feature/history/mode subscriptions returning unsubscribe functions   | Draw/edit, geometry, and workflow inspectors can refresh from package subscriptions, not `map.on(...)` event arrays               | Forcing consumers to subscribe to internal `_gm:*` events                      |
-| Feature store internals        | Add `features.query(...)` and `features.count(...)`                      | Consumers can filter by source, shape, temporary state, and id without touching `featureStore`                                    | Returning live mutable store internals as the primary query API                |
-| Endpoint snapping internals    | Implemented: use `geoForge.geometry.endpointSnapping.configure(...)`     | Geometry demo no longer reads `geoForge.actionInstances.helper__snapping`; unavailable helper calls safely return `false`         | Documenting `actionInstances` as supported application API                     |
-| Transaction form boilerplate   | Add transaction `ensure(...)` or feature-property editor helper          | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
-| Raster state mirroring         | Add raster-layer subscription and proxy helper                           | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
-| Decorator authoring complexity | Add optional authoring session/helper layer                              | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
-| Overlay add/update ambiguity   | Document `add` as upsert or introduce `upsert`                           | Consumer code can choose strict create, patch update, or intentional upsert                                                       | Silent behavior that differs from method names                                 |
-| Placeholder shell actions      | Add source/docs URLs to demo metadata                                    | Docs and GitHub buttons navigate to real references; export still copies snippets                                                 | Treating placeholder shell actions as GeoForge API problems                    |
+| Problem                        | Best next solution                                                           | Minimum acceptance criteria                                                                                                       | Avoid                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Control profile mutation       | Add `geoForge.control.applyProfile(...)` and granular visibility setters     | Demo Studio no longer writes `control.uiEnabled` directly or calls `updateReactivePanel()` after profile changes                  | Adding another demo-only wrapper around `options.controls`                     |
+| Repeated seeded-data cleanup   | Implemented: use `geoForge.sessions.start(...)` or lower-level owned imports | A caller can import features, dispose them by owner/session, and opt out of history without storing every `FeatureData` reference | Making broad `deleteAll()` the recommended cleanup path                        |
+| History suppression wrappers   | Add `history: false` to feature mutating APIs                                | Import/delete/update snippets no longer need `runWithoutHistory(...)` for single operations                                       | Deprecating `history.suspend(...)`; it is still useful for batches             |
+| Manual event-name lists        | Add feature/history/mode subscriptions returning unsubscribe functions       | Draw/edit, geometry, and workflow inspectors can refresh from package subscriptions, not `map.on(...)` event arrays               | Forcing consumers to subscribe to internal `_gm:*` events                      |
+| Feature store internals        | Add `features.query(...)` and `features.count(...)`                          | Consumers can filter by source, shape, temporary state, and id without touching `featureStore`                                    | Returning live mutable store internals as the primary query API                |
+| Endpoint snapping internals    | Implemented: use `geoForge.geometry.endpointSnapping.configure(...)`         | Geometry demo no longer reads `geoForge.actionInstances.helper__snapping`; unavailable helper calls safely return `false`         | Documenting `actionInstances` as supported application API                     |
+| Transaction form boilerplate   | Add transaction `ensure(...)` or feature-property editor helper              | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
+| Raster state mirroring         | Add raster-layer subscription and proxy helper                               | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
+| Decorator authoring complexity | Add optional authoring session/helper layer                                  | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
+| Overlay add/update ambiguity   | Document `add` as upsert or introduce `upsert`                               | Consumer code can choose strict create, patch update, or intentional upsert                                                       | Silent behavior that differs from method names                                 |
+| Placeholder shell actions      | Add source/docs URLs to demo metadata                                        | Docs and GitHub buttons navigate to real references; export still copies snippets                                                 | Treating placeholder shell actions as GeoForge API problems                    |
 
 ## API Design Guardrails
 
@@ -595,7 +595,7 @@ These changes remove the most obvious internal leaks without changing the deeper
 
 ### Phase 2: Add scoped workflow ownership
 
-1. Add `geoForge.sessions.start(...)` or owner-based feature cleanup.
+1. Add `geoForge.sessions.start(...)` or owner-based feature cleanup. (Implemented for feature imports, feature queries, feature subscriptions, and feature cleanup.)
 2. Add automatic disposal utilities for event subscriptions, overlays, decorators, and imported features.
 3. Add state snapshots for controls, modes, features, selection, transactions, and raster layers.
 
@@ -615,7 +615,7 @@ These changes turn the most complex demo flows into reusable production patterns
 
 A cleaner external integration should be able to look like this:
 
-This example intentionally includes proposed additions from the roadmap. It is not valid against the current package until those APIs are implemented.
+This example intentionally includes proposed additions from the roadmap. The session, feature subscription, history, transaction, and endpoint-snapping pieces are implemented; control profiles in constructor options and raster proxy options remain illustrative.
 
 ```ts
 const geoForge = new GeoForge(map, {
@@ -635,8 +635,8 @@ const geoForge = new GeoForge(map, {
 await geoForge.waitForGeomanLoaded();
 
 const session = geoForge.sessions.start({
-  id: 'network-workflow',
-  history: 'suspend',
+  ownerId: 'network-workflow',
+  history: false,
 });
 
 const imported = session.features.importGeoJson(sampleNetwork, {
@@ -667,7 +667,7 @@ This preserves the current subsystem architecture while removing the repeated gl
 | P0       | History-free feature operations        | Repeated local wrappers across almost every demo                         |
 | P0       | Feature/history/mode subscriptions     | UI integrations should not maintain event-name lists                     |
 | Done     | Public snapping configuration          | Implemented as `geoForge.geometry.endpointSnapping`                      |
-| P1       | Session/owner lifecycle API            | Prevents broad cleanup and repetitive teardown code                      |
+| Done     | Session/owner lifecycle API            | Prevents broad cleanup and repetitive teardown code                      |
 | P1       | Feature query/count APIs               | Avoids direct feature store iteration                                    |
 | P1       | Transaction form helper                | Simplifies a common application workflow                                 |
 | P2       | Raster state subscription/proxy helper | Makes raster layer panels easier to externalize                          |

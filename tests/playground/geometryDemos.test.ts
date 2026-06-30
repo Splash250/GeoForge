@@ -67,6 +67,10 @@ describe('geometryDemos', () => {
     const inspectorProps: GeometryInspectorProps[] = [];
     const mutationHandlers = new Map<string, () => void>();
     const unsubscribeFeatures = vi.fn();
+    const disposeSession = vi.fn(() => {
+      featureStore.clear();
+      unsubscribeFeatures();
+    });
     const configureEndpointSnapping = vi.fn(() => true);
     const disableEndpointSnapping = vi.fn(() => true);
     const configureLineEndpointSnapping = vi.fn(() => {
@@ -81,22 +85,24 @@ describe('geometryDemos', () => {
         },
         features: {
           getByOwner: vi.fn(() => Array.from(featureStore.values())),
-          importGeoJson: vi.fn(() => ({
-            stats: { total: 2, success: 2, failed: 0, overwritten: 0 },
-            addedFeatures: [lineA, lineB],
+        },
+        sessions: {
+          start: vi.fn(() => ({
+            ownerId: 'demo:geometry-tools-network-topology',
+            disposed: false,
+            dispose: disposeSession,
+            features: {
+              query: vi.fn(() => Array.from(featureStore.values())),
+              importGeoJson: vi.fn(() => ({
+                stats: { total: 2, success: 2, failed: 0, overwritten: 0 },
+                addedFeatures: [lineA, lineB],
+              })),
+              subscribe: vi.fn((handler: () => void) => {
+                mutationHandlers.set('features', handler);
+                return unsubscribeFeatures;
+              }),
+            },
           })),
-          deleteByOwner: vi.fn(() => {
-            const deletedRefs = Array.from(featureStore.values()).map((feature) => ({
-              sourceName: feature.sourceName,
-              featureId: feature.id,
-            }));
-            featureStore.clear();
-            return deletedRefs;
-          }),
-          subscribe: vi.fn((handler: () => void) => {
-            mutationHandlers.set('features', handler);
-            return unsubscribeFeatures;
-          }),
         },
         geometry: {
           getLineNetworkGraph: vi.fn((features) => {
@@ -193,6 +199,7 @@ describe('geometryDemos', () => {
 
     expect(disableEndpointSnapping).toHaveBeenCalledTimes(1);
     expect(configureLineEndpointSnapping).not.toHaveBeenCalled();
+    expect(disposeSession).toHaveBeenCalledTimes(1);
     expect(unsubscribeFeatures).toHaveBeenCalledTimes(1);
   });
 });

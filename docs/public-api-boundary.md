@@ -20,6 +20,7 @@ These exports are the preferred public API for new application code.
 | `GeomanTransactionSubsystem`       | Transaction subsystem exposed through `geoForge.transactions`.                                                          |
 | `GeomanTransaction`                | Transaction object returned by `geoForge.transactions.start(...)`.                                                      |
 | `GeomanHistorySubsystem`           | History subsystem exposed through `geoForge.history`.                                                                   |
+| `GeomanSessionSubsystem`           | Session lifecycle subsystem exposed through `geoForge.sessions` for scoped setup and cleanup.                           |
 | `GeomanLayerSubsystem`             | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays.           |
 | `GeomanControlProfile`             | Type for runtime control visibility profiles used by `geoForge.control.applyProfile(...)`.                              |
 | `GeomanControlVisibilityOptions`   | Type for granular control visibility updates.                                                                           |
@@ -108,4 +109,4 @@ Do not rely on deep imports from `src`, `dist`, or internal folders. Deep import
 - Prefer documentation and deprecation clarity over export removal.
 - Add new package subpaths only after consumer import usage is checked and the subpath is explicitly approved.
 - Prefer `geoForge.control.applyProfile(...)`, `setModeVisibility(...)`, and `getProfile()` for runtime control visibility instead of mutating `geoForge.options.controls` or refreshing controls manually.
-- Prefer `geoForge.features.importGeoJson(..., { ownerId })`, `getByOwner(...)`, and `deleteByOwner(...)` for scoped setup or preview data cleanup instead of storing every imported `FeatureData` reference in application code.
+- Prefer `geoForge.sessions.start(...)` for scoped setup, preview data, subscriptions, and cleanup. Use lower-level `geoForge.features.importGeoJson(..., { ownerId })`, `getByOwner(...)`, and `deleteByOwner(...)` only when a session object is unnecessary.

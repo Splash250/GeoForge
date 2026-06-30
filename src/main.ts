@@ -25,6 +25,7 @@ import { BaseHelper } from '@/modes/helpers/base.ts';
 import { helperClassMap } from '@/modes/helpers/index.ts';
 import { GeomanHtmlOverlaySubsystem } from '@/overlays/html/geomanHtmlOverlaySubsystem.ts';
 import { GeomanSelectionSubsystem } from '@/selection/geomanSelectionSubsystem.ts';
+import { GeomanSessionSubsystem } from '@/sessions/index.ts';
 import type { GeomanSelectionOptions } from '@/selection/types.ts';
 import '@/styles/map/maplibre.css';
 import '@/styles/style.css';
@@ -79,6 +80,7 @@ export class Geoman {
   selection: GeomanSelectionSubsystem;
   geometry: GeomanGeometrySubsystem;
   history: GeomanHistorySubsystem;
+  sessions: GeomanSessionSubsystem;
   contextPanels: GeomanContextPanelSubsystem;
   transactions: GeomanTransactionSubsystem;
   layers: GeomanLayerSubsystem;
@@ -103,6 +105,7 @@ export class Geoman {
     this.selection = new GeomanSelectionSubsystem({ geoman: this });
     this.geometry = new GeomanGeometrySubsystem({ geoman: this });
     this.history = new GeomanHistorySubsystem({ geoman: this });
+    this.sessions = new GeomanSessionSubsystem({ geoman: this });
     this.contextPanels = new GeomanContextPanelSubsystem({ geoman: this });
     this.transactions = new GeomanTransactionSubsystem({ geoman: this });
     this.layers = new GeomanLayerSubsystem({ geoman: this });
@@ -582,6 +585,9 @@ export * from '@/transactions/index.ts';
 
 // history
 export * from '@/history/index.ts';
+
+// sessions
+export * from '@/sessions/index.ts';
 
 // layers
 export * from '@/layers/index.ts';
