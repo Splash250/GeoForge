@@ -19,6 +19,7 @@ These exports are the preferred public API for new application code.
 | `GeomanSelectionSubsystem`         | Selection subsystem exposed through `geoForge.selection`.                                                               |
 | `GeomanTransactionSubsystem`       | Transaction subsystem exposed through `geoForge.transactions`.                                                          |
 | `GeomanTransaction`                | Transaction object returned by `geoForge.transactions.start(...)`.                                                      |
+| `GeomanFeaturePropertyEditor`      | Form helper object returned by `geoForge.transactions.featureProperties(...)`.                                          |
 | `GeomanHistorySubsystem`           | History subsystem exposed through `geoForge.history`.                                                                   |
 | `GeomanSessionSubsystem`           | Session lifecycle subsystem exposed through `geoForge.sessions` for scoped setup and cleanup.                           |
 | `GeomanLayerSubsystem`             | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays.           |

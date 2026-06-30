@@ -27,13 +27,6 @@ describe('workflowDemos', () => {
       shape: 'line',
       getProperty: vi.fn(() => 'Network A'),
     };
-    const transaction = {
-      status: 'active',
-      isDirty: vi.fn(() => false),
-      cancel: vi.fn(),
-      updateProperty: vi.fn(),
-      commit: vi.fn(),
-    };
     const history = {
       getState: vi.fn(() => ({
         canUndo: true,
@@ -52,6 +45,35 @@ describe('workflowDemos', () => {
     const historySubscriptionHandlers: Array<() => void> = [];
     const unsubscribeFeatures = vi.fn();
     const unsubscribeHistory = vi.fn();
+    const unsubscribeEditor = vi.fn();
+    const editorState = {
+      values: { name: 'Network A' },
+      properties: { name: 'Network A' },
+      dirty: false,
+      active: false,
+      available: true,
+      disposed: false,
+      blocked: false,
+      canCommit: false,
+      canCancel: false,
+      canUndo: true,
+      canRedo: false,
+      validationMessages: [],
+      history: history.getState(),
+    };
+    const editor = {
+      getState: vi.fn(() => editorState),
+      set: vi.fn(),
+      commit: vi.fn(),
+      cancel: vi.fn(),
+      undo: vi.fn(() => true),
+      redo: vi.fn(() => false),
+      dispose: vi.fn(),
+      subscribe: vi.fn((handler: (state: typeof editorState) => void) => {
+        handler(editorState);
+        return unsubscribeEditor;
+      }),
+    };
     const geoForge = {
       features: {
         importGeoJson: vi.fn(() => ({
@@ -79,7 +101,8 @@ describe('workflowDemos', () => {
       disableSingleFeatureEditMode: vi.fn(),
       transactions: {
         getActive: vi.fn(() => null),
-        start: vi.fn(() => transaction),
+        start: vi.fn(),
+        featureProperties: vi.fn(() => editor),
       },
     };
     const context: DemoContext = {
@@ -107,8 +130,14 @@ describe('workflowDemos', () => {
 
     resultInspectorProps.onUndo();
 
-    expect(transaction.cancel).toHaveBeenCalledTimes(1);
-    expect(history.undo).toHaveBeenCalledTimes(1);
+    expect(editor.undo).toHaveBeenCalledTimes(1);
+    expect(history.undo).not.toHaveBeenCalled();
+    expect(geoForge.transactions.start).not.toHaveBeenCalled();
+    expect(geoForge.transactions.featureProperties).toHaveBeenCalledWith({
+      feature: selectedFeature,
+      id: 'demo-feature-name-edit',
+      label: 'Demo feature name edit',
+    });
     expect(inspectorProps.at(-1)?.state.canUndoDemoChange).toBe(true);
 
     featureSubscriptionHandlers[0]?.();
@@ -120,5 +149,20 @@ describe('workflowDemos', () => {
 
     expect(unsubscribeFeatures).toHaveBeenCalledTimes(1);
     expect(unsubscribeHistory).toHaveBeenCalledTimes(1);
+    expect(unsubscribeEditor).toHaveBeenCalledTimes(1);
+    expect(editor.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  test('snippet demonstrates featureProperties instead of manual transaction lifecycle', async () => {
+    const { workflowDemos } =
+      await import('../../examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts');
+    const snippet = workflowDemos[0].code();
+
+    expect(snippet).toContain('geoForge.transactions.featureProperties');
+    expect(snippet).not.toContain('geoForge.transactions.start');
+    expect(snippet).not.toContain('geoForge.transactions.getActive');
+    expect(snippet).not.toContain('transaction.cancel();\n  const applied = geoForge.history');
+    expect(snippet).not.toContain('transactionIsDirty');
+    expect(snippet).not.toContain('canUndoHistory');
   });
 });

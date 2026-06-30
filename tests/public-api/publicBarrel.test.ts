@@ -14,6 +14,9 @@ import type {
   GeomanEndpointSnappingState,
   GeomanControlProfile,
   GeomanControlVisibilityOptions,
+  GeomanFeaturePropertyEditor,
+  GeomanFeaturePropertyEditorOptions,
+  GeomanFeaturePropertyEditorState,
   GeomanLineDecoratorSubsystemOptions,
   HtmlOverlayDefinition,
   HtmlOverlayIframeOptions,
@@ -36,6 +39,7 @@ const STABLE_ROOT_EXPORTS = [
   'GeomanSelectionSubsystem',
   'GeomanTransactionSubsystem',
   'GeomanTransaction',
+  'GeomanFeaturePropertyEditor',
   'GeomanHistorySubsystem',
   'GeomanSessionSubsystem',
   'GeomanLayerSubsystem',
@@ -167,6 +171,7 @@ describe('public API barrel', () => {
       const transactions = new publicBarrel.GeomanTransactionSubsystem({
         geoman: Object.create(mainModule.Geoman.prototype),
       });
+      expect(typeof transactions.featureProperties).toBe('function');
       const transaction = transactions.start({ id: 'public-api-status-hardening' });
 
       expect(transaction.status).toBe('active');
@@ -310,6 +315,9 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<GeomanEndpointSnappingState>().toMatchTypeOf<object>();
   expectTypeOf<GeomanControlProfile>().toMatchTypeOf<object>();
   expectTypeOf<GeomanControlVisibilityOptions>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanFeaturePropertyEditor>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanFeaturePropertyEditorOptions>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanFeaturePropertyEditorState>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorLayerPosition>().toMatchTypeOf<string>();
   expectTypeOf<LineDecoratorManagerOptions>().toMatchTypeOf<object>();

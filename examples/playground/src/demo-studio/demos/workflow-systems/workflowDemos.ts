@@ -1,7 +1,7 @@
 import type {
   FeatureData,
   GeoJsonImportFeatureCollection,
-  GeomanTransaction,
+  GeomanFeaturePropertyEditor,
   GeomanTransactionCommitResult,
 } from 'maplibre-geoforge';
 import type { DemoContext, DemoDefinition } from '../../registry/types.ts';
@@ -60,20 +60,13 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
         return { teardown: () => {} };
       }
 
-      let activeTransaction: GeomanTransaction | null = null;
       let importedFeatures: FeatureData[] = [];
       let singleFeatureEditActivated = false;
       let unsubscribeFeatures: (() => void) | null = null;
       let unsubscribeHistory: (() => void) | null = null;
+      let unsubscribeEditor: (() => void) | null = null;
+      let propertyEditor: GeomanFeaturePropertyEditor | null = null;
       let state: WorkflowDemoState;
-
-      const cancelDemoTransaction = () => {
-        const transaction = activeTransaction;
-        if (transaction?.status === 'active') {
-          transaction.cancel();
-        }
-        activeTransaction = null;
-      };
 
       const cleanupImportedFeatures = () => {
         runWithoutHistory(geoForge, () => {
@@ -82,16 +75,6 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           });
         });
       };
-
-      if (geoForge.transactions.getActive()?.status === 'active') {
-        const message = 'Workflow transaction demo requires no active transaction before setup.';
-        context.notify({
-          title: 'Transactions setup blocked',
-          body: message,
-          tone: 'error',
-        });
-        throw new Error(message);
-      }
 
       try {
         const importResult = geoForge.features.importGeoJson(workflowSampleNetworkGeoJson, {
@@ -106,54 +89,30 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
 
         const getSelectedName = () => readFeatureName(selectedFeature);
 
-        const ensureActiveTransaction = () => {
-          if (!isActive()) {
-            return null;
-          }
-
-          if (activeTransaction?.status === 'active') {
-            return activeTransaction;
-          }
-
-          if (geoForge.transactions.getActive()?.status === 'active') {
-            throw new Error(
-              'Workflow transaction demo cannot start while another transaction is active.',
-            );
-          }
-
-          activeTransaction = geoForge.transactions.start({ id: transactionId });
-          return activeTransaction;
-        };
-
-        const canUndoHistoryChange = (transactionDirty: boolean) => {
-          const historyState = geoForge.history.getState();
-
-          return !transactionDirty && historyState.canUndo;
-        };
-
-        const canRedoHistoryChange = (transactionDirty: boolean) => {
-          const historyState = geoForge.history.getState();
-
-          return !transactionDirty && historyState.canRedo;
-        };
-
         const buildState = (lastAction: string): WorkflowDemoState => {
-          const historyState = geoForge.history.getState();
-          const transactionStatus = activeTransaction?.status ?? 'inactive';
-          const transactionDirty =
-            activeTransaction?.status === 'active' ? activeTransaction.isDirty() : false;
+          const editorState = propertyEditor?.getState();
+          const historyState = editorState?.history ?? geoForge.history.getState();
+          const transactionStatus = editorState?.blocked
+            ? 'blocked'
+            : editorState?.active
+              ? 'active'
+              : 'inactive';
+          const selectedFeatureName =
+            typeof editorState?.values.name === 'string'
+              ? editorState.values.name
+              : getSelectedName();
 
           return {
             selectedFeatureId: String(selectedFeature.id),
-            selectedFeatureName: getSelectedName(),
+            selectedFeatureName,
             transactionStatus,
-            transactionDirty,
+            transactionDirty: editorState?.dirty ?? false,
             historyCanUndo: historyState.canUndo,
             historyCanRedo: historyState.canRedo,
             historyUndoCount: historyState.undoCount,
             historyRedoCount: historyState.redoCount,
-            canUndoDemoChange: canUndoHistoryChange(transactionDirty),
-            canRedoDemoChange: canRedoHistoryChange(transactionDirty),
+            canUndoDemoChange: editorState?.canUndo ?? historyState.canUndo,
+            canRedoDemoChange: editorState?.canRedo ?? historyState.canRedo,
             lastAction,
           };
         };
@@ -188,12 +147,7 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
             return;
           }
 
-          const transaction = ensureActiveTransaction();
-          if (!transaction) {
-            return;
-          }
-
-          transaction.updateProperty(selectedFeature, 'name', nextName);
+          propertyEditor?.set('name', nextName);
           updateRuntime('Previewing name change');
         };
 
@@ -202,22 +156,14 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
             return;
           }
 
-          const transaction = ensureActiveTransaction();
-          if (!transaction) {
-            return;
-          }
-
-          const result = transaction.commit();
+          const result = propertyEditor?.commit() ?? {
+            committed: true,
+            messages: [],
+            historyEntryId: null,
+          };
           const lastAction = formatCommitResult(result);
           if (!isActive()) {
             return;
-          }
-
-          if (result.committed) {
-            activeTransaction = null;
-            ensureActiveTransaction();
-          } else {
-            activeTransaction = transaction;
           }
 
           updateRuntime(lastAction);
@@ -238,11 +184,7 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
             return;
           }
 
-          if (activeTransaction?.status === 'active') {
-            activeTransaction.cancel();
-          }
-          activeTransaction = null;
-          ensureActiveTransaction();
+          propertyEditor?.cancel();
           updateRuntime('Cancelled preview and restored the selected feature name');
           context.logEvent({
             name: 'workflow-systems:transaction-cancelled',
@@ -251,25 +193,15 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           });
         };
 
-        const applyHistory = (direction: 'undo' | 'redo') => {
+        const onUndo = () => {
           if (!isActive()) {
             return;
           }
 
-          if (activeTransaction?.status === 'active') {
-            activeTransaction.cancel();
-          }
-          activeTransaction = null;
-
-          const applied = direction === 'undo' ? geoForge.history.undo() : geoForge.history.redo();
-          ensureActiveTransaction();
-          updateRuntime(
-            applied
-              ? `${direction === 'undo' ? 'Undid' : 'Redid'} last transaction`
-              : `Nothing to ${direction}`,
-          );
+          const applied = propertyEditor?.undo() ?? false;
+          updateRuntime(applied ? 'Undid last transaction' : 'Nothing to undo');
           context.logEvent({
-            name: `workflow-systems:history-${direction}`,
+            name: 'workflow-systems:history-undo',
             category: 'demo-studio',
             payload: {
               applied,
@@ -279,37 +211,36 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           });
         };
 
-        const onUndo = () => {
-          if (!isActive()) {
-            return;
-          }
-
-          if (!canUndoHistoryChange(activeTransaction?.isDirty() ?? false)) {
-            updateRuntime('No history entry to undo');
-            return;
-          }
-
-          applyHistory('undo');
-        };
-
         const onRedo = () => {
           if (!isActive()) {
             return;
           }
 
-          if (!canRedoHistoryChange(activeTransaction?.isDirty() ?? false)) {
-            updateRuntime('No history entry to redo');
-            return;
-          }
-
-          applyHistory('redo');
+          const applied = propertyEditor?.redo() ?? false;
+          updateRuntime(applied ? 'Redid last transaction' : 'Nothing to redo');
+          context.logEvent({
+            name: 'workflow-systems:history-redo',
+            category: 'demo-studio',
+            payload: {
+              applied,
+              history: geoForge.history.getState(),
+              selectedFeatureId: selectedFeature.id,
+            },
+          });
         };
 
         geoForge.enableSingleFeatureEditMode({ allowedShapes: ['line'] });
         singleFeatureEditActivated = true;
         geoForge.selection.selectFeature(selectedFeature, { reason: 'api' });
-        ensureActiveTransaction();
+        propertyEditor = geoForge.transactions.featureProperties({
+          feature: selectedFeature,
+          id: transactionId,
+          label: 'Demo feature name edit',
+        });
         state = buildState('Ready for a transaction-backed name edit');
+        unsubscribeEditor = propertyEditor.subscribe(() => {
+          updateRuntime('Feature property editor updated');
+        });
         unsubscribeFeatures = geoForge.features.subscribe(refreshFeatureState);
         unsubscribeHistory = geoForge.history.subscribe((_historyState, event) => {
           if (event.type !== 'initial') {
@@ -345,9 +276,10 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           },
           code: buildWorkflowSnippet(),
           teardown: () => {
+            unsubscribeEditor?.();
             unsubscribeFeatures?.();
             unsubscribeHistory?.();
-            cancelDemoTransaction();
+            propertyEditor?.dispose();
             if (singleFeatureEditActivated) {
               geoForge.disableSingleFeatureEditMode();
             }
@@ -355,9 +287,10 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           },
         };
       } catch (error) {
+        unsubscribeEditor?.();
         unsubscribeFeatures?.();
         unsubscribeHistory?.();
-        cancelDemoTransaction();
+        propertyEditor?.dispose();
         if (singleFeatureEditActivated) {
           geoForge.disableSingleFeatureEditMode();
         }
@@ -433,15 +366,12 @@ function cleanupImportedFeatures() {
   });
 }
 
-if (geoForge.transactions.getActive()?.status === 'active') {
-  throw new Error('Workflow transaction demo requires no active transaction before setup.');
-}
-
-let transaction;
+let editor;
 let addedFeatures = [];
 let feature;
 let unsubscribeFeatures;
 let unsubscribeHistory;
+let unsubscribeEditor;
 
 try {
   const importResult = geoForge.features.importGeoJson(workflowSampleNetworkGeoJson, {
@@ -456,8 +386,15 @@ try {
 
   geoForge.enableSingleFeatureEditMode({ allowedShapes: ['line'] });
   geoForge.selection.selectFeature(feature, { reason: 'api' });
-  transaction = geoForge.transactions.start({ id: '${transactionId}' });
+  editor = geoForge.transactions.featureProperties({
+    feature,
+    id: '${transactionId}',
+    label: 'Demo feature name edit',
+  });
 
+  unsubscribeEditor = editor.subscribe((state) => {
+    console.log('Feature property editor state', state);
+  });
   unsubscribeFeatures = geoForge.features.subscribe(() => {
     console.log('Selected feature changed', feature.getProperty('name'));
   });
@@ -467,73 +404,39 @@ try {
     }
   });
 } catch (error) {
-  transaction?.cancel();
+  editor?.dispose();
   geoForge.disableSingleFeatureEditMode();
   cleanupImportedFeatures();
   throw error;
 }
 
 function updateName(nextName) {
-  if (!feature) return;
-  if (transaction.status !== 'active') {
-    if (geoForge.transactions.getActive()?.status === 'active') {
-      throw new Error('Workflow transaction demo cannot start while another transaction is active.');
-    }
-    transaction = geoForge.transactions.start({ id: '${transactionId}' });
-  }
-  transaction.updateProperty(feature, 'name', nextName);
+  editor.set('name', nextName);
 }
 
 function commitName() {
-  const result = transaction.commit();
-  console.log(result, geoForge.history.getState());
-  if (result.committed) {
-    transaction = geoForge.transactions.start({ id: '${transactionId}' });
-  }
+  const result = editor.commit();
+  console.log(result, editor.getState());
 }
 
 function cancelName() {
-  transaction.cancel();
-  console.log(feature.getProperty('name'), geoForge.history.getState());
-  transaction = geoForge.transactions.start({ id: '${transactionId}' });
-}
-
-function transactionIsDirty() {
-  return transaction?.status === 'active' ? transaction.isDirty() : false;
-}
-
-function canUndoHistory() {
-  return !transactionIsDirty() && geoForge.history.getState().canUndo;
-}
-
-function canRedoHistory() {
-  return !transactionIsDirty() && geoForge.history.getState().canRedo;
+  editor.cancel();
+  console.log(feature.getProperty('name'), editor.getState());
 }
 
 function undoName() {
-  if (!canUndoHistory()) {
-    return false;
-  }
-  transaction.cancel();
-  const applied = geoForge.history.undo();
-  transaction = geoForge.transactions.start({ id: '${transactionId}' });
-  return applied;
+  return editor.undo();
 }
 
 function redoName() {
-  if (!canRedoHistory()) {
-    return false;
-  }
-  transaction.cancel();
-  const applied = geoForge.history.redo();
-  transaction = geoForge.transactions.start({ id: '${transactionId}' });
-  return applied;
+  return editor.redo();
 }
 
 // Demo cleanup:
+unsubscribeEditor?.();
 unsubscribeFeatures?.();
 unsubscribeHistory?.();
-transaction?.cancel();
+editor?.dispose();
 geoForge.disableSingleFeatureEditMode();
 cleanupImportedFeatures();`;
 }
