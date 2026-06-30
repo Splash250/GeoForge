@@ -62,6 +62,37 @@ describe('GeomanHtmlOverlaySubsystem', () => {
     expect(managerFactory).not.toHaveBeenCalled();
   });
 
+  it('falls back to add when a legacy manager factory does not provide upsert', () => {
+    const manager = {
+      add: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      get: vi.fn(() => null),
+      getAll: vi.fn(() => []),
+      setSelected: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const managerFactory = vi.fn(() => manager);
+    const subsystem = new GeomanHtmlOverlaySubsystem({
+      getMapAdapter: () => ({}) as never,
+      managerFactory,
+    });
+    const overlay: HtmlOverlayDefinition = {
+      id: 'overlay-1',
+      html: '<button>OK</button>',
+      corners: {
+        topLeft: [0, 1],
+        topRight: [1, 1],
+        bottomRight: [1, 0],
+        bottomLeft: [0, 0],
+      },
+    };
+
+    subsystem.upsert(overlay);
+
+    expect(manager.add).toHaveBeenCalledWith(overlay);
+  });
+
   it('can create a fresh manager after destroy', () => {
     const firstManager = {
       add: vi.fn(),

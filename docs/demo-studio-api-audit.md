@@ -38,7 +38,7 @@ These would reduce repeated consumer code, hide internal implementation details,
 | Draw/edit modes      | Activate draw shapes and global edit modes, clear seeded features                                 | `disableAllModes()`, `enableDraw(...)`, compatibility helpers like `enableGlobalEditMode()`                                                                        | Works, but mode activation API is split across old and new surfaces   |
 | Feature data         | Import GeoJSON, export feature store, show stats                                                  | `features.importGeoJson(...)`, `features.exportGeoJson()`                                                                                                          | Strong core API; cleanup and history suppression are repetitive       |
 | Line decorators      | Sync arrowheads/symbols/text from line features and state controls                                | `decorators.lines.configure(...)`, `syncFromFeatures(...)`, custom symbol image management                                                                         | Strong renderer API; authoring ergonomics need a preset/builder layer |
-| HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.add(...)`, `setSelected(...)`, `destroy()`                                                                                                          | Strong API; app still owns map camera/pointer test orchestration      |
+| HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.upsert(...)`, `setSelected(...)`, `destroy()`                                                                                                       | Strong API; app still owns map camera/pointer test orchestration      |
 | Geometry topology    | Import network, build graph, validate topology, enable endpoint snapping                          | `geometry.getLineNetworkGraph(...)`, `validateLineNetworkTopology(...)`, `geometry.endpointSnapping.configure(...)`                                                | Strong public geometry API                                            |
 | Workflow systems     | Single-feature edit, transaction preview/commit/cancel, history undo/redo                         | `enableSingleFeatureEditMode(...)`, `selection.selectFeature(...)`, `transactions.start(...)`, `history.*`                                                         | Powerful but too manual for common production forms                   |
 | Studio shell         | Search demos, select demos, reset, copy docs path, show example count, copy snippets, show toasts | `DemoSidebar.svelte`, `DemoTopToolbar.svelte`, `InspectorPanel.svelte`, local handlers in `DemoStudioApp.svelte`                                                   | Useful demo wrapper; docs/GitHub actions are placeholders             |
@@ -460,7 +460,7 @@ Severity: Low
 
 Status: Implemented.
 
-Overlay demos now call `overlays.html.upsert(...)` repeatedly as state changes. `upsert(...)` is the explicit public method for creating or replacing a full overlay definition by id, while `add(...)` remains available as a backward-compatible alias for the same upsert behavior. `update(id, patch)` remains the partial patch API.
+Overlay demos now call `overlays.html.upsert(...)` repeatedly as state changes. `upsert(...)` is the preferred public method for creating or replacing a full overlay definition by id. `add(...)` remains available as a backward-compatible alias for the same upsert behavior, including for legacy manager factories that only expose `add(...)`. `update(id, patch)` remains the partial patch API for existing overlays.
 
 References:
 
@@ -475,8 +475,6 @@ geoForge.overlays.html.upsert(definition);
 geoForge.overlays.html.add(definition); // legacy alias for upsert
 geoForge.overlays.html.update(id, patch);
 ```
-
-Or document that `add` is intentionally an upsert.
 
 Production outcome:
 
