@@ -10,12 +10,15 @@
   import { createDemoGeoForge } from './map/createGeoForge.ts';
   import { createDemoMap } from './map/createDemoMap.ts';
   import { applyDemoControlProfile } from './map/controlProfiles.ts';
-  import { buildCustomRasterTileUrl } from './map/customRasterLayers.ts';
   import { onDemoMapLoad } from './map/onDemoMapLoad.ts';
   import { demoRegistry } from './registry/demoRegistry.ts';
   import type { DemoCategory, DemoContext, RegisteredDemoDefinition } from './registry/types.ts';
   import { ToastStack, type Toast } from './ui/index.ts';
-  import type { DiscoveredRasterLayer, GeomanRasterLayer } from 'maplibre-geoforge';
+  import {
+    createRasterProxyTransformer,
+    type DiscoveredRasterLayer,
+    type GeomanRasterLayer
+  } from 'maplibre-geoforge';
 
   type ToastInput = Omit<Toast, 'id'>;
 
@@ -42,6 +45,7 @@
   let destroyed = false;
   let toastSequence = 0;
   let resizeCleanup: (() => void) | null = null;
+  let rasterLayerSubscriptionCleanup: (() => void) | null = null;
   let activeRuntimeInitializationRun = 0;
   let geoForgeInitializationMap: Map | null = null;
   const toastTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -49,17 +53,6 @@
   const activeCategory = $derived(findActiveCategory(categories, activeCategoryId));
   const activeDemo = $derived(findActiveDemo(activeCategory, activeDemoId));
   const statusLabel = $derived(eventCount > 0 ? `${eventCount} event${eventCount === 1 ? '' : 's'}` : 'GeoForge Demo Studio');
-
-  $effect(() => {
-    const currentMap = map;
-    const currentGeoForge = geoForge;
-
-    if (!mapReady || !currentMap || !currentGeoForge) {
-      return;
-    }
-
-    syncMapCustomRasterLayers(currentMap, currentGeoForge);
-  });
 
   $effect(() => {
     const currentMap = map;
@@ -181,10 +174,19 @@
         return;
       }
 
+      const rasterProxyTransformer = createRasterProxyTransformer({
+        path: '/__geoforge_tile_proxy',
+        origin: typeof window === 'undefined' ? undefined : window.location.origin
+      });
+
       createdGeoForge.layers.configureRasterLayers({
         basemapLayerId: 'dark-basemap',
-        transformRequestUrl: buildCustomRasterTileUrl,
-        transformTileUrl: buildCustomRasterTileUrl
+        transformRequestUrl: rasterProxyTransformer,
+        transformTileUrl: rasterProxyTransformer
+      });
+      rasterLayerSubscriptionCleanup?.();
+      rasterLayerSubscriptionCleanup = createdGeoForge.layers.subscribeRasterLayers((layers) => {
+        customRasterLayers = layers;
       });
 
       geoForge = createdGeoForge;
@@ -297,7 +299,6 @@
       }
 
       activeDemoTeardown = result.teardown;
-      syncMapCustomRasterLayers(currentMap, currentGeoForge);
       mapStatus = 'Ready';
     } catch (error) {
       if (!isCurrent()) {
@@ -397,7 +398,6 @@
     }
 
     geoForge.layers.addRasterLayer(input);
-    customRasterLayers = geoForge.layers.getRasterLayers();
   }
 
   function handleAddCustomRasterLayers(inputs: Array<{ name: string; url: string }>) {
@@ -406,7 +406,6 @@
     }
 
     geoForge.layers.addRasterLayers(inputs);
-    customRasterLayers = geoForge.layers.getRasterLayers();
   }
 
   function handleMoveCustomRasterLayer(layerId: string, direction: -1 | 1) {
@@ -415,7 +414,6 @@
     }
 
     geoForge.layers.reorderRasterLayer(layerId, direction);
-    customRasterLayers = geoForge.layers.getRasterLayers();
   }
 
   function handleRemoveCustomRasterLayer(layerId: string) {
@@ -424,7 +422,6 @@
     }
 
     geoForge.layers.removeRasterLayer(layerId);
-    customRasterLayers = geoForge.layers.getRasterLayers();
   }
 
   async function handleDiscoverCustomRasterLayers(url: string): Promise<DiscoveredRasterLayer[]> {
@@ -433,23 +430,6 @@
     }
 
     return geoForge.layers.discoverRasterLayers(url);
-  }
-
-  function syncMapCustomRasterLayers(currentMap: Map, currentGeoForge: DemoContext['geoForge']) {
-    if (!isCurrentMap(currentMap)) {
-      return;
-    }
-
-    try {
-      currentGeoForge.layers.syncRasterLayers();
-      customRasterLayers = currentGeoForge.layers.getRasterLayers();
-    } catch (error) {
-      notify({
-        title: 'Raster layer update failed',
-        body: describeError(error),
-        tone: 'error'
-      });
-    }
   }
 
   async function handleExport() {
@@ -506,6 +486,8 @@
     activeSetupAbortController?.abort();
     teardownActiveDemo();
     resizeCleanup?.();
+    rasterLayerSubscriptionCleanup?.();
+    rasterLayerSubscriptionCleanup = null;
 
     toastTimers.forEach((timer) => clearTimeout(timer));
     toastTimers.clear();

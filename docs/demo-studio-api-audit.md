@@ -485,32 +485,32 @@ Overlay state synchronization is less ambiguous.
 
 Severity: Medium
 
-The raster subsystem exposes good methods: configure defaults, discover, add, remove, reorder, get, sync. Demo Studio still has to keep a separate `customRasterLayers` Svelte state and manually refresh it after every operation. It also owns a request transformer for a local tile proxy.
+Status: Implemented.
+
+The raster subsystem exposes good methods: configure defaults, discover, add, remove, reorder, get, sync. It now also exposes `geoForge.layers.subscribeRasterLayers(...)` so panels can render from package-owned state notifications instead of manually refreshing after every operation. Demo Studio uses the public `createRasterProxyTransformer(...)` helper for its local proxy path rather than owning a private URL transformer.
 
 References:
 
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:184`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:394`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:417`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:426`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:435`
-- `examples/playground/src/demo-studio/map/customRasterLayers.ts:1`
-- `src/layers/raster.ts:111`
-- `src/layers/raster.ts:128`
+- `examples/playground/src/demo-studio/DemoStudioApp.svelte`
+- `src/layers/raster.ts`
+- `src/layers/index.ts`
 
-Recommended API:
+Implemented API:
 
 ```ts
 const unsubscribe = geoForge.layers.subscribeRasterLayers((layers) => {
   setLayers(layers);
 });
 
+const proxyRasterUrl = createRasterProxyTransformer({
+  path: '/__geoforge_tile_proxy',
+  origin: window.location.origin,
+});
+
 geoForge.layers.configureRasterLayers({
   basemapLayerId: 'dark-basemap',
-  requestProxy: {
-    path: '/__geoforge_tile_proxy',
-    preserveTemplateTokens: true,
-  },
+  transformRequestUrl: proxyRasterUrl,
+  transformTileUrl: proxyRasterUrl,
 });
 ```
 
@@ -571,7 +571,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 | Feature store internals        | Add `features.query(...)` and `features.count(...)`                          | Consumers can filter by source, shape, temporary state, and id without touching `featureStore`                                    | Returning live mutable store internals as the primary query API                |
 | Endpoint snapping internals    | Implemented: use `geoForge.geometry.endpointSnapping.configure(...)`         | Geometry demo no longer reads `geoForge.actionInstances.helper__snapping`; unavailable helper calls safely return `false`         | Documenting `actionInstances` as supported application API                     |
 | Transaction form boilerplate   | Implemented: add `geoForge.transactions.featureProperties(...)`              | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
-| Raster state mirroring         | Add raster-layer subscription and proxy helper                               | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
+| Raster state mirroring         | Implemented: add raster-layer subscription and proxy helper                  | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
 | Decorator authoring complexity | Add optional authoring session/helper layer                                  | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
 | Overlay add/update ambiguity   | Document `add` as upsert or introduce `upsert`                               | Consumer code can choose strict create, patch update, or intentional upsert                                                       | Silent behavior that differs from method names                                 |
 | Placeholder shell actions      | Add source/docs URLs to demo metadata                                        | Docs and GitHub buttons navigate to real references; export still copies snippets                                                 | Treating placeholder shell actions as GeoForge API problems                    |
@@ -610,7 +610,7 @@ These changes make GeoForge easier to use in route-based apps, demos, wizards, a
 2. Add a feature property editor or transaction helper for common forms. (Implemented as `geoForge.transactions.featureProperties(...)`.)
 3. Add decorator authoring helpers for interactive editors.
 4. Clarify overlay `add` versus `upsert` semantics.
-5. Add raster layer subscription and proxy configuration helpers.
+5. Add raster layer subscription and proxy configuration helpers. (Implemented)
 
 These changes turn the most complex demo flows into reusable production patterns.
 
@@ -618,7 +618,7 @@ These changes turn the most complex demo flows into reusable production patterns
 
 A cleaner external integration should be able to look like this:
 
-This example intentionally includes proposed additions from the roadmap. The session, feature subscription, history, transaction, and endpoint-snapping pieces are implemented; control profiles in constructor options and raster proxy options remain illustrative.
+This example intentionally includes proposed additions from the roadmap. The session, feature subscription, history, transaction, endpoint-snapping, and raster proxy pieces are implemented; control profiles in constructor options remain illustrative.
 
 ```ts
 const geoForge = new GeoForge(map, {
@@ -629,13 +629,20 @@ const geoForge = new GeoForge(map, {
       helper: ['snapping', 'zoom_to_features'],
     },
   },
-  rasterLayers: {
-    basemapLayerId: 'dark-basemap',
-    requestProxy: { path: '/__geoforge_tile_proxy' },
-  },
 });
 
 await geoForge.waitForGeomanLoaded();
+
+const proxyRasterUrl = createRasterProxyTransformer({
+  path: '/__geoforge_tile_proxy',
+  origin: window.location.origin,
+});
+
+geoForge.layers.configureRasterLayers({
+  basemapLayerId: 'dark-basemap',
+  transformRequestUrl: proxyRasterUrl,
+  transformTileUrl: proxyRasterUrl,
+});
 
 const session = geoForge.sessions.start({
   ownerId: 'network-workflow',
@@ -673,7 +680,7 @@ This preserves the current subsystem architecture while removing the repeated gl
 | Done     | Session/owner lifecycle API            | Prevents broad cleanup and repetitive teardown code                                             |
 | P1       | Feature query/count APIs               | Avoids direct feature store iteration                                                           |
 | Done     | Transaction form helper                | Implemented as `geoForge.transactions.featureProperties(...)` for common feature-property forms |
-| P2       | Raster state subscription/proxy helper | Makes raster layer panels easier to externalize                                                 |
+| Done     | Raster state subscription/proxy helper | Implemented with `geoForge.layers.subscribeRasterLayers(...)` and public raster proxy helpers    |
 | P2       | Decorator authoring session            | Helps advanced visual editors without bloating renderer APIs                                    |
 | P2       | Overlay upsert semantics               | Low-cost clarity improvement                                                                    |
 | P2       | Demo shell reference links             | Turns Demo Studio into a stronger production reference app                                      |
