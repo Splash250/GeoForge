@@ -850,6 +850,9 @@ function shouldNotifySubscription(
   if (options.sourceNames && !options.sourceNames.includes(change.feature.sourceName)) {
     return false;
   }
+  if (options.ownerId !== undefined && change.feature.ownerId !== options.ownerId) {
+    return false;
+  }
   return true;
 }
 

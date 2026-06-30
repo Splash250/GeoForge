@@ -25,18 +25,24 @@ type GeometryInspectorProps = {
   state: GeometryInspectorState;
 };
 
-type OwnedFeatureApi = DemoContext['geoForge']['features'] & {
-  importGeoJson(
-    geoJson: GeoJsonImportFeatureCollection,
-    options?: { ownerId?: string; history?: boolean },
-  ): ReturnType<DemoContext['geoForge']['features']['importGeoJson']>;
-  getByOwner(
-    ownerId: string,
-  ): ReturnType<DemoContext['geoForge']['features']['importGeoJson']>['addedFeatures'];
-  deleteByOwner(
-    ownerId: string,
-    options?: { history?: boolean },
-  ): Array<{ sourceName: string; featureId: string | number }>;
+type GeometrySession = {
+  features: {
+    importGeoJson: DemoContext['geoForge']['features']['importGeoJson'];
+    query: DemoContext['geoForge']['features']['query'];
+    subscribe: DemoContext['geoForge']['features']['subscribe'];
+  };
+  dispose: () => void;
+};
+
+type SessionCapableGeoForge = DemoContext['geoForge'] & {
+  sessions: {
+    start: (options?: {
+      ownerId?: string;
+      history?: boolean;
+      cleanup?: boolean;
+      cleanupHistory?: boolean;
+    }) => GeometrySession;
+  };
 };
 
 const typedSampleNetworkGeoJson = sampleNetworkGeoJson as GeoJsonImportFeatureCollection;
@@ -62,22 +68,20 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
     code: () => buildGeometryTopologySnippet(),
     inspector: GeometryInspector,
     setup: (context) => {
-      const { geoForge } = context;
+      const geoForge = context.geoForge as SessionCapableGeoForge;
       const isActive = () => !context.signal.aborted && context.isCurrent();
 
       if (!isActive()) {
         return { teardown: () => {} };
       }
 
-      const importResult = getOwnedFeatureApi(geoForge).importGeoJson(
-        geometrySampleNetworkGeoJson,
-        {
-          ownerId: GEOMETRY_TOPOLOGY_OWNER_ID,
-          history: false,
-        },
-      );
+      const session = geoForge.sessions.start({
+        ownerId: GEOMETRY_TOPOLOGY_OWNER_ID,
+        history: false,
+      });
+      const importResult = session.features.importGeoJson(geometrySampleNetworkGeoJson);
       geoForge.geometry.endpointSnapping.configure({ enabled: true, maxPixelDistance: 18 });
-      const state = createLiveTopologyState(geoForge, GEOMETRY_TOPOLOGY_OWNER_ID);
+      const state = createLiveTopologyState(geoForge, session);
       const code = buildGeometryTopologySnippet();
       const updateRuntime = () => {
         if (!isActive()) {
@@ -85,17 +89,14 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
         }
 
         context.setInspectorProps({
-          state: createLiveTopologyState(geoForge, GEOMETRY_TOPOLOGY_OWNER_ID),
+          state: createLiveTopologyState(geoForge, session),
         });
       };
-      const unsubscribeFeatures = geoForge.features.subscribe(updateRuntime);
+      session.features.subscribe(updateRuntime);
       const cleanup = () => {
-        unsubscribeFeatures();
         geoForge.geometry.endpointSnapping.disable();
         geoForge.geometry.clearLineEndpointConnectionPreview();
-        getOwnedFeatureApi(geoForge).deleteByOwner(GEOMETRY_TOPOLOGY_OWNER_ID, {
-          history: false,
-        });
+        session.dispose();
       };
 
       if (!isActive()) {
@@ -134,10 +135,10 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
 
 function createLiveTopologyState(
   geoForge: DemoContext['geoForge'],
-  ownerId: string,
+  session: GeometrySession,
 ): GeometryInspectorState {
-  const liveLineFeatures = getOwnedFeatureApi(geoForge)
-    .getByOwner(ownerId)
+  const liveLineFeatures = session.features
+    .query()
     .filter((feature) => feature.shape === 'line' && !feature.temporary);
   const graph = geoForge.geometry.getLineNetworkGraph(liveLineFeatures);
   const validationResult = geoForge.geometry.validateLineNetworkTopology(graph, {
@@ -170,10 +171,6 @@ function toIssueState(issue: GeomanLineTopologyValidationIssue): GeometryTopolog
   };
 }
 
-function getOwnedFeatureApi(geoForge: DemoContext['geoForge']): OwnedFeatureApi {
-  return geoForge.features as OwnedFeatureApi;
-}
-
 function buildGeometryTopologySnippet() {
   return `import { sampleNetworkGeoJson } from '../shared/sampleGeoJson';
 
@@ -185,20 +182,19 @@ const geometrySampleNetworkGeoJson = {
     properties: { ...feature.properties },
   })),
 };
-const ownerId = 'demo:geometry-tools-network-topology';
-
-const importResult = geoForge.features.importGeoJson(geometrySampleNetworkGeoJson, {
-  ownerId,
+const session = geoForge.sessions.start({
+  ownerId: 'demo:geometry-tools-network-topology',
   history: false,
 });
+const importResult = session.features.importGeoJson(geometrySampleNetworkGeoJson);
 
 geoForge.geometry.endpointSnapping.configure({
   enabled: true,
   maxPixelDistance: 18,
 });
 
-const getLiveLines = () => geoForge.features
-  .getByOwner(ownerId)
+const getLiveLines = () => session.features
+  .query()
   .filter((featureData) => featureData.shape === 'line' && !featureData.temporary);
 
 const graph = geoForge.geometry.getLineNetworkGraph(getLiveLines());
@@ -233,13 +229,12 @@ const refreshTopology = () => {
   });
 };
 
-const unsubscribeFeatures = geoForge.features.subscribe(() => {
+session.features.subscribe(() => {
   refreshTopology();
 });
 
-// Demo cleanup removes the preview layer and only features owned by this setup.
+// Demo cleanup removes the preview layer and session-owned features/subscriptions.
 geoForge.geometry.endpointSnapping.disable();
 geoForge.geometry.clearLineEndpointConnectionPreview();
-unsubscribeFeatures();
-geoForge.features.deleteByOwner(ownerId, { history: false });`;
+session.dispose();`;
 }

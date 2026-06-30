@@ -85,6 +85,7 @@ export type GeomanUnsubscribe = () => void;
 export type GeomanFeatureSubscriptionOptions = {
   sourceNames?: Array<FeatureSourceName>;
   includeTemporary?: boolean;
+  ownerId?: FeatureOwnerId;
 };
 
 export type GeomanFeatureQueryOptions = {
