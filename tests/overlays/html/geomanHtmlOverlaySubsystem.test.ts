@@ -6,6 +6,7 @@ describe('GeomanHtmlOverlaySubsystem', () => {
   it('creates the DOM-owning manager lazily on first use and delegates operations', () => {
     const manager = {
       add: vi.fn(),
+      upsert: vi.fn(),
       update: vi.fn(),
       remove: vi.fn(),
       get: vi.fn(() => null),
@@ -32,6 +33,7 @@ describe('GeomanHtmlOverlaySubsystem', () => {
     expect(managerFactory).not.toHaveBeenCalled();
 
     subsystem.add(overlay);
+    subsystem.upsert(overlay);
     subsystem.update('overlay-1', { selected: true });
     subsystem.setSelected('overlay-1');
     subsystem.remove('overlay-1');
@@ -39,6 +41,7 @@ describe('GeomanHtmlOverlaySubsystem', () => {
 
     expect(managerFactory).toHaveBeenCalledTimes(1);
     expect(manager.add).toHaveBeenCalledWith(overlay);
+    expect(manager.upsert).toHaveBeenCalledWith(overlay);
     expect(manager.update).toHaveBeenCalledWith('overlay-1', { selected: true });
     expect(manager.setSelected).toHaveBeenCalledWith('overlay-1');
     expect(manager.remove).toHaveBeenCalledWith('overlay-1');
@@ -62,6 +65,7 @@ describe('GeomanHtmlOverlaySubsystem', () => {
   it('can create a fresh manager after destroy', () => {
     const firstManager = {
       add: vi.fn(),
+      upsert: vi.fn(),
       update: vi.fn(),
       remove: vi.fn(),
       get: vi.fn(() => null),
@@ -71,6 +75,7 @@ describe('GeomanHtmlOverlaySubsystem', () => {
     };
     const secondManager = {
       add: vi.fn(),
+      upsert: vi.fn(),
       update: vi.fn(),
       remove: vi.fn(),
       get: vi.fn(() => null),

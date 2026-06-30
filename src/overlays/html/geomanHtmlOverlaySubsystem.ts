@@ -5,7 +5,7 @@ import type { HtmlOverlayDefinition } from './types.ts';
 
 type GeomanHtmlOverlayManager = Pick<
   HtmlOverlayManager,
-  'add' | 'update' | 'remove' | 'get' | 'getAll' | 'setSelected' | 'destroy'
+  'add' | 'upsert' | 'update' | 'remove' | 'get' | 'getAll' | 'setSelected' | 'destroy'
 >;
 
 export type GeomanHtmlOverlayManagerFactory = (options: {
@@ -24,6 +24,10 @@ export class GeomanHtmlOverlaySubsystem {
 
   add(definition: HtmlOverlayDefinition) {
     this.getManager().add(definition);
+  }
+
+  upsert(definition: HtmlOverlayDefinition) {
+    this.getManager().upsert(definition);
   }
 
   update(id: string, patch: Partial<HtmlOverlayDefinition>) {

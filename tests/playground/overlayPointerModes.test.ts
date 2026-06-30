@@ -39,7 +39,7 @@ describe('overlay pointer modes demo', () => {
     const demo = overlayDemos.find((candidate) => candidate.id === 'overlays-pointer-modes');
     expect(demo).toBeDefined();
 
-    const addedOverlays: unknown[] = [];
+    const upsertedOverlays: unknown[] = [];
     const selectedIds: Array<string | null> = [];
     const pitchCalls: unknown[] = [];
     const inspectorProps: OverlayPointerInspectorProps[] = [];
@@ -48,7 +48,7 @@ describe('overlay pointer modes demo', () => {
       geoForge: {
         overlays: {
           html: {
-            add: vi.fn((definition) => addedOverlays.push(definition)),
+            upsert: vi.fn((definition) => upsertedOverlays.push(definition)),
             setSelected: vi.fn((id) => selectedIds.push(id)),
             destroy: vi.fn(),
           },
@@ -77,7 +77,7 @@ describe('overlay pointer modes demo', () => {
       pointerMode: 'selected',
       mapPitched: false,
     });
-    expect(addedOverlays.at(-1)).toMatchObject({
+    expect(upsertedOverlays.at(-1)).toMatchObject({
       id: 'overlays-pointer-modes-sample',
       selected: true,
       visible: true,
@@ -94,7 +94,7 @@ describe('overlay pointer modes demo', () => {
       mapPitched: false,
     });
 
-    expect(addedOverlays.at(-1)).toMatchObject({
+    expect(upsertedOverlays.at(-1)).toMatchObject({
       iframe: {
         interactable: false,
         pointerMode: 'always',
@@ -108,7 +108,7 @@ describe('overlay pointer modes demo', () => {
 
     inspectorProps.at(-1)?.onReset();
 
-    expect(addedOverlays.at(-1)).toMatchObject({
+    expect(upsertedOverlays.at(-1)).toMatchObject({
       iframe: {
         interactable: true,
         pointerMode: 'selected',

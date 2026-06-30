@@ -17,10 +17,12 @@ import type {
   GeomanFeaturePropertyEditor,
   GeomanFeaturePropertyEditorOptions,
   GeomanFeaturePropertyEditorState,
+  GeomanHtmlOverlaySubsystem,
   GeomanLineDecoratorSubsystemOptions,
   GeomanRasterLayer,
   HtmlOverlayDefinition,
   HtmlOverlayIframeOptions,
+  HtmlOverlayManager,
   LineDecoratorGeomanSyncOptions,
   LineDecoratorLayerPosition,
   LineDecoratorManagerOptions,
@@ -331,6 +333,12 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<GeomanLineDecoratorSubsystemOptions>().toMatchTypeOf<object>();
   expectTypeOf<SymbolDecoratorRendererOptions>().toMatchTypeOf<object>();
   expectTypeOf<TextDecoratorRendererOptions>().toMatchTypeOf<object>();
+  expectTypeOf<HtmlOverlayManager['upsert']>().toEqualTypeOf<
+    (definition: HtmlOverlayDefinition) => void
+  >();
+  expectTypeOf<GeomanHtmlOverlaySubsystem['upsert']>().toEqualTypeOf<
+    (definition: HtmlOverlayDefinition) => void
+  >();
   expectTypeOf<HtmlOverlayDefinition>().toMatchTypeOf<object>();
   expectTypeOf<HtmlOverlayIframeOptions>().toMatchTypeOf<object>();
   expectTypeOf<RasterLayerDefaults>().toMatchTypeOf<object>();

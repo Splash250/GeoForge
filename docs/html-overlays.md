@@ -3,14 +3,14 @@
 HTML overlays place iframe-backed HTML inside a projected rectangle on the map.
 Use `geoForge.overlays.html` for the high-level lifecycle.
 
-## Add an overlay
+## Add or refresh an overlay
 
 ```ts
 import { GeoForge } from 'maplibre-geoforge';
 
 const geoForge = new GeoForge(map);
 
-geoForge.overlays.html.add({
+geoForge.overlays.html.upsert({
   id: 'inspection-panel',
   html: '<main><h1>Inspection</h1></main>',
   corners: {
@@ -28,8 +28,10 @@ geoForge.overlays.html.add({
 });
 ```
 
-`add` creates a new overlay or replaces the existing overlay with the same
-`id`.
+`upsert` creates a new overlay or replaces the existing overlay with the same
+`id`. Use it when application state re-renders a full overlay definition.
+`add` remains available as a backward-compatible alias for the same upsert
+behavior.
 
 ## Lifecycle API
 
@@ -48,6 +50,8 @@ geoForge.overlays.html.remove('inspection-panel');
 geoForge.overlays.html.destroy();
 ```
 
+- `upsert(definition)` creates or replaces an overlay by `id`.
+- `add(definition)` is a legacy alias for `upsert(definition)`.
 - `update(id, patch)` merges a partial definition into an existing overlay and
   keeps the original `id`.
 - `remove(id)` removes one overlay.

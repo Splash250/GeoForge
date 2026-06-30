@@ -458,20 +458,21 @@ The core renderer remains lean, while applications get a supported path for inte
 
 Severity: Low
 
-Overlay demos call `overlays.html.add(...)` repeatedly as state changes. This appears to behave as an upsert, but the public API names both `add(...)` and `update(...)`, which can make production consumers unsure whether repeated `add` is intended.
+Status: Implemented.
+
+Overlay demos now call `overlays.html.upsert(...)` repeatedly as state changes. `upsert(...)` is the explicit public method for creating or replacing a full overlay definition by id, while `add(...)` remains available as a backward-compatible alias for the same upsert behavior. `update(id, patch)` remains the partial patch API.
 
 References:
 
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:62`
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:63`
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:136`
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:137`
+- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts`
+- `src/overlays/html/htmlOverlayManager.ts`
+- `src/overlays/html/geomanHtmlOverlaySubsystem.ts`
 
-Recommended API/documentation:
+Implemented API:
 
 ```ts
 geoForge.overlays.html.upsert(definition);
-geoForge.overlays.html.add(definition); // throws if id exists
+geoForge.overlays.html.add(definition); // legacy alias for upsert
 geoForge.overlays.html.update(id, patch);
 ```
 
@@ -573,7 +574,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 | Transaction form boilerplate   | Implemented: add `geoForge.transactions.featureProperties(...)`              | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
 | Raster state mirroring         | Implemented: add raster-layer subscription and proxy helper                  | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
 | Decorator authoring complexity | Add optional authoring session/helper layer                                  | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
-| Overlay add/update ambiguity   | Document `add` as upsert or introduce `upsert`                               | Consumer code can choose strict create, patch update, or intentional upsert                                                       | Silent behavior that differs from method names                                 |
+| Overlay add/update ambiguity   | Implemented: add explicit `upsert`; keep `add` as legacy upsert alias        | Consumer code can choose patch update or intentional full-definition upsert                                                       | Silent behavior that differs from method names                                 |
 | Placeholder shell actions      | Add source/docs URLs to demo metadata                                        | Docs and GitHub buttons navigate to real references; export still copies snippets                                                 | Treating placeholder shell actions as GeoForge API problems                    |
 
 ## API Design Guardrails
@@ -682,7 +683,7 @@ This preserves the current subsystem architecture while removing the repeated gl
 | Done     | Transaction form helper                | Implemented as `geoForge.transactions.featureProperties(...)` for common feature-property forms |
 | Done     | Raster state subscription/proxy helper | Implemented with `geoForge.layers.subscribeRasterLayers(...)` and public raster proxy helpers    |
 | P2       | Decorator authoring session            | Helps advanced visual editors without bloating renderer APIs                                    |
-| P2       | Overlay upsert semantics               | Low-cost clarity improvement                                                                    |
+| Done     | Overlay upsert semantics               | Implemented as `geoForge.overlays.html.upsert(...)`; `add(...)` remains a compatibility alias   |
 | P2       | Demo shell reference links             | Turns Demo Studio into a stronger production reference app                                      |
 
 ## Bottom Line

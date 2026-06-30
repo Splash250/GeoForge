@@ -59,7 +59,7 @@ export const overlayDemos: DemoDefinition[] = [
           return;
         }
 
-        geoForge.overlays.html.add(createOverlayDefinition(nextState));
+        geoForge.overlays.html.upsert(createOverlayDefinition(nextState));
         geoForge.overlays.html.setSelected(nextState.visible ? overlayId : null);
       };
 
@@ -133,7 +133,7 @@ export const overlayDemos: DemoDefinition[] = [
           return;
         }
 
-        geoForge.overlays.html.add(createPointerModesOverlayDefinition(nextState));
+        geoForge.overlays.html.upsert(createPointerModesOverlayDefinition(nextState));
         geoForge.overlays.html.setSelected(pointerModesOverlayId);
       };
 
@@ -280,7 +280,7 @@ function createPointerModesOverlayDefinition(
 }
 
 function buildOverlaySnippet(state: OverlayDemoState) {
-  return `geoForge.overlays.html.add({
+  return `geoForge.overlays.html.upsert({
   id: '${overlayId}',
   corners: {
     topLeft: [19.039, 47.501],
@@ -303,7 +303,7 @@ geoForge.overlays.html.setSelected(${state.visible ? `'${overlayId}'` : 'null'})
 }
 
 function buildPointerModesSnippet(state: OverlayPointerDemoState) {
-  return `geoForge.overlays.html.add({
+  return `geoForge.overlays.html.upsert({
   id: '${pointerModesOverlayId}',
   corners: {
     topLeft: [19.039, 47.501],

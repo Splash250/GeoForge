@@ -56,6 +56,10 @@ export class HtmlOverlayManager {
   }
 
   add(definition: HtmlOverlayDefinition): void {
+    this.upsert(definition);
+  }
+
+  upsert(definition: HtmlOverlayDefinition): void {
     if (this.destroyed) {
       return;
     }

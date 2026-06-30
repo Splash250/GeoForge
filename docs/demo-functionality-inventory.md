@@ -363,6 +363,7 @@ Demo fit:
 Preferred high-level surface:
 
 - `geoForge.overlays.html.add(definition)`
+- `geoForge.overlays.html.upsert(definition)`
 - `geoForge.overlays.html.update(id, patch)`
 - `geoForge.overlays.html.setSelected(idOrNull)`
 - `geoForge.overlays.html.remove(id)`
