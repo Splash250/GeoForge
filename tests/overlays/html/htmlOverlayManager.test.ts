@@ -50,6 +50,73 @@ afterEach(() => {
 });
 
 describe('HtmlOverlayManager', () => {
+  it('upsert creates an overlay and refreshes an existing overlay by id without replacing the iframe node', () => {
+    const result = evaluateManager((definitionValue) => {
+      const container = document.createElement('div');
+      const mapAdapter = createMapAdapter(container);
+      const manager = new HtmlOverlayManager({ mapAdapter });
+
+      manager.upsert({
+        ...definitionValue,
+        html: '<main>before</main>',
+        selected: true,
+      });
+
+      const overlay = container.querySelector('.gm-html-overlay') as HTMLDivElement;
+      const iframe = overlay.querySelector('iframe') as HTMLIFrameElement;
+      const before = {
+        iframe,
+        left: overlay.style.left,
+        selected: manager.getSelected(),
+        overlayCount: container.querySelectorAll('.gm-html-overlay').length,
+      };
+
+      manager.upsert({
+        ...definitionValue,
+        html: '<main>after</main>',
+        corners: {
+          topLeft: [3, 4],
+          topRight: [5, 4],
+          bottomRight: [5, 6],
+          bottomLeft: [3, 6],
+        },
+        iframe: {
+          title: 'After',
+        },
+        selected: true,
+      });
+
+      return {
+        before,
+        after: {
+          sameIframe: overlay.querySelector('iframe') === before.iframe,
+          srcdoc: iframe.srcdoc,
+          title: iframe.title,
+          left: overlay.style.left,
+          selected: manager.getSelected(),
+          overlayCount: container.querySelectorAll('.gm-html-overlay').length,
+        },
+      };
+    });
+
+    expect(result).toEqual({
+      before: {
+        iframe: expect.any(HTMLIFrameElement),
+        left: '0px',
+        selected: 'overlay-a',
+        overlayCount: 1,
+      },
+      after: {
+        sameIframe: true,
+        srcdoc: '<main>after</main>',
+        title: 'After',
+        left: '300px',
+        selected: 'overlay-a',
+        overlayCount: 1,
+      },
+    });
+  });
+
   it('add creates root and one overlay', () => {
     const result = evaluateManager((definitionValue) => {
       const container = document.createElement('div');

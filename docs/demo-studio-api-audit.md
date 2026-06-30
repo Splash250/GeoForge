@@ -38,7 +38,7 @@ These would reduce repeated consumer code, hide internal implementation details,
 | Draw/edit modes      | Activate draw shapes and global edit modes, clear seeded features                                 | `disableAllModes()`, `enableDraw(...)`, compatibility helpers like `enableGlobalEditMode()`                                                                        | Works, but mode activation API is split across old and new surfaces   |
 | Feature data         | Import GeoJSON, export feature store, show stats                                                  | `features.importGeoJson(...)`, `features.exportGeoJson()`                                                                                                          | Strong core API; cleanup and history suppression are repetitive       |
 | Line decorators      | Sync arrowheads/symbols/text from line features and state controls                                | `decorators.lines.configure(...)`, `syncFromFeatures(...)`, custom symbol image management                                                                         | Strong renderer API; authoring ergonomics need a preset/builder layer |
-| HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.add(...)`, `setSelected(...)`, `destroy()`                                                                                                          | Strong API; app still owns map camera/pointer test orchestration      |
+| HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.upsert(...)`, `setSelected(...)`, `destroy()`                                                                                                       | Strong API; app still owns map camera/pointer test orchestration      |
 | Geometry topology    | Import network, build graph, validate topology, enable endpoint snapping                          | `geometry.getLineNetworkGraph(...)`, `validateLineNetworkTopology(...)`, `geometry.endpointSnapping.configure(...)`                                                | Strong public geometry API                                            |
 | Workflow systems     | Single-feature edit, transaction preview/commit/cancel, history undo/redo                         | `enableSingleFeatureEditMode(...)`, `selection.selectFeature(...)`, `transactions.start(...)`, `history.*`                                                         | Powerful but too manual for common production forms                   |
 | Studio shell         | Search demos, select demos, reset, copy docs path, show example count, copy snippets, show toasts | `DemoSidebar.svelte`, `DemoTopToolbar.svelte`, `InspectorPanel.svelte`, local handlers in `DemoStudioApp.svelte`                                                   | Useful demo wrapper; docs/GitHub actions are placeholders             |
@@ -458,24 +458,23 @@ The core renderer remains lean, while applications get a supported path for inte
 
 Severity: Low
 
-Overlay demos call `overlays.html.add(...)` repeatedly as state changes. This appears to behave as an upsert, but the public API names both `add(...)` and `update(...)`, which can make production consumers unsure whether repeated `add` is intended.
+Status: Implemented.
+
+Overlay demos now call `overlays.html.upsert(...)` repeatedly as state changes. `upsert(...)` is the preferred public method for creating or replacing a full overlay definition by id. `add(...)` remains available as a backward-compatible alias for the same upsert behavior, including for legacy manager factories that only expose `add(...)`. `update(id, patch)` remains the partial patch API for existing overlays.
 
 References:
 
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:62`
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:63`
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:136`
-- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts:137`
+- `examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts`
+- `src/overlays/html/htmlOverlayManager.ts`
+- `src/overlays/html/geomanHtmlOverlaySubsystem.ts`
 
-Recommended API/documentation:
+Implemented API:
 
 ```ts
 geoForge.overlays.html.upsert(definition);
-geoForge.overlays.html.add(definition); // throws if id exists
+geoForge.overlays.html.add(definition); // legacy alias for upsert
 geoForge.overlays.html.update(id, patch);
 ```
-
-Or document that `add` is intentionally an upsert.
 
 Production outcome:
 
@@ -573,7 +572,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 | Transaction form boilerplate   | Implemented: add `geoForge.transactions.featureProperties(...)`              | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
 | Raster state mirroring         | Implemented: add raster-layer subscription and proxy helper                  | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
 | Decorator authoring complexity | Add optional authoring session/helper layer                                  | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
-| Overlay add/update ambiguity   | Document `add` as upsert or introduce `upsert`                               | Consumer code can choose strict create, patch update, or intentional upsert                                                       | Silent behavior that differs from method names                                 |
+| Overlay add/update ambiguity   | Implemented: add explicit `upsert`; keep `add` as legacy upsert alias        | Consumer code can choose patch update or intentional full-definition upsert                                                       | Silent behavior that differs from method names                                 |
 | Placeholder shell actions      | Add source/docs URLs to demo metadata                                        | Docs and GitHub buttons navigate to real references; export still copies snippets                                                 | Treating placeholder shell actions as GeoForge API problems                    |
 
 ## API Design Guardrails
@@ -609,7 +608,7 @@ These changes make GeoForge easier to use in route-based apps, demos, wizards, a
 1. Add a public `geoForge.helpers` facade or equivalent helper-specific APIs for snapping configuration.
 2. Add a feature property editor or transaction helper for common forms. (Implemented as `geoForge.transactions.featureProperties(...)`.)
 3. Add decorator authoring helpers for interactive editors.
-4. Clarify overlay `add` versus `upsert` semantics.
+4. Clarify overlay `add` versus `upsert` semantics. (Implemented as `geoForge.overlays.html.upsert(...)`; `add(...)` remains a compatibility alias.)
 5. Add raster layer subscription and proxy configuration helpers. (Implemented)
 
 These changes turn the most complex demo flows into reusable production patterns.
@@ -682,7 +681,7 @@ This preserves the current subsystem architecture while removing the repeated gl
 | Done     | Transaction form helper                | Implemented as `geoForge.transactions.featureProperties(...)` for common feature-property forms |
 | Done     | Raster state subscription/proxy helper | Implemented with `geoForge.layers.subscribeRasterLayers(...)` and public raster proxy helpers    |
 | P2       | Decorator authoring session            | Helps advanced visual editors without bloating renderer APIs                                    |
-| P2       | Overlay upsert semantics               | Low-cost clarity improvement                                                                    |
+| Done     | Overlay upsert semantics               | Implemented as `geoForge.overlays.html.upsert(...)`; `add(...)` remains a compatibility alias   |
 | P2       | Demo shell reference links             | Turns Demo Studio into a stronger production reference app                                      |
 
 ## Bottom Line

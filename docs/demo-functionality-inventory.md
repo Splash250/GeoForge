@@ -362,13 +362,16 @@ Demo fit:
 
 Preferred high-level surface:
 
-- `geoForge.overlays.html.add(definition)`
+- `geoForge.overlays.html.upsert(definition)` for full-definition create/replace
 - `geoForge.overlays.html.update(id, patch)`
 - `geoForge.overlays.html.setSelected(idOrNull)`
 - `geoForge.overlays.html.remove(id)`
 - `geoForge.overlays.html.get(id)`
 - `geoForge.overlays.html.getAll()`
 - `geoForge.overlays.html.destroy()`
+
+`geoForge.overlays.html.add(definition)` remains a backward-compatible alias for
+the same upsert behavior.
 
 Overlay definition:
 
