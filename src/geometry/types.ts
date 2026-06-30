@@ -1,4 +1,5 @@
 import type { FeatureData } from '@/core/features/feature-data.ts';
+import type { FeatureSourceName } from '@/types/features.ts';
 import type { LngLatTuple, ScreenPoint } from '@/types/map/index.ts';
 
 export type GeomanLineSegmentInput = {
@@ -128,6 +129,25 @@ export type GeomanNearestLineEndpointOptions = {
   maxPixelDistance?: number;
   endpoints?: Array<GeomanLineEndpointName>;
   excludeFeatures?: Iterable<FeatureData>;
+};
+
+export type GeomanEndpointSnappingConfigureOptions = {
+  enabled: boolean;
+  maxPixelDistance?: number;
+  endpoints?: Array<GeomanLineEndpointName>;
+  excludeFeatures?: Iterable<FeatureData>;
+  sourceNames?: Array<FeatureSourceName>;
+};
+
+export type GeomanEndpointSnappingState = GeomanEndpointSnappingConfigureOptions & {
+  available: boolean;
+  applied: boolean;
+};
+
+export type GeomanEndpointSnappingFacade = {
+  configure(options: GeomanEndpointSnappingConfigureOptions): boolean;
+  disable(): boolean;
+  getState(): GeomanEndpointSnappingState;
 };
 
 export type GeomanLineEndpointHit = GeomanLineEndpointRef & {

@@ -6,6 +6,9 @@ import type {
   ArrowheadManagerOptions,
   ArrowheadOptions,
   FeatureOwnerId,
+  GeomanEndpointSnappingConfigureOptions,
+  GeomanEndpointSnappingFacade,
+  GeomanEndpointSnappingState,
   GeomanControlProfile,
   GeomanControlVisibilityOptions,
   GeomanLineDecoratorSubsystemOptions,
@@ -295,6 +298,9 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<ArrowheadOptions>().toMatchTypeOf<object>();
   expectTypeOf<ArrowheadManagerOptions>().toMatchTypeOf<object>();
   expectTypeOf<FeatureOwnerId>().toMatchTypeOf<string | number>();
+  expectTypeOf<GeomanEndpointSnappingConfigureOptions>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanEndpointSnappingFacade>().toMatchTypeOf<object>();
+  expectTypeOf<GeomanEndpointSnappingState>().toMatchTypeOf<object>();
   expectTypeOf<GeomanControlProfile>().toMatchTypeOf<object>();
   expectTypeOf<GeomanControlVisibilityOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorOptions>().toMatchTypeOf<object>();

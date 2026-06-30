@@ -21,7 +21,7 @@ The highest-value API improvements are:
 1. Add a public batch/session API for setup and cleanup work.
 2. Add public control-profile APIs on the existing `geoForge.control` subsystem instead of mutating `geoForge.options.controls` and calling `geoForge.control.updateReactivePanel()`.
 3. Add public event/subscription helpers for feature, history, and mode state changes.
-4. Add a first-class helper configuration facade, especially for snapping and endpoint snapping.
+4. Continue adding focused subsystem facades where demos still need helper configuration; endpoint snapping now has a geometry-owned facade.
 5. Add a higher-level transaction editing workflow for common "edit selected feature property, commit/cancel, undo/redo" applications.
 6. Add raster-layer state events and optional request-proxy integration points.
 
@@ -39,7 +39,7 @@ These would reduce repeated consumer code, hide internal implementation details,
 | Feature data         | Import GeoJSON, export feature store, show stats                                                  | `features.importGeoJson(...)`, `features.exportGeoJson()`                                                                                                     | Strong core API; cleanup and history suppression are repetitive       |
 | Line decorators      | Sync arrowheads/symbols/text from line features and state controls                                | `decorators.lines.configure(...)`, `syncFromFeatures(...)`, custom symbol image management                                                                    | Strong renderer API; authoring ergonomics need a preset/builder layer |
 | HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.add(...)`, `setSelected(...)`, `destroy()`                                                                                                     | Strong API; app still owns map camera/pointer test orchestration      |
-| Geometry topology    | Import network, build graph, validate topology, enable endpoint snapping                          | `geometry.getLineNetworkGraph(...)`, `validateLineNetworkTopology(...)`, direct `actionInstances.helper__snapping` access                                     | Geometry is strong; snapping configuration leaks internals            |
+| Geometry topology    | Import network, build graph, validate topology, enable endpoint snapping                          | `geometry.getLineNetworkGraph(...)`, `validateLineNetworkTopology(...)`, `geometry.endpointSnapping.configure(...)`                                           | Strong public geometry API                                            |
 | Workflow systems     | Single-feature edit, transaction preview/commit/cancel, history undo/redo                         | `enableSingleFeatureEditMode(...)`, `selection.selectFeature(...)`, `transactions.start(...)`, `history.*`                                                    | Powerful but too manual for common production forms                   |
 | Studio shell         | Search demos, select demos, reset, copy docs path, show example count, copy snippets, show toasts | `DemoSidebar.svelte`, `DemoTopToolbar.svelte`, `InspectorPanel.svelte`, local handlers in `DemoStudioApp.svelte`                                              | Useful demo wrapper; docs/GitHub actions are placeholders             |
 
@@ -300,47 +300,39 @@ Applications use one mode controller instead of mixing old shortcut names and ge
 
 Severity: High
 
-The topology demo uses public geometry methods for graph construction and validation, but enabling endpoint snapping requires reaching into `geoForge.actionInstances.helper__snapping` and casting it to `SnappingHelper`.
+Status: Implemented.
+
+The topology demo uses public geometry methods for graph construction and validation. Endpoint snapping is now configured through the geometry subsystem instead of reaching into `geoForge.actionInstances.helper__snapping` and casting it to `SnappingHelper`.
 
 References:
 
-- `examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts:70`
-- `examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts:87`
-- `examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts:181`
-- `examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts:182`
+- `examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts`
+- `src/geometry/geomanGeometrySubsystem.ts`
+- `src/geometry/types.ts`
 - `src/main.ts:93`
 
 Why this matters:
 
 Endpoint snapping is a production editing feature, not an internal demo concern. If consumers need it, they need a supported helper API.
 
-Recommended API:
+Implemented API:
 
 ```ts
-// Proposed new helper facade; current code has to reach through actionInstances.
-geoForge.helpers.snapping.configure({
-  enabled: true,
-  lineEndpointSnapping: {
-    enabled: true,
-    maxPixelDistance: 18,
-  },
-});
-
-geoForge.helpers.snapping.disableLineEndpointSnapping();
-```
-
-Or under geometry:
-
-```ts
-geoForge.geometry.endpointSnapping.configure({
+const applied = geoForge.geometry.endpointSnapping.configure({
   enabled: true,
   maxPixelDistance: 18,
+  endpoints: ['start', 'end'],
+  excludeFeatures: [activeFeature],
+  sourceNames: ['gm_main'],
 });
+
+const state = geoForge.geometry.endpointSnapping.getState();
+geoForge.geometry.endpointSnapping.disable();
 ```
 
 Production outcome:
 
-Advanced editing behavior becomes stable and discoverable without exposing action instance keys.
+Advanced editing behavior is stable and discoverable without exposing action instance keys. `configure(...)` and `disable()` return `true` when the snapping helper is available and received the configuration, and `false` when the call safely no-ops. `getState()` reports the requested state plus `available` and `applied` flags; `applied` is only true for the current snapping helper instance.
 
 ### 8. Transaction workflows are powerful but too manual for common forms
 
@@ -574,7 +566,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 | History suppression wrappers   | Add `history: false` to feature mutating APIs                            | Import/delete/update snippets no longer need `runWithoutHistory(...)` for single operations                                       | Deprecating `history.suspend(...)`; it is still useful for batches             |
 | Manual event-name lists        | Add feature/history/mode subscriptions returning unsubscribe functions   | Draw/edit, geometry, and workflow inspectors can refresh from package subscriptions, not `map.on(...)` event arrays               | Forcing consumers to subscribe to internal `_gm:*` events                      |
 | Feature store internals        | Add `features.query(...)` and `features.count(...)`                      | Consumers can filter by source, shape, temporary state, and id without touching `featureStore`                                    | Returning live mutable store internals as the primary query API                |
-| Endpoint snapping internals    | Add public snapping configuration                                        | Geometry demo no longer reads `geoForge.actionInstances.helper__snapping`                                                         | Documenting `actionInstances` as supported application API                     |
+| Endpoint snapping internals    | Implemented: use `geoForge.geometry.endpointSnapping.configure(...)`     | Geometry demo no longer reads `geoForge.actionInstances.helper__snapping`; unavailable helper calls safely return `false`         | Documenting `actionInstances` as supported application API                     |
 | Transaction form boilerplate   | Add transaction `ensure(...)` or feature-property editor helper          | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
 | Raster state mirroring         | Add raster-layer subscription and proxy helper                           | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
 | Decorator authoring complexity | Add optional authoring session/helper layer                              | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
@@ -585,7 +577,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 
 - Keep the root import boundary intact: new public APIs should remain available through `maplibre-geoforge`.
 - Prefer adding methods to existing subsystems (`control`, `features`, `history`, `modes`, `layers`) before creating new top-level namespaces.
-- Introduce a new top-level namespace only when no existing subsystem owns the concept cleanly. Snapping helper configuration is a good candidate for either `geoForge.helpers.snapping` or a helper-specific method under `geoForge.modes`.
+- Introduce a new top-level namespace only when no existing subsystem owns the concept cleanly. Endpoint snapping is owned by `geoForge.geometry.endpointSnapping` because it supports line topology workflows.
 - Return unsubscribe/dispose functions from every subscription or session API.
 - Preserve compatibility shortcuts such as `enableDraw(...)` and `enableGlobalEditMode(...)`, but make new snippets prefer the generic `geoForge.modes` surface.
 - Keep advanced exports available for specialized users, but do not make Demo Studio snippets depend on internals such as `actionInstances`, direct `featureStore` iteration, or manual control repaint calls.
@@ -656,9 +648,9 @@ const unsubscribe = session.features.subscribe(() => {
   renderTopology(geoForge.geometry.validateLineNetworkTopology(graph));
 });
 
-geoForge.helpers.snapping.configure({
+geoForge.geometry.endpointSnapping.configure({
   enabled: true,
-  lineEndpointSnapping: { enabled: true, maxPixelDistance: 18 },
+  maxPixelDistance: 18,
 });
 
 session.dispose();
@@ -674,7 +666,7 @@ This preserves the current subsystem architecture while removing the repeated gl
 | P0       | Public control profiles                | Current implementation mutates internals and refreshes controls manually |
 | P0       | History-free feature operations        | Repeated local wrappers across almost every demo                         |
 | P0       | Feature/history/mode subscriptions     | UI integrations should not maintain event-name lists                     |
-| P1       | Public snapping configuration          | Current endpoint snapping path reaches into `actionInstances`            |
+| Done     | Public snapping configuration          | Implemented as `geoForge.geometry.endpointSnapping`                      |
 | P1       | Session/owner lifecycle API            | Prevents broad cleanup and repetitive teardown code                      |
 | P1       | Feature query/count APIs               | Avoids direct feature store iteration                                    |
 | P1       | Transaction form helper                | Simplifies a common application workflow                                 |

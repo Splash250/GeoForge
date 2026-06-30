@@ -1,4 +1,5 @@
 import { GeomanGeometrySubsystem } from '@/geometry/geomanGeometrySubsystem.ts';
+import { SOURCES } from '@/core/features/constants.ts';
 import type { FeatureData } from '@/core/features/feature-data.ts';
 import type { Geoman } from '@/main.ts';
 import type { LngLatTuple } from '@/types/map/index.ts';
@@ -100,6 +101,213 @@ const createStatefulFeature = (
 };
 
 describe('GeomanGeometrySubsystem', () => {
+  test('configures line endpoint snapping through the public geometry facade', () => {
+    const configureLineEndpointSnapping = vi.fn();
+    const subsystem = new GeomanGeometrySubsystem({
+      geoman: {
+        ...createGeoman(),
+        actionInstances: {
+          helper__snapping: {
+            configureLineEndpointSnapping,
+          },
+        },
+      } as unknown as Geoman,
+    });
+    const excludedFeature = createFeature([
+      [0, 0],
+      [1, 0],
+    ]);
+    const options = {
+      enabled: true,
+      maxPixelDistance: 18,
+      endpoints: ['start' as const],
+      excludeFeatures: [excludedFeature],
+      sourceNames: [SOURCES.main],
+    };
+
+    expect(subsystem.endpointSnapping.configure(options)).toBe(true);
+
+    expect(configureLineEndpointSnapping).toHaveBeenCalledWith(options);
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      ...options,
+      available: true,
+      applied: true,
+    });
+  });
+
+  test('disables line endpoint snapping through the public geometry facade', () => {
+    const configureLineEndpointSnapping = vi.fn();
+    const subsystem = new GeomanGeometrySubsystem({
+      geoman: {
+        ...createGeoman(),
+        actionInstances: {
+          helper__snapping: {
+            configureLineEndpointSnapping,
+          },
+        },
+      } as unknown as Geoman,
+    });
+
+    expect(subsystem.endpointSnapping.disable()).toBe(true);
+
+    expect(configureLineEndpointSnapping).toHaveBeenCalledWith({ enabled: false });
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      enabled: false,
+      available: true,
+      applied: true,
+    });
+  });
+
+  test('endpoint snapping facade no-ops safely when the snapping helper is unavailable', () => {
+    const subsystem = new GeomanGeometrySubsystem({ geoman: createGeoman() });
+
+    expect(
+      subsystem.endpointSnapping.configure({
+        enabled: true,
+        maxPixelDistance: 18,
+      }),
+    ).toBe(false);
+
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      enabled: true,
+      maxPixelDistance: 18,
+      available: false,
+      applied: false,
+    });
+    expect(subsystem.endpointSnapping.disable()).toBe(false);
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      enabled: false,
+      available: false,
+      applied: false,
+    });
+  });
+
+  test('endpoint snapping state is unapplied when the snapping helper is replaced', () => {
+    const firstHelper = {
+      configureLineEndpointSnapping: vi.fn(),
+    };
+    const secondHelper = {
+      configureLineEndpointSnapping: vi.fn(),
+    };
+    const geoman = {
+      ...createGeoman(),
+      actionInstances: {
+        helper__snapping: firstHelper,
+      },
+    } as unknown as Geoman;
+    const subsystem = new GeomanGeometrySubsystem({ geoman });
+
+    expect(
+      subsystem.endpointSnapping.configure({
+        enabled: true,
+        maxPixelDistance: 18,
+      }),
+    ).toBe(true);
+
+    (geoman.actionInstances as Record<string, unknown>).helper__snapping = secondHelper;
+
+    expect(subsystem.endpointSnapping.getState()).toEqual({
+      enabled: true,
+      maxPixelDistance: 18,
+      available: true,
+      applied: false,
+    });
+    expect(secondHelper.configureLineEndpointSnapping).not.toHaveBeenCalled();
+  });
+
+  test('endpoint snapping configuration snapshots caller arrays and feature iterables', () => {
+    const configureLineEndpointSnapping = vi.fn();
+    const subsystem = new GeomanGeometrySubsystem({
+      geoman: {
+        ...createGeoman(),
+        actionInstances: {
+          helper__snapping: {
+            configureLineEndpointSnapping,
+          },
+        },
+      } as unknown as Geoman,
+    });
+    const excludedFeature = createFeature([
+      [0, 0],
+      [1, 0],
+    ]);
+    const laterExcludedFeature = createFeature([
+      [1, 0],
+      [2, 0],
+    ]);
+    const endpoints: Array<'start' | 'end'> = ['start'];
+    const sourceNames = [SOURCES.main];
+    const excludeFeatures = new Set<FeatureData>([excludedFeature]);
+
+    subsystem.endpointSnapping.configure({
+      enabled: true,
+      endpoints,
+      excludeFeatures,
+      sourceNames,
+    });
+    endpoints.push('end');
+    sourceNames.push(SOURCES.temporary);
+    excludeFeatures.add(laterExcludedFeature);
+
+    const forwardedOptions = configureLineEndpointSnapping.mock.calls[0]?.[0];
+
+    expect(forwardedOptions).toMatchObject({
+      enabled: true,
+      endpoints: ['start'],
+      sourceNames: [SOURCES.main],
+    });
+    expect(Array.from(forwardedOptions?.excludeFeatures ?? [])).toEqual([excludedFeature]);
+    expect(subsystem.endpointSnapping.getState()).toMatchObject({
+      enabled: true,
+      endpoints: ['start'],
+      sourceNames: [SOURCES.main],
+      available: true,
+      applied: true,
+    });
+    expect(Array.from(subsystem.endpointSnapping.getState().excludeFeatures ?? [])).toEqual([
+      excludedFeature,
+    ]);
+  });
+
+  test('endpoint snapping state reads return fresh arrays', () => {
+    const configureLineEndpointSnapping = vi.fn();
+    const subsystem = new GeomanGeometrySubsystem({
+      geoman: {
+        ...createGeoman(),
+        actionInstances: {
+          helper__snapping: {
+            configureLineEndpointSnapping,
+          },
+        },
+      } as unknown as Geoman,
+    });
+    const excludedFeature = createFeature([
+      [0, 0],
+      [1, 0],
+    ]);
+    const laterExcludedFeature = createFeature([
+      [1, 0],
+      [2, 0],
+    ]);
+
+    subsystem.endpointSnapping.configure({
+      enabled: true,
+      endpoints: ['start'],
+      excludeFeatures: [excludedFeature],
+      sourceNames: [SOURCES.main],
+    });
+    const mutableState = subsystem.endpointSnapping.getState();
+    mutableState.endpoints?.push('end');
+    mutableState.sourceNames?.push(SOURCES.temporary);
+    (mutableState.excludeFeatures as Array<FeatureData> | undefined)?.push(laterExcludedFeature);
+
+    const nextState = subsystem.endpointSnapping.getState();
+
+    expect(nextState.endpoints).toEqual(['start']);
+    expect(nextState.sourceNames).toEqual([SOURCES.main]);
+    expect(Array.from(nextState.excludeFeatures ?? [])).toEqual([excludedFeature]);
+  });
+
   test('extracts line string segments with indexes and midpoints', () => {
     const subsystem = new GeomanGeometrySubsystem({ geoman: createGeoman() });
     const feature = createFeature([
