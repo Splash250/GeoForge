@@ -59,8 +59,9 @@ export class GeomanLineDecoratorSubsystem {
   }
 
   configure(options: GeomanLineDecoratorConfigureOptions) {
+    const hasLayerPositionOption = Object.prototype.hasOwnProperty.call(options, 'layerPosition');
     const layerPositionChanged =
-      options.layerPosition !== undefined && options.layerPosition !== this.options.layerPosition;
+      hasLayerPositionOption && options.layerPosition !== this.options.layerPosition;
 
     this.options = {
       ...this.options,
