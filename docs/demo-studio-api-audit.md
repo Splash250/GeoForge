@@ -685,7 +685,7 @@ This preserves the current subsystem architecture while removing the repeated gl
 | Done     | Raster state subscription/proxy helper | Implemented with `geoForge.layers.subscribeRasterLayers(...)` and public raster proxy helpers    |
 | P2       | Decorator authoring session            | Helps advanced visual editors without bloating renderer APIs                                    |
 | Done     | Overlay upsert semantics               | Implemented as `geoForge.overlays.html.upsert(...)`; `add(...)` remains a compatibility alias   |
-| P2       | Demo shell reference links             | Turns Demo Studio into a stronger production reference app                                      |
+| Done     | Demo shell reference links             | Implemented with demo metadata source/docs URLs and safe toolbar reference navigation           |
 
 ## Bottom Line
 
