@@ -4,7 +4,6 @@ import { ensureBaseSymbolImages } from '../shared/symbolImages.ts';
 import AdvancedDecoratorInspector from './AdvancedDecoratorInspector.svelte';
 import LineDecoratorsInspector from './LineDecoratorsInspector.svelte';
 import {
-  applyAdvancedLineStyleToFeatures,
   createAdvancedCustomSvgImageManager,
   createAdvancedDecoratorState,
   getAdvancedDecoratorCode,
@@ -12,7 +11,6 @@ import {
   getAdvancedDecoratorRenderState,
   syncAdvancedDecorators,
   type AdvancedCustomSvgEnsureError,
-  type AdvancedDecoratorSyncTarget,
   type AdvancedDecoratorState,
 } from './advancedDecoratorAuthoring.ts';
 import {
@@ -160,36 +158,24 @@ export const lineDecoratorDemos: DemoDefinition[] = [
       const customSvgImageManager = createAdvancedCustomSvgImageManager(svgToImage);
       const isLatestSetup = () => !context.signal.aborted && context.isCurrent();
       const emptyTeardown = () => ({ teardown: () => {} });
-      const cleanupAndEmptyTeardown = () => {
-        customSvgImageManager.cleanup(map);
-        return emptyTeardown();
-      };
 
       if (!isLatestSetup()) {
         return emptyTeardown();
       }
 
       await ensureBaseSymbolImages(map);
-      await customSvgImageManager.ensure(map, state, { isCurrent: isLatestSetup });
 
       if (!isLatestSetup()) {
-        return cleanupAndEmptyTeardown();
+        return emptyTeardown();
       }
 
-      let importResult: ReturnType<typeof geoForge.features.importGeoJson>;
-      try {
-        importResult = geoForge.features.importGeoJson(getAdvancedDecoratorLineFeature(state), {
-          overwrite: true,
-          history: false,
-        });
-      } catch (error) {
-        customSvgImageManager.cleanup(map);
-        throw error;
-      }
+      const importResult = geoForge.features.importGeoJson(getAdvancedDecoratorLineFeature(state), {
+        overwrite: true,
+        history: false,
+      });
       const importedLineFeatures = importResult.addedFeatures;
 
       if (!importedLineFeatures.length) {
-        customSvgImageManager.cleanup(map);
         const message = `Unable to import advanced decorator line (${importResult.stats.success}/${importResult.stats.total} features imported).`;
         context.notify({
           title: 'Advanced line import failed',
@@ -199,17 +185,25 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         throw new Error(message);
       }
 
-      const getLineFeatures = () =>
-        importedLineFeatures.map((featureData) => featureData.getGeoJson());
+      const authoring = geoForge.decorators.lines.createAuthoringSession({
+        features: importedLineFeatures,
+        layerPosition: state.layerPosition,
+        decorators: getAdvancedDecoratorLineFeature(state).properties.decorators,
+        symbolImages: { registerSvg: true },
+      });
+
+      await customSvgImageManager.ensure(authoring, state, { isCurrent: isLatestSetup });
+
+      if (!isLatestSetup()) {
+        customSvgImageManager.cleanup(authoring);
+        authoring.dispose();
+        return emptyTeardown();
+      }
 
       const syncRuntime = (nextState: AdvancedDecoratorState) => {
-        runWithoutHistory(geoForge, () => {
-          applyAdvancedLineStyleToFeatures(importedLineFeatures, nextState);
-        });
         syncAdvancedDecorators({
-          geoForge: geoForge as AdvancedDecoratorSyncTarget,
+          authoring,
           state: nextState,
-          features: getLineFeatures(),
         });
       };
 
@@ -230,7 +224,7 @@ export const lineDecoratorDemos: DemoDefinition[] = [
           !context.signal.aborted && context.isCurrent() && version === syncVersion;
 
         try {
-          const imageResult = await customSvgImageManager.ensure(map, state, {
+          const imageResult = await customSvgImageManager.ensure(authoring, state, {
             isCurrent: isLatestState,
           });
 
@@ -315,8 +309,8 @@ export const lineDecoratorDemos: DemoDefinition[] = [
         code: getAdvancedDecoratorCode(state),
         teardown: () => {
           syncVersion++;
-          geoForge.decorators.lines.destroy();
-          customSvgImageManager.cleanup(map);
+          customSvgImageManager.cleanup(authoring);
+          authoring.dispose();
           runWithoutHistory(geoForge, () => {
             importedLineFeatures.forEach((featureData) => {
               geoForge.features.delete(featureData);

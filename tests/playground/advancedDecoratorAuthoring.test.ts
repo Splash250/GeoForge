@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import {
   ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
   addAdvancedDecorator,
-  applyAdvancedLineStyleToFeatures,
   buildDecoratorFromAdvancedState,
   clearAdvancedDecorators,
   createAdvancedCustomSvgImageManager,
@@ -14,7 +13,7 @@ import {
   parseIterationCount,
   removeAdvancedDecorator,
   syncAdvancedDecorators,
-  type AdvancedDecoratorSyncTarget,
+  type AdvancedDecoratorAuthoringTarget,
   validateSvgMarkup,
   type AdvancedDecoratorState,
 } from '../../examples/playground/src/demo-studio/demos/line-decorators/advancedDecoratorAuthoring.ts';
@@ -376,7 +375,7 @@ describe('advanced decorator authoring helpers', () => {
     ]);
   });
 
-  test('builds an advanced decorator code snippet with import and sync calls', () => {
+  test('builds an advanced decorator code snippet with an authoring session', () => {
     const state = {
       ...createAdvancedDecoratorState(),
       layerPosition: 'below-lines' as const,
@@ -391,11 +390,12 @@ describe('advanced decorator authoring helpers', () => {
     const code = getAdvancedDecoratorCode(state);
 
     expect(code).toContain('geoForge.features.importGeoJson(lineFeature');
-    expect(code).toContain(
-      'geoForge.decorators.lines.configure({ layerPosition: "below-lines" });',
-    );
-    expect(code).toContain('geoForge.decorators.lines.syncFromFeatures(features, (feature) =>');
-    expect(code).toContain('feature.properties?.decorators');
+    expect(code).toContain('geoForge.decorators.lines.createAuthoringSession({');
+    expect(code).toContain('features: importResult.addedFeatures');
+    expect(code).toContain('layerPosition: "below-lines"');
+    expect(code).toContain('decorators: lineFeature.properties.decorators');
+    expect(code).toContain('authoring.setLineStyle({');
+    expect(code).toContain('authoring.sync();');
     expect(code).toContain('"decorators"');
   });
 
@@ -532,8 +532,7 @@ describe('advanced decorator authoring helpers', () => {
     });
   });
 
-  test('sync adapter configures layer position and syncs decorators from current state', () => {
-    const oldDecorators = [buildDecoratorFromAdvancedState(createAdvancedDecoratorState())];
+  test('sync adapter updates the authoring session from current state', () => {
     const currentDecorators = [
       buildDecoratorFromAdvancedState({
         ...createAdvancedDecoratorState(),
@@ -541,68 +540,51 @@ describe('advanced decorator authoring helpers', () => {
         text: 'LIVE',
       }),
     ];
-    const feature = getAdvancedDecoratorLineFeature({
-      ...createAdvancedDecoratorState(),
-      decorators: oldDecorators,
-    });
     const calls: unknown[] = [];
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: (options) => calls.push(['configure', options]),
-          syncFromFeatures: (features, getDecorators) =>
-            calls.push(['syncFromFeatures', features, getDecorators(feature)]),
-        },
-      },
+    const authoring: AdvancedDecoratorAuthoringTarget = {
+      setLayerPosition: (layerPosition) => calls.push(['setLayerPosition', layerPosition]),
+      setLineStyle: (lineStyle) => calls.push(['setLineStyle', lineStyle]),
+      setDecorators: (decorators) => calls.push(['setDecorators', decorators]),
+      sync: () => calls.push(['sync']),
+    };
+    const state: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      layerPosition: 'below-lines',
+      decorators: currentDecorators,
     };
 
     syncAdvancedDecorators({
-      geoForge,
-      state: {
-        ...createAdvancedDecoratorState(),
-        layerPosition: 'below-lines',
-        decorators: currentDecorators,
-      },
-      features: [feature],
+      authoring,
+      state,
     });
 
     expect(calls).toEqual([
-      ['configure', { layerPosition: 'below-lines' }],
-      ['syncFromFeatures', [feature], currentDecorators],
+      ['setLayerPosition', 'below-lines'],
+      ['setLineStyle', state.lineStyle],
+      ['setDecorators', currentDecorators],
+      ['sync'],
     ]);
   });
 
-  test('sync adapter clones state decorators before returning them to GeoForge', () => {
-    const oldDecorator = buildDecoratorFromAdvancedState({
-      ...createAdvancedDecoratorState(),
-      kind: 'text',
-      text: 'OLD',
-    });
+  test('sync adapter clones state decorators before giving them to the authoring session', () => {
     const decorator = buildDecoratorFromAdvancedState(createAdvancedDecoratorState());
-    const feature = getAdvancedDecoratorLineFeature({
-      ...createAdvancedDecoratorState(),
-      decorators: [oldDecorator],
-    });
     const state = {
       ...createAdvancedDecoratorState(),
       decorators: [decorator],
     };
     let resolvedDecorators: unknown;
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: () => {},
-          syncFromFeatures: (features, getDecorators) => {
-            resolvedDecorators = getDecorators(features[0]);
-          },
-        },
+    const authoring: AdvancedDecoratorAuthoringTarget = {
+      setLayerPosition: () => {},
+      setLineStyle: () => {},
+      setDecorators: (decorators) => {
+        resolvedDecorators = decorators;
       },
+      sync: () => {},
     };
 
     syncAdvancedDecorators({
-      geoForge,
+      authoring,
       state,
-      features: [feature],
     });
 
     const firstDecorator = state.decorators[0];
@@ -614,41 +596,6 @@ describe('advanced decorator authoring helpers', () => {
       {
         kind: 'symbol',
         rotate: { mode: 'line', angle: -90 },
-      },
-    ]);
-  });
-
-  test('applies current line style to imported feature targets', () => {
-    const updates: unknown[] = [];
-    const featureTargets = [
-      {
-        updateProperties: (properties: unknown) => updates.push(properties),
-      },
-      {
-        updateProperties: (properties: unknown) => updates.push(properties),
-      },
-    ];
-    const state: AdvancedDecoratorState = {
-      ...createAdvancedDecoratorState(),
-      lineStyle: {
-        color: '#be123c',
-        width: 11,
-        opacity: 0.45,
-      },
-    };
-
-    applyAdvancedLineStyleToFeatures(featureTargets, state);
-
-    expect(updates).toEqual([
-      {
-        lineColor: '#be123c',
-        lineWidth: 11,
-        lineOpacity: 0.45,
-      },
-      {
-        lineColor: '#be123c',
-        lineWidth: 11,
-        lineOpacity: 0.45,
       },
     ]);
   });
@@ -839,25 +786,17 @@ describe('advanced decorator authoring helpers', () => {
       decorators: [buildDecoratorFromAdvancedState(validState)],
     };
     let resolvedDecorators: unknown;
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: () => {},
-          syncFromFeatures: (features, getDecorators) => {
-            resolvedDecorators = getDecorators(features[0]);
-          },
-        },
-      },
-    };
+    const authoring = createDecoratorCaptureAuthoringTarget((decorators) => {
+      resolvedDecorators = decorators;
+    });
 
     await imageManager.ensure(map, validState);
     const result = await imageManager.ensure(map, invalidState);
     syncAdvancedDecorators({
-      geoForge,
+      authoring,
       state: getAdvancedDecoratorRenderState(invalidState, {
         customImageReady: result.customImageReady,
       }),
-      features: [getAdvancedDecoratorLineFeature(invalidState)],
     });
 
     expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
@@ -939,23 +878,15 @@ describe('advanced decorator authoring helpers', () => {
       decorators: [buildDecoratorFromAdvancedState(validState)],
     };
     let resolvedDecorators: unknown;
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: () => {},
-          syncFromFeatures: (features, getDecorators) => {
-            resolvedDecorators = getDecorators(features[0]);
-          },
-        },
-      },
-    };
+    const authoring = createDecoratorCaptureAuthoringTarget((decorators) => {
+      resolvedDecorators = decorators;
+    });
 
     await imageManager.ensure(map, validState);
     await expect(imageManager.ensure(map, failingState)).rejects.toThrow('decode failed');
     syncAdvancedDecorators({
-      geoForge,
+      authoring,
       state: getAdvancedDecoratorRenderState(failingState, { customImageReady: false }),
-      features: [getAdvancedDecoratorLineFeature(failingState)],
     });
 
     expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
@@ -986,23 +917,15 @@ describe('advanced decorator authoring helpers', () => {
       decorators: [buildDecoratorFromAdvancedState(customState)],
     };
     let resolvedDecorators: unknown;
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: () => {},
-          syncFromFeatures: (features, getDecorators) => {
-            resolvedDecorators = getDecorators(features[0]);
-          },
-        },
-      },
-    };
+    const authoring = createDecoratorCaptureAuthoringTarget((decorators) => {
+      resolvedDecorators = decorators;
+    });
 
     await imageManager.ensure(map, customState);
     const result = await imageManager.ensure(map, textDraftState);
     syncAdvancedDecorators({
-      geoForge,
+      authoring,
       state: getAdvancedDecoratorRenderState(textDraftState, result),
-      features: [getAdvancedDecoratorLineFeature(textDraftState)],
     });
 
     expect(result.customImageReady).toBe(true);
@@ -1036,22 +959,14 @@ describe('advanced decorator authoring helpers', () => {
       customSvgCss: '.mark { fill: blue; }',
     };
     let resolvedDecorators: unknown;
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: () => {},
-          syncFromFeatures: (features, getDecorators) => {
-            resolvedDecorators = getDecorators(features[0]);
-          },
-        },
-      },
-    };
+    const authoring = createDecoratorCaptureAuthoringTarget((decorators) => {
+      resolvedDecorators = decorators;
+    });
 
     const result = await imageManager.ensure(map, changedDraftState);
     syncAdvancedDecorators({
-      geoForge,
+      authoring,
       state: getAdvancedDecoratorRenderState(changedDraftState, result),
-      features: [getAdvancedDecoratorLineFeature(changedDraftState)],
     });
 
     expect(images.get('gf-demo-custom-advanced-saved-1')).toEqual({
@@ -1088,22 +1003,14 @@ describe('advanced decorator authoring helpers', () => {
       customSvg: '<span>not svg</span>',
     };
     let resolvedDecorators: unknown;
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: () => {},
-          syncFromFeatures: (features, getDecorators) => {
-            resolvedDecorators = getDecorators(features[0]);
-          },
-        },
-      },
-    };
+    const authoring = createDecoratorCaptureAuthoringTarget((decorators) => {
+      resolvedDecorators = decorators;
+    });
 
     const result = await imageManager.ensure(map, invalidDraftState);
     syncAdvancedDecorators({
-      geoForge,
+      authoring,
       state: getAdvancedDecoratorRenderState(invalidDraftState, result),
-      features: [getAdvancedDecoratorLineFeature(invalidDraftState)],
     });
 
     expect(images.has(ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)).toBe(false);
@@ -1146,28 +1053,20 @@ describe('advanced decorator authoring helpers', () => {
       customSvgCss: '.mark { fill: blue; }',
     };
     let resolvedDecorators: unknown;
-    const geoForge: AdvancedDecoratorSyncTarget = {
-      decorators: {
-        lines: {
-          configure: () => {},
-          syncFromFeatures: (features, getDecorators) => {
-            resolvedDecorators = getDecorators(features[0]);
-          },
-        },
-      },
-    };
+    const authoring = createDecoratorCaptureAuthoringTarget((decorators) => {
+      resolvedDecorators = decorators;
+    });
 
     let readyImageIds: string[] | undefined;
     await imageManager.ensure(map, failingDraftState).catch((error: unknown) => {
       readyImageIds = (error as { readyImageIds?: string[] }).readyImageIds;
     });
     syncAdvancedDecorators({
-      geoForge,
+      authoring,
       state: getAdvancedDecoratorRenderState(failingDraftState, {
         customImageReady: false,
         readyImageIds,
       }),
-      features: [getAdvancedDecoratorLineFeature(failingDraftState)],
     });
 
     expect(images.get('gf-demo-custom-advanced-saved-1')).toEqual({ svg: savedSvg });
@@ -1217,6 +1116,17 @@ type Deferred<T> = {
   resolve: (value: T) => void;
   reject: (error: unknown) => void;
 };
+
+function createDecoratorCaptureAuthoringTarget(
+  onDecorators: (decorators: unknown) => void,
+): AdvancedDecoratorAuthoringTarget {
+  return {
+    setLayerPosition: () => {},
+    setLineStyle: () => {},
+    setDecorators: onDecorators,
+    sync: () => {},
+  };
+}
 
 function createDeferred<T>(): Deferred<T> {
   let resolve: Deferred<T>['resolve'] = () => {};

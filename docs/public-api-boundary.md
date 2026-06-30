@@ -38,12 +38,15 @@ These exports are the preferred public API for new application code.
 
 These exports remain available for integrations that need lower-level ownership of MapLibre sources, overlay lifecycle, or decorator lifecycle. New code should prefer the corresponding high-level `GeoForge` subsystem when possible.
 
-| Export                         | Preferred path                                                                                                 |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `LineDecoratorManager`         | Prefer `geoForge.decorators.lines` unless the application owns decorator sources directly.                     |
-| `GeomanLineDecoratorSubsystem` | Prefer the instance at `geoForge.decorators.lines`.                                                            |
-| `HtmlOverlayManager`           | Prefer `geoForge.overlays.html` unless the application owns overlay manager construction and cleanup directly. |
-| `GeomanHtmlOverlaySubsystem`   | Prefer the instance at `geoForge.overlays.html`.                                                               |
+| Export                                | Preferred path                                                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `LineDecoratorManager`                | Prefer `geoForge.decorators.lines` unless the application owns decorator sources directly.                     |
+| `GeomanLineDecoratorSubsystem`        | Prefer the instance at `geoForge.decorators.lines`.                                                            |
+| `GeomanLineDecoratorAuthoringSession` | Prefer `geoForge.decorators.lines.createAuthoringSession(...)` for interactive line decorator editors.         |
+| `loadSvgSymbolImage`                  | Prefer `authoring.registerSvgSymbolImage(...)` unless an application needs standalone SVG image loading.       |
+| `validateSvgSymbolMarkup`             | Prefer `authoring.registerSvgSymbolImage(...)` unless an application needs standalone SVG validation.          |
+| `HtmlOverlayManager`                  | Prefer `geoForge.overlays.html` unless the application owns overlay manager construction and cleanup directly. |
+| `GeomanHtmlOverlaySubsystem`          | Prefer the instance at `geoForge.overlays.html`.                                                               |
 
 ## Deprecated Compatibility Exports
 
