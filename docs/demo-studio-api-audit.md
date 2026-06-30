@@ -256,6 +256,13 @@ const features = geoForge.features.query({
 });
 ```
 
+Implemented in Phase 1:
+
+- `geoForge.features.query(options?)` returns a `FeatureData[]` snapshot, excluding temporary features by default.
+- `geoForge.features.count(options?)` returns the matching snapshot length.
+- Query options support `sourceNames`, `shapes`, `includeTemporary`, `ownerId`, `ids`, and `editableOnly`.
+- Demo Studio draw/edit feature counts now use `features.count({ sourceNames: [SOURCES.main], includeTemporary: false })` instead of iterating `features.featureStore`.
+
 Production outcome:
 
 Apps no longer depend on the shape of `featureStore` or the `temporary` property.
@@ -590,7 +597,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 1. Add `geoForge.control.applyProfile(...)` and `setModeVisibility(...)`.
 2. Add `history: false` options to feature import/delete/update APIs, while retaining `history.suspend(...)` for multi-operation batches.
 3. Add `features.subscribe(...)`, `history.subscribe(...)`, and `modes.subscribe(...)`. (Implemented)
-4. Add `features.count(...)` and `features.query(...)`.
+4. Add `features.count(...)` and `features.query(...)`. (Implemented)
 
 These changes remove the most obvious internal leaks without changing the deeper subsystems.
 

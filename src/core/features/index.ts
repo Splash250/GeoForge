@@ -17,6 +17,7 @@ import { BaseSource } from '@/core/map/base/source.ts';
 import { SHAPE_NAMES } from '@/modes/constants.ts';
 import {
   type FeatureId,
+  type GeomanFeatureQueryOptions,
   type GeomanFeatureSubscriptionCallback,
   type GeomanFeatureSubscriptionEvent,
   type GeomanFeatureSubscriptionEventType,
@@ -204,6 +205,38 @@ export class Features {
 
   get(sourceName: keyof SourcesStorage, featureId: FeatureId): FeatureData | null {
     return this.featureStoreService.get(sourceName, featureId);
+  }
+
+  query(options: GeomanFeatureQueryOptions = {}): Array<FeatureData> {
+    const sourceNames = options.sourceNames ? new Set(options.sourceNames) : null;
+    const shapes = options.shapes ? new Set(options.shapes) : null;
+    const ids = options.ids ? new Set(options.ids.map((id) => String(id))) : null;
+
+    return Array.from(this.featureStore.values()).filter((featureData) => {
+      if (!options.includeTemporary && featureData.temporary) {
+        return false;
+      }
+      if (sourceNames && !sourceNames.has(featureData.sourceName)) {
+        return false;
+      }
+      if (shapes && !shapes.has(featureData.shape)) {
+        return false;
+      }
+      if (options.ownerId !== undefined && featureData.ownerId !== options.ownerId) {
+        return false;
+      }
+      if (ids && !ids.has(String(featureData.id))) {
+        return false;
+      }
+      if (options.editableOnly && !this.gm.isFeatureEditable(featureData)) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  count(options: GeomanFeatureQueryOptions = {}): number {
+    return this.query(options).length;
   }
 
   add(featureData: FeatureData) {
@@ -414,9 +447,7 @@ export class Features {
   }
 
   getByOwner(ownerId: FeatureOwnerId): Array<FeatureData> {
-    return Array.from(this.featureStore.values()).filter(
-      (featureData) => featureData.ownerId === ownerId,
-    );
+    return this.query({ ownerId, includeTemporary: true });
   }
 
   deleteByOwner(
@@ -492,17 +523,7 @@ export class Features {
   }
 
   private getSubscribedFeatures(options: GeomanFeatureSubscriptionOptions): Array<FeatureData> {
-    const sourceNames = options.sourceNames ? new Set(options.sourceNames) : null;
-
-    return Array.from(this.featureStore.values()).filter((featureData) => {
-      if (!options.includeTemporary && featureData.temporary) {
-        return false;
-      }
-      if (sourceNames && !sourceNames.has(featureData.sourceName)) {
-        return false;
-      }
-      return true;
-    });
+    return this.query(options);
   }
 
   /**

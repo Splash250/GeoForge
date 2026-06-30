@@ -1,4 +1,4 @@
-import type { DrawModeName, GeoJsonImportFeatureCollection } from 'maplibre-geoforge';
+import { SOURCES, type DrawModeName, type GeoJsonImportFeatureCollection } from 'maplibre-geoforge';
 import type { DemoContext, DemoDefinition } from '../../registry/types.ts';
 import { sampleNetworkGeoJson } from '../shared/sampleGeoJson.ts';
 import DrawEditInspector from './DrawEditInspector.svelte';
@@ -27,16 +27,6 @@ type DrawEditInspectorProps = {
   onSelectShape: (shape: DrawEditShapeTool) => void;
   onSelectEditMode: (mode: DrawEditMode) => void;
   onClearFeatures: () => void;
-};
-
-type CountableFeatureData = {
-  temporary?: boolean;
-};
-
-type FeatureStoreCountSource = {
-  featureStore: {
-    values: () => Iterable<CountableFeatureData>;
-  };
 };
 
 const typedSampleNetworkGeoJson = sampleNetworkGeoJson as GeoJsonImportFeatureCollection;
@@ -74,7 +64,11 @@ export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
         lastAction: 'Waiting for setup',
       };
 
-      const refreshFeatureCount = () => countUserFacingFeatures(geoForge.features);
+      const refreshFeatureCount = () =>
+        geoForge.features.count({
+          sourceNames: [SOURCES.main],
+          includeTemporary: false,
+        });
 
       const updateRuntime = (lastAction = state.lastAction) => {
         if (!isActive()) {
@@ -217,18 +211,6 @@ function enableEditMode(geoForge: DemoContext['geoForge'], mode: DrawEditMode) {
   modeHandlers[mode]();
 }
 
-function countUserFacingFeatures(features: FeatureStoreCountSource): number {
-  let count = 0;
-
-  for (const featureData of features.featureStore.values()) {
-    if (!featureData.temporary) {
-      count += 1;
-    }
-  }
-
-  return count;
-}
-
 function formatShapeLabel(shape: DrawEditShapeTool) {
   return shape.replace('_', ' ');
 }
@@ -238,7 +220,8 @@ function formatEditModeLabel(mode: DrawEditMode) {
 }
 
 function buildDrawEditSnippet() {
-  return `import { sampleNetworkGeoJson } from '../shared/sampleGeoJson';
+  return `import { SOURCES } from 'maplibre-geoforge';
+import { sampleNetworkGeoJson } from '../shared/sampleGeoJson';
 
 const drawEditSampleNetworkGeoJson = {
   ...sampleNetworkGeoJson,
@@ -255,7 +238,15 @@ geoForge.features.importGeoJson(drawEditSampleNetworkGeoJson, {
 });
 
 const unsubscribeFeatures = geoForge.features.subscribe(() => {
-  console.log('Feature collection updated', geoForge.features.exportGeoJson());
+  const featureCount = geoForge.features.count({
+    sourceNames: [SOURCES.main],
+    includeTemporary: false,
+  });
+
+  console.log('Feature collection updated', {
+    featureCount,
+    geoJson: geoForge.features.exportGeoJson(),
+  });
 });
 
 function activateDraw(shape) {

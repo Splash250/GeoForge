@@ -8,7 +8,7 @@ type DrawEditInspectorProps = {
   onClearFeatures: () => void;
 };
 
-type FeatureDouble = Pick<FeatureData, 'id'> & { temporary: boolean };
+type FeatureDouble = Pick<FeatureData, 'id'> & { temporary: boolean; sourceName: string };
 
 vi.mock(
   '../../examples/playground/src/demo-studio/demos/draw-edit/DrawEditInspector.svelte',
@@ -18,12 +18,12 @@ vi.mock(
 );
 
 describe('drawEditDemos', () => {
-  test('counts seeded features from the in-memory feature store immediately after import', async () => {
+  test('counts seeded features through the public feature count API immediately after import', async () => {
     const { drawEditDemos } =
       await import('../../examples/playground/src/demo-studio/demos/draw-edit/drawEditDemos.ts');
     const featureStore = new Map<string, FeatureDouble>([
-      ['main:seed-1', { id: 'seed-1', temporary: false }],
-      ['main:seed-2', { id: 'seed-2', temporary: false }],
+      ['main:seed-1', { id: 'seed-1', sourceName: 'gm_main', temporary: false }],
+      ['main:seed-2', { id: 'seed-2', sourceName: 'gm_main', temporary: false }],
     ]);
     const inspectorProps: DrawEditInspectorProps[] = [];
     const mutationHandlers = new Map<string, () => void>();
@@ -31,7 +31,17 @@ describe('drawEditDemos', () => {
 
     const geoForge = {
       features: {
-        featureStore,
+        count: vi.fn(({ sourceNames, includeTemporary } = {}) => {
+          return Array.from(featureStore.values()).filter((feature) => {
+            if (!includeTemporary && feature.temporary) {
+              return false;
+            }
+            if (sourceNames && !sourceNames.includes(feature.sourceName)) {
+              return false;
+            }
+            return true;
+          }).length;
+        }),
         exportGeoJson: () => ({ type: 'FeatureCollection', features: [] }),
         importGeoJson: vi.fn(() => ({
           stats: { total: 2, success: 2, failed: 0, overwritten: 0 },
@@ -95,8 +105,16 @@ describe('drawEditDemos', () => {
 
     expect(geoForge.history.suspend).not.toHaveBeenCalled();
 
-    featureStore.set('main:drawn-1', { id: 'drawn-1', temporary: false });
-    featureStore.set('temporary:helper-1', { id: 'helper-1', temporary: true });
+    featureStore.set('main:drawn-1', {
+      id: 'drawn-1',
+      sourceName: 'gm_main',
+      temporary: false,
+    });
+    featureStore.set('temporary:helper-1', {
+      id: 'helper-1',
+      sourceName: 'gm_temporary',
+      temporary: true,
+    });
     mutationHandlers.get('features')?.();
 
     expect(inspectorProps.at(-1)?.state.featureCount).toBe(1);
