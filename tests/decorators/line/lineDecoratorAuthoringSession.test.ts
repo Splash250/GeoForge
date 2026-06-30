@@ -283,6 +283,56 @@ describe('line decorator authoring session', () => {
     expect(map.addImage).not.toHaveBeenCalled();
     expect(map.updateImage).not.toHaveBeenCalled();
   });
+
+  it('does not mutate an image that becomes externally owned while SVG loading is pending', async () => {
+    const images = new Set<string>();
+    const calls: unknown[] = [];
+    const map = {
+      hasImage: vi.fn((id: string) => images.has(id)),
+      addImage: vi.fn((id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.add(id);
+      }),
+      updateImage: vi.fn((id: string, image: unknown) => calls.push(['updateImage', id, image])),
+      removeImage: vi.fn((id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      }),
+    };
+    const subsystem = createSubsystem({ map });
+    const authoring = subsystem.createAuthoringSession({ features: [] });
+    const deferred = createDeferred<{
+      width: number;
+      height: number;
+      data: Uint8Array;
+      svg: string;
+    }>();
+
+    const registration = authoring.registerSvgSymbolImage({
+      id: 'shared-arrow',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+      loadImage: () => deferred.promise,
+    });
+
+    images.add('shared-arrow');
+    deferred.resolve({
+      width: 1,
+      height: 1,
+      data: new Uint8Array(4),
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+    });
+
+    await expect(registration).resolves.toMatchObject({ ok: false, reason: 'image-exists' });
+    expect(calls).toEqual([]);
+    expect(map.addImage).not.toHaveBeenCalled();
+    expect(map.updateImage).not.toHaveBeenCalled();
+    expect(map.removeImage).not.toHaveBeenCalled();
+
+    authoring.dispose();
+
+    expect(map.removeImage).not.toHaveBeenCalled();
+    expect(images.has('shared-arrow')).toBe(true);
+  });
 });
 
 type Deferred<T> = {

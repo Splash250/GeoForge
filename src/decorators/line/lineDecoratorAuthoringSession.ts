@@ -161,12 +161,7 @@ export class GeomanLineDecoratorAuthoringSession implements LineDecoratorAuthori
     const ownsImage = this.registeredSvgImageIds.has(registration.id);
 
     if (map.hasImage(registration.id) && !ownsImage) {
-      return {
-        ok: false,
-        id: registration.id,
-        reason: 'image-exists',
-        error: new Error(`Symbol image "${registration.id}" is already registered.`),
-      };
+      return getImageExistsRegistrationResult(registration.id);
     }
 
     let image: SymbolImageInput;
@@ -195,6 +190,10 @@ export class GeomanLineDecoratorAuthoringSession implements LineDecoratorAuthori
         reason: 'stale',
         error: new Error(`Symbol image "${registration.id}" registration is stale.`),
       };
+    }
+
+    if (map.hasImage(registration.id) && !this.registeredSvgImageIds.has(registration.id)) {
+      return getImageExistsRegistrationResult(registration.id);
     }
 
     if (map.hasImage(registration.id)) {
@@ -432,4 +431,13 @@ function getSvgValidationError(id: string, svg: string): SvgSymbolImageRegistrat
   }
 
   return null;
+}
+
+function getImageExistsRegistrationResult(id: string): SvgSymbolImageRegistrationResult {
+  return {
+    ok: false,
+    id,
+    reason: 'image-exists',
+    error: new Error(`Symbol image "${id}" is already registered.`),
+  };
 }
