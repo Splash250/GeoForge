@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import type { LineDecoratorOptions } from '../../src/decorators/line/types.ts';
 import {
   ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
   addAdvancedDecorator,
@@ -620,6 +621,45 @@ describe('advanced decorator authoring helpers', () => {
     ]);
   });
 
+  test('sync adapter preserves function-valued arrowhead decorator options', () => {
+    const perArrowheadOptions = () => ({ color: '#123456' });
+    const decorator: LineDecoratorOptions = {
+      kind: 'arrowhead',
+      frequency: '60px',
+      offsets: { start: '10px', end: '20px' },
+      perArrowheadOptions,
+    };
+    const state = {
+      ...createAdvancedDecoratorState(),
+      decorators: [decorator],
+    };
+    let resolvedDecorators: LineDecoratorOptions[] | undefined;
+    const authoring: AdvancedDecoratorAuthoringTarget = {
+      setLayerPosition: () => {},
+      setLineStyle: () => {},
+      setDecorators: (decorators) => {
+        resolvedDecorators = decorators as LineDecoratorOptions[];
+      },
+      sync: () => {},
+    };
+
+    syncAdvancedDecorators({
+      authoring,
+      state,
+    });
+    decorator.offsets = { start: '90px', end: '90px' };
+
+    expect(resolvedDecorators?.[0]).toMatchObject({
+      kind: 'arrowhead',
+      offsets: { start: '10px', end: '20px' },
+    });
+    expect(
+      resolvedDecorators?.[0]?.kind === 'arrowhead'
+        ? resolvedDecorators[0].perArrowheadOptions
+        : undefined,
+    ).toBe(perArrowheadOptions);
+  });
+
   test('custom SVG image manager replaces changed content and removes image on cleanup', async () => {
     const calls: unknown[] = [];
     const images = new Map<string, unknown>();
@@ -664,6 +704,58 @@ describe('advanced decorator authoring helpers', () => {
       ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
       ['addImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID, { svg: loadedSvg[1] }],
       ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+    ]);
+  });
+
+  test('custom SVG image manager prefers remove and add over update for raw map targets', async () => {
+    const calls: unknown[] = [];
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown) => {
+        calls.push(['addImage', id, image]);
+        images.set(id, image);
+      },
+      removeImage: (id: string) => {
+        calls.push(['removeImage', id]);
+        images.delete(id);
+      },
+      updateImage: (id: string, image: unknown) => {
+        calls.push(['updateImage', id, image]);
+        images.set(id, image);
+      },
+    };
+    const imageManager = createAdvancedCustomSvgImageManager(async (svg) => ({ svg }));
+    const firstState: AdvancedDecoratorState = {
+      ...createAdvancedDecoratorState(),
+      symbolPreset: 'custom',
+      customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
+      customSvgCss: '.mark { fill: red; }',
+    };
+    const secondState: AdvancedDecoratorState = {
+      ...firstState,
+      customSvgCss: '.mark { fill: blue; }',
+    };
+
+    await imageManager.ensure(map, firstState);
+    await imageManager.ensure(map, secondState);
+
+    expect(calls).toEqual([
+      [
+        'addImage',
+        ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+        {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: red; }</style><path class="mark"/></svg>',
+        },
+      ],
+      ['removeImage', ADVANCED_CUSTOM_SYMBOL_IMAGE_ID],
+      [
+        'addImage',
+        ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+        {
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><style>.mark { fill: blue; }</style><path class="mark"/></svg>',
+        },
+      ],
     ]);
   });
 

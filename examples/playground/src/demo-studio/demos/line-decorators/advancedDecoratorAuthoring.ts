@@ -545,11 +545,11 @@ async function registerAdvancedSvgImage<TImage>(
   }
 
   if (target.hasImage(source.id)) {
-    if (target.updateImage) {
-      target.updateImage(source.id, image);
-    } else if (target.removeImage) {
+    if (target.removeImage) {
       target.removeImage(source.id);
       target.addImage(source.id, image);
+    } else if (target.updateImage) {
+      target.updateImage(source.id, image);
     }
   } else {
     target.addImage(source.id, image);
@@ -987,5 +987,19 @@ function validateSvgMarkupWithoutDomParser(svg: string): AdvancedSvgValidationRe
 }
 
 function cloneLineDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
-  return JSON.parse(JSON.stringify(decorator)) as LineDecoratorOptions;
+  return cloneDecoratorValue(decorator) as LineDecoratorOptions;
+}
+
+function cloneDecoratorValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(cloneDecoratorValue);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [key, cloneDecoratorValue(entryValue)]),
+    );
+  }
+
+  return value;
 }
