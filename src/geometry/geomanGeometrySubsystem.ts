@@ -71,6 +71,7 @@ export class GeomanGeometrySubsystem {
     available: false,
     applied: false,
   };
+  private endpointSnappingAppliedHelper: LineEndpointSnappingHelper | null = null;
   readonly endpointSnapping: GeomanEndpointSnappingFacade;
 
   constructor(options: GeomanGeometrySubsystemOptions) {
@@ -715,26 +716,30 @@ export class GeomanGeometrySubsystem {
     const available = helper !== null;
 
     if (helper) {
-      helper.configureLineEndpointSnapping(nextOptions);
+      helper.configureLineEndpointSnapping(cloneEndpointSnappingOptions(nextOptions));
     }
 
     this.endpointSnappingState = {
-      ...nextOptions,
+      ...cloneEndpointSnappingOptions(nextOptions),
       available,
       applied: available,
     };
+    this.endpointSnappingAppliedHelper = helper;
 
     return available;
   }
 
   private getEndpointSnappingState(): GeomanEndpointSnappingState {
-    const available = this.getLineEndpointSnappingHelper() !== null;
+    const helper = this.getLineEndpointSnappingHelper();
+    const available = helper !== null;
+    const applied =
+      this.endpointSnappingState.applied && helper === this.endpointSnappingAppliedHelper;
 
-    return {
+    return cloneEndpointSnappingState({
       ...this.endpointSnappingState,
       available,
-      applied: this.endpointSnappingState.applied && available,
-    };
+      applied,
+    });
   }
 
   private getLineEndpointSnappingHelper(): LineEndpointSnappingHelper | null {
@@ -764,7 +769,7 @@ function cloneEndpointSnappingOptions(
   }
 
   if (options.excludeFeatures !== undefined) {
-    nextOptions.excludeFeatures = options.excludeFeatures;
+    nextOptions.excludeFeatures = Array.from(options.excludeFeatures);
   }
 
   if (options.sourceNames !== undefined) {
@@ -772,6 +777,16 @@ function cloneEndpointSnappingOptions(
   }
 
   return nextOptions;
+}
+
+function cloneEndpointSnappingState(
+  state: GeomanEndpointSnappingState,
+): GeomanEndpointSnappingState {
+  return {
+    ...cloneEndpointSnappingOptions(state),
+    available: state.available,
+    applied: state.applied,
+  };
 }
 
 function normalizePoint(pointInput: GeomanSegmentPointInput): ProjectedPoint {

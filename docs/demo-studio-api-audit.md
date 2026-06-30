@@ -332,7 +332,7 @@ geoForge.geometry.endpointSnapping.disable();
 
 Production outcome:
 
-Advanced editing behavior is stable and discoverable without exposing action instance keys. `configure(...)` and `disable()` return `true` when the snapping helper is available and received the configuration, and `false` when the call safely no-ops. `getState()` reports the requested state plus `available` and `applied` flags.
+Advanced editing behavior is stable and discoverable without exposing action instance keys. `configure(...)` and `disable()` return `true` when the snapping helper is available and received the configuration, and `false` when the call safely no-ops. `getState()` reports the requested state plus `available` and `applied` flags; `applied` is only true for the current snapping helper instance.
 
 ### 8. Transaction workflows are powerful but too manual for common forms
 
