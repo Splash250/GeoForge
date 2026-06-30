@@ -14,6 +14,7 @@ export type GeomanTransactionConstructorOptions = {
   geoman: Geoman;
   id: string;
   validate?: GeomanTransactionValidator;
+  label?: string;
   onDone: (transaction: GeomanTransaction) => void;
 };
 
@@ -31,11 +32,13 @@ export class GeomanTransaction {
   readonly id: string;
   readonly geoman: Geoman;
   readonly validate?: GeomanTransactionValidator;
+  readonly label?: string;
 
   constructor(options: GeomanTransactionConstructorOptions) {
     this.geoman = options.geoman;
     this.id = options.id;
     this.validate = options.validate;
+    this.label = options.label;
     this.#onDone = options.onDone;
   }
 
@@ -113,7 +116,7 @@ export class GeomanTransaction {
         before: change.before,
         after: change.after,
       })),
-      { label: this.id },
+      { label: this.label ?? this.id },
     );
 
     this.#status = 'committed';

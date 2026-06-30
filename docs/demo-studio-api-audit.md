@@ -340,7 +340,9 @@ Advanced editing behavior is stable and discoverable without exposing action ins
 
 Severity: High
 
-The workflow demo manually checks for active transactions, starts one, updates a property, commits/cancels, restarts a transaction after commit/cancel, blocks undo/redo while dirty, cancels before history operations, and rebuilds UI state after every step.
+Status: Implemented.
+
+The workflow demo previously manually checked for active transactions, started one, updated a property, committed/cancelled, restarted a transaction after commit/cancel, blocked undo/redo while dirty, cancelled before history operations, and rebuilt UI state after every step. It now uses a transaction-owned feature-property editor helper for the common form-editing path while raw `transactions.start(...)` remains available for advanced workflows.
 
 References:
 
@@ -352,18 +354,19 @@ References:
 - `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:254`
 - `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:308`
 
-Recommended API:
+Implemented API:
 
 ```ts
-const editor = geoForge.editors.featureProperties({
+const editor = geoForge.transactions.featureProperties({
   feature,
-  transactionId: 'feature-name-edit',
-  history: true,
-  singleFeatureEdit: { allowedShapes: ['line'] },
+  id: 'feature-name-edit',
+  label: 'Feature name edit',
+  validate: ({ values }) =>
+    typeof values.name === 'string' && values.name.trim() ? true : 'Name is required',
 });
 
 editor.set('name', nextName);
-editor.commit();
+const result = editor.commit();
 editor.cancel();
 editor.undo();
 editor.redo();
@@ -373,16 +376,9 @@ const unsubscribe = editor.subscribe((state) => {
 });
 ```
 
-Smaller alternative:
-
-```ts
-const tx = geoForge.transactions.ensure({ id: 'feature-name-edit' });
-const result = tx.updateProperty(feature, 'name', nextName).commitAndRestart();
-```
-
 Production outcome:
 
-Form-based integrations become straightforward, and transaction/history correctness is centralized.
+Form-based integrations can set properties, commit, cancel, subscribe to state, and call undo/redo through one stable object. The helper lazily starts and owns a transaction on first edit, keeps the editor reusable after commit/cancel, blocks helper undo/redo while dirty, exposes validation messages in state, does not commit/cancel transactions it did not start, and handles feature unavailability without throwing during state refresh.
 
 ### 9. Single-feature edit mode is a good high-level API but needs state events
 
@@ -569,7 +565,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 | Manual event-name lists        | Add feature/history/mode subscriptions returning unsubscribe functions       | Draw/edit, geometry, and workflow inspectors can refresh from package subscriptions, not `map.on(...)` event arrays               | Forcing consumers to subscribe to internal `_gm:*` events                      |
 | Feature store internals        | Add `features.query(...)` and `features.count(...)`                          | Consumers can filter by source, shape, temporary state, and id without touching `featureStore`                                    | Returning live mutable store internals as the primary query API                |
 | Endpoint snapping internals    | Implemented: use `geoForge.geometry.endpointSnapping.configure(...)`         | Geometry demo no longer reads `geoForge.actionInstances.helper__snapping`; unavailable helper calls safely return `false`         | Documenting `actionInstances` as supported application API                     |
-| Transaction form boilerplate   | Add transaction `ensure(...)` or feature-property editor helper              | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
+| Transaction form boilerplate   | Implemented: add `geoForge.transactions.featureProperties(...)`              | A form can set properties, commit, cancel, and block undo while dirty through one stable object                                   | Hiding transactions completely; advanced consumers still need raw transactions |
 | Raster state mirroring         | Add raster-layer subscription and proxy helper                               | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
 | Decorator authoring complexity | Add optional authoring session/helper layer                                  | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
 | Overlay add/update ambiguity   | Document `add` as upsert or introduce `upsert`                               | Consumer code can choose strict create, patch update, or intentional upsert                                                       | Silent behavior that differs from method names                                 |
@@ -606,7 +602,7 @@ These changes make GeoForge easier to use in route-based apps, demos, wizards, a
 ### Phase 3: Productize advanced workflows
 
 1. Add a public `geoForge.helpers` facade or equivalent helper-specific APIs for snapping configuration.
-2. Add a feature property editor or transaction helper for common forms.
+2. Add a feature property editor or transaction helper for common forms. (Implemented as `geoForge.transactions.featureProperties(...)`.)
 3. Add decorator authoring helpers for interactive editors.
 4. Clarify overlay `add` versus `upsert` semantics.
 5. Add raster layer subscription and proxy configuration helpers.
@@ -663,19 +659,19 @@ This preserves the current subsystem architecture while removing the repeated gl
 
 ## Prioritized Backlog
 
-| Priority | Item                                   | Reason                                                                   |
-| -------- | -------------------------------------- | ------------------------------------------------------------------------ |
-| P0       | Public control profiles                | Current implementation mutates internals and refreshes controls manually |
-| P0       | History-free feature operations        | Repeated local wrappers across almost every demo                         |
-| P0       | Feature/history/mode subscriptions     | UI integrations should not maintain event-name lists                     |
-| Done     | Public snapping configuration          | Implemented as `geoForge.geometry.endpointSnapping`                      |
-| Done     | Session/owner lifecycle API            | Prevents broad cleanup and repetitive teardown code                      |
-| P1       | Feature query/count APIs               | Avoids direct feature store iteration                                    |
-| P1       | Transaction form helper                | Simplifies a common application workflow                                 |
-| P2       | Raster state subscription/proxy helper | Makes raster layer panels easier to externalize                          |
-| P2       | Decorator authoring session            | Helps advanced visual editors without bloating renderer APIs             |
-| P2       | Overlay upsert semantics               | Low-cost clarity improvement                                             |
-| P2       | Demo shell reference links             | Turns Demo Studio into a stronger production reference app               |
+| Priority | Item                                   | Reason                                                                                          |
+| -------- | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| P0       | Public control profiles                | Current implementation mutates internals and refreshes controls manually                        |
+| P0       | History-free feature operations        | Repeated local wrappers across almost every demo                                                |
+| P0       | Feature/history/mode subscriptions     | UI integrations should not maintain event-name lists                                            |
+| Done     | Public snapping configuration          | Implemented as `geoForge.geometry.endpointSnapping`                                             |
+| Done     | Session/owner lifecycle API            | Prevents broad cleanup and repetitive teardown code                                             |
+| P1       | Feature query/count APIs               | Avoids direct feature store iteration                                                           |
+| Done     | Transaction form helper                | Implemented as `geoForge.transactions.featureProperties(...)` for common feature-property forms |
+| P2       | Raster state subscription/proxy helper | Makes raster layer panels easier to externalize                                                 |
+| P2       | Decorator authoring session            | Helps advanced visual editors without bloating renderer APIs                                    |
+| P2       | Overlay upsert semantics               | Low-cost clarity improvement                                                                    |
+| P2       | Demo shell reference links             | Turns Demo Studio into a stronger production reference app                                      |
 
 ## Bottom Line
 
