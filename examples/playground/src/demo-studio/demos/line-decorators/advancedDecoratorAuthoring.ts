@@ -279,7 +279,10 @@ export function getAdvancedDecoratorCode(state: AdvancedDecoratorState): string 
   const layerPositionJson = JSON.stringify(state.layerPosition);
 
   return `const lineFeature = ${lineFeatureJson};
-const importResult = geoForge.features.importGeoJson(lineFeature, { overwrite: true });
+const importResult = geoForge.features.importGeoJson(lineFeature, {
+  overwrite: true,
+  history: false,
+});
 const features = importResult.addedFeatures.map((featureData) => featureData.getGeoJson());
 
 geoForge.decorators.lines.configure({ layerPosition: ${layerPositionJson} });
@@ -301,10 +304,7 @@ export function addAdvancedDecorator(
 
   return {
     ...state,
-    decorators: [
-      ...(state.decorators ?? []).map(cloneLineDecorator),
-      nextDecorator,
-    ],
+    decorators: [...(state.decorators ?? []).map(cloneLineDecorator), nextDecorator],
     customSymbolImages: emptyToUndefined(nextCustomSymbolImages),
   };
 }
@@ -570,8 +570,7 @@ function getAdvancedCustomSymbolImageSources(
   if (
     (state.decorators ?? []).some(
       (decorator) =>
-        decorator.kind === 'symbol' &&
-        decorator.imageId === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
+        decorator.kind === 'symbol' && decorator.imageId === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID,
     ) &&
     !sources.some((source) => source.id === ADVANCED_CUSTOM_SYMBOL_IMAGE_ID)
   ) {
@@ -614,7 +613,10 @@ function captureSavedCustomSymbolDecorator(
   };
 }
 
-function attachReadyImageIds(error: unknown, readyImageIds: string[]): AdvancedCustomSvgEnsureError {
+function attachReadyImageIds(
+  error: unknown,
+  readyImageIds: string[],
+): AdvancedCustomSvgEnsureError {
   const ensureError: AdvancedCustomSvgEnsureError =
     error instanceof Error ? error : new Error('Unable to load custom SVG image.');
   ensureError.readyImageIds = readyImageIds;
@@ -626,8 +628,9 @@ function getNextSavedCustomSymbolImageId(state: AdvancedDecoratorState): string 
   const reservedIds = new Set([
     ...Object.keys(state.customSymbolImages ?? {}),
     ...(state.decorators ?? [])
-      .filter((decorator): decorator is LineDecoratorOptions & { kind: 'symbol' } =>
-        decorator.kind === 'symbol',
+      .filter(
+        (decorator): decorator is LineDecoratorOptions & { kind: 'symbol' } =>
+          decorator.kind === 'symbol',
       )
       .map((decorator) => decorator.imageId),
   ]);
@@ -650,8 +653,9 @@ function pruneCustomSymbolImages(
 
   const usedImageIds = new Set(
     decorators
-      .filter((decorator): decorator is LineDecoratorOptions & { kind: 'symbol' } =>
-        decorator.kind === 'symbol',
+      .filter(
+        (decorator): decorator is LineDecoratorOptions & { kind: 'symbol' } =>
+          decorator.kind === 'symbol',
       )
       .map((decorator) => decorator.imageId),
   );

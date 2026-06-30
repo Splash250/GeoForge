@@ -27,23 +27,19 @@ describe('drawEditDemos', () => {
     ]);
     const inspectorProps: DrawEditInspectorProps[] = [];
     const mutationHandlers = new Map<string, () => void>();
-    let suspendCalls = 0;
 
     const geoForge = {
       features: {
         featureStore,
         exportGeoJson: () => ({ type: 'FeatureCollection', features: [] }),
-        importGeoJson: () => ({
+        importGeoJson: vi.fn(() => ({
           stats: { total: 2, success: 2, failed: 0, overwritten: 0 },
           addedFeatures: Array.from(featureStore.values()),
-        }),
+        })),
         deleteAll: vi.fn(() => featureStore.clear()),
       },
       history: {
-        suspend: <TResult>(callback: () => TResult) => {
-          suspendCalls += 1;
-          return callback();
-        },
+        suspend: vi.fn(<TResult>(callback: () => TResult) => callback()),
       },
       disableAllModes: vi.fn(),
       enableDraw: vi.fn(),
@@ -78,17 +74,21 @@ describe('drawEditDemos', () => {
     expect(resultInspectorProps.state.featureCount).toBe(2);
     expect(resultInspectorProps.state.lastAction).toBe('Seeded sample features');
     expect(inspectorProps.at(-1)?.state.featureCount).toBe(2);
-    expect(suspendCalls).toBe(1);
+    expect(geoForge.features.importGeoJson).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ overwrite: true, history: false }),
+    );
+    expect(geoForge.history.suspend).not.toHaveBeenCalled();
 
     resultInspectorProps.onClearFeatures();
 
     expect(inspectorProps.at(-1)?.state.featureCount).toBe(0);
     expect(inspectorProps.at(-1)?.state.lastAction).toBe('Features cleared');
-    expect(suspendCalls).toBe(2);
+    expect(geoForge.features.deleteAll).toHaveBeenLastCalledWith({ history: false });
 
     resultInspectorProps.onSelectShape('marker');
 
-    expect(suspendCalls).toBe(2);
+    expect(geoForge.history.suspend).not.toHaveBeenCalled();
 
     featureStore.set('main:drawn-1', { id: 'drawn-1', temporary: false });
     featureStore.set('temporary:helper-1', { id: 'helper-1', temporary: true });

@@ -20,8 +20,9 @@ const features = gm.features;
 | Method                                                     | Returns               | Description                               |
 | ---------------------------------------------------------- | --------------------- | ----------------------------------------- |
 | `add(featureData: FeatureData)`                            | `void`                | Add a feature to the store.               |
-| `delete(featureData: FeatureData)`                         | `void`                | Remove a feature from the store.          |
-| `deleteByOwner(ownerId: FeatureOwnerId)`                   | `GeomanFeatureRef[]`  | Remove all runtime features for an owner. |
+| `delete(featureData: FeatureData, options?)`               | `void`                | Remove a feature from the store.          |
+| `deleteAll(options?)`                                      | `void`                | Remove all features from the store.       |
+| `deleteByOwner(ownerId: FeatureOwnerId, options?)`         | `GeomanFeatureRef[]`  | Remove all runtime features for an owner. |
 | `getByOwner(ownerId: FeatureOwnerId)`                      | `FeatureData[]`       | Return runtime features for an owner.     |
 | `has(sourceName: FeatureSourceName, featureId: FeatureId)` | `boolean`             | Check if a feature exists in a source.    |
 | `get(sourceName: FeatureSourceName, featureId: FeatureId)` | `FeatureData \| null` | Retrieve a feature by id.                 |
@@ -53,6 +54,28 @@ gm.features.deleteByOwner(ownerId);
 
 `ownerId` is runtime metadata on `FeatureData`; it is not written into exported
 GeoJSON properties.
+
+### Operation-Level History Suppression
+
+Feature import, delete, and update APIs record history by default. Pass
+`history: false` to suppress history for one operation:
+
+```ts
+const result = gm.features.importGeoJson(networkPreview, {
+  ownerId,
+  history: false,
+});
+
+gm.features.delete(result.addedFeatures[0], { history: false });
+gm.features.deleteByOwner(ownerId, { history: false });
+
+const feature = result.addedFeatures[0];
+feature.updateProperties({ status: 'preview' }, { history: false });
+feature.updateGeometry(nextGeometry, { history: false });
+```
+
+Use `gm.history.suspend(...)` when suppressing history across a batch of mixed
+operations.
 
 ## Feature Creation
 

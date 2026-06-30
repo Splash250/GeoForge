@@ -7,6 +7,7 @@ import type { GmEditFeatureUpdatedEvent } from '@/types/events/edit.ts';
 import type { FeatureDataParameters } from '@/types/features.ts';
 import {
   type FeatureId,
+  type FeatureMutationOptions,
   type FeatureOwnerId,
   type FeatureShape,
   type FeatureShapeProperties,
@@ -197,8 +198,8 @@ export class FeatureData {
     return value === undefined ? undefined : (cloneDeep(value) as TValue);
   }
 
-  updateProperty(name: string, value: unknown): this {
-    this.updateProperties({ [name]: value });
+  updateProperty(name: string, value: unknown, options?: FeatureMutationOptions): this {
+    this.updateProperties({ [name]: value }, options);
 
     return this;
   }
@@ -266,7 +267,7 @@ export class FeatureData {
    *   coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
    * });
    */
-  updateGeometry(geometry: BasicGeometry) {
+  updateGeometry(geometry: BasicGeometry, options?: FeatureMutationOptions) {
     const featureGeoJson = this.getGeoJson();
     if (!featureGeoJson) {
       throw new Error(`Feature not found: "${this.id}"`);
@@ -282,7 +283,7 @@ export class FeatureData {
       diff,
       sourceName: this.sourceName,
     });
-    this.recordUpdate(before, this.getGeoJson(), 'feature.updateGeometry');
+    this.recordUpdate(before, this.getGeoJson(), 'feature.updateGeometry', options);
   }
 
   /**
@@ -316,8 +317,8 @@ export class FeatureData {
   /**
    * @deprecated Use `updateGeometry()` instead.
    */
-  updateGeoJsonGeometry(geometry: BasicGeometry) {
-    this.updateGeometry(geometry);
+  updateGeoJsonGeometry(geometry: BasicGeometry, options?: FeatureMutationOptions) {
+    this.updateGeometry(geometry, options);
   }
 
   /**
@@ -339,7 +340,7 @@ export class FeatureData {
    * // Mix of updates and deletions
    * feature.updateProperties({ color: 'blue', oldProp: undefined });
    */
-  updateProperties(properties: Record<string, unknown>) {
+  updateProperties(properties: Record<string, unknown>, options?: FeatureMutationOptions) {
     if (!this._geoJson) {
       throw new Error(`Feature not found: "${this.id}"`);
     }
@@ -395,7 +396,7 @@ export class FeatureData {
       diff,
       sourceName: this.sourceName,
     });
-    this.recordUpdate(before, this.getGeoJson(), 'feature.updateProperties');
+    this.recordUpdate(before, this.getGeoJson(), 'feature.updateProperties', options);
   }
 
   /**
@@ -410,7 +411,7 @@ export class FeatureData {
    * // Replace all custom properties
    * feature.setProperties({ name: 'New Feature', category: 'poi' });
    */
-  setProperties(properties: Record<string, unknown>) {
+  setProperties(properties: Record<string, unknown>, options?: FeatureMutationOptions) {
     if (!this._geoJson) {
       throw new Error(`Feature not found: "${this.id}"`);
     }
@@ -436,7 +437,7 @@ export class FeatureData {
       diff,
       sourceName: this.sourceName,
     });
-    this.recordUpdate(before, this.getGeoJson(), 'feature.setProperties');
+    this.recordUpdate(before, this.getGeoJson(), 'feature.setProperties', options);
   }
 
   /**
@@ -446,7 +447,10 @@ export class FeatureData {
    * @internal
    * @param properties - Properties to merge with existing ones
    */
-  _updateAllProperties(properties: Partial<ShapeGeoJsonProperties>) {
+  _updateAllProperties(
+    properties: Partial<ShapeGeoJsonProperties>,
+    options?: FeatureMutationOptions,
+  ) {
     if (!this._geoJson) {
       throw new Error(`Feature not found: "${this.id}"`);
     }
@@ -459,39 +463,45 @@ export class FeatureData {
       diff,
       sourceName: this.sourceName,
     });
-    this.recordUpdate(before, this.getGeoJson(), 'feature.updateAllProperties');
+    this.recordUpdate(before, this.getGeoJson(), 'feature.updateAllProperties', options);
   }
 
   /**
    * @deprecated Use `updateProperties()` instead. Set property value to `undefined` to delete it.
    */
-  updateGeoJsonProperties(properties: Partial<ShapeGeoJsonProperties>) {
-    this._updateAllProperties(properties);
+  updateGeoJsonProperties(
+    properties: Partial<ShapeGeoJsonProperties>,
+    options?: FeatureMutationOptions,
+  ) {
+    this._updateAllProperties(properties, options);
   }
 
   /**
    * @deprecated Use `setProperties()` instead.
    */
-  setGeoJsonCustomProperties(properties: Feature['properties']) {
-    this.setProperties(properties || {});
+  setGeoJsonCustomProperties(properties: Feature['properties'], options?: FeatureMutationOptions) {
+    this.setProperties(properties || {}, options);
   }
 
   /**
    * @deprecated Use `updateProperties()` instead.
    */
-  updateGeoJsonCustomProperties(properties: Feature['properties']) {
-    this.updateProperties(properties || {});
+  updateGeoJsonCustomProperties(
+    properties: Feature['properties'],
+    options?: FeatureMutationOptions,
+  ) {
+    this.updateProperties(properties || {}, options);
   }
 
   /**
    * @deprecated Use `updateProperties({ propName: undefined })` instead.
    */
-  deleteGeoJsonCustomProperties(fieldNames: Array<string>) {
+  deleteGeoJsonCustomProperties(fieldNames: Array<string>, options?: FeatureMutationOptions) {
     const deleteProps: Record<string, undefined> = {};
     for (const fieldName of fieldNames) {
       deleteProps[fieldName] = undefined;
     }
-    this.updateProperties(deleteProps);
+    this.updateProperties(deleteProps, options);
   }
 
   convertToPolygon(): boolean {
@@ -578,7 +588,13 @@ export class FeatureData {
     before: GeoJsonShapeFeature,
     after: GeoJsonShapeFeature,
     label: string,
+    options?: FeatureMutationOptions,
   ): void {
+    if (options?.history === false) {
+      this.gm.history?.record([]);
+      return;
+    }
+
     if (!this.isHistoryRecordable()) {
       return;
     }

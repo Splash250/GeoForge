@@ -1,5 +1,5 @@
 import type { GeoJsonImportFeatureCollection } from 'maplibre-geoforge';
-import type { DemoContext, DemoDefinition } from '../../registry/types.ts';
+import type { DemoDefinition } from '../../registry/types.ts';
 import { sampleNetworkGeoJson } from '../shared/sampleGeoJson.ts';
 import FeatureDataInspector from './FeatureDataInspector.svelte';
 
@@ -29,7 +29,8 @@ export const featureDataDemos: DemoDefinition<FeatureDataInspectorProps>[] = [
   {
     id: 'feature-data-import-geojson',
     title: 'Import GeoJSON',
-    description: 'Import a sample GeoJSON network, inspect import stats, and export the live feature store.',
+    description:
+      'Import a sample GeoJSON network, inspect import stats, and export the live feature store.',
     docsPath: '/docs/importing-geojson',
     code: () => buildFeatureDataSnippet(),
     inspector: FeatureDataInspector,
@@ -58,10 +59,12 @@ export const featureDataDemos: DemoDefinition<FeatureDataInspectorProps>[] = [
       };
 
       const importSample = (lastAction: string) => {
-        const { stats, addedFeatures } = runWithoutHistory(geoForge, () =>
-          geoForge.features.importGeoJson(typedSampleNetworkGeoJson, {
+        const { stats, addedFeatures } = geoForge.features.importGeoJson(
+          typedSampleNetworkGeoJson,
+          {
             overwrite: true,
-          }),
+            history: false,
+          },
         );
 
         const exportedGeoJson = geoForge.features.exportGeoJson();
@@ -145,9 +148,7 @@ export const featureDataDemos: DemoDefinition<FeatureDataInspectorProps>[] = [
         inspectorProps: { state, onImportSample, onExport },
         code: buildFeatureDataSnippet(),
         teardown: () => {
-          runWithoutHistory(geoForge, () => {
-            geoForge.features.deleteAll();
-          });
+          geoForge.features.deleteAll({ history: false });
         },
       };
     },
@@ -162,25 +163,13 @@ function formatExportedJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-function runWithoutHistory<T>(geoForge: DemoContext['geoForge'], callback: () => T): T {
-  const history = geoForge.history as { suspend?: <TResult>(callback: () => TResult) => TResult };
-
-  return history.suspend ? history.suspend(callback) : callback();
-}
-
 function buildFeatureDataSnippet() {
   return `import { sampleNetworkGeoJson } from '../shared/sampleGeoJson';
 
-function runWithoutHistory(callback) {
-  const suspend = geoForge.history.suspend?.bind(geoForge.history);
-  return suspend ? suspend(callback) : callback();
-}
-
-const { stats, addedFeatures } = runWithoutHistory(() =>
-  geoForge.features.importGeoJson(sampleNetworkGeoJson, {
-    overwrite: true,
-  }),
-);
+const { stats, addedFeatures } = geoForge.features.importGeoJson(sampleNetworkGeoJson, {
+  overwrite: true,
+  history: false,
+});
 
 console.log(stats);
 console.log(addedFeatures.map((featureData) => featureData.id));
@@ -188,7 +177,5 @@ console.log(addedFeatures.map((featureData) => featureData.id));
 const exportedGeoJson = geoForge.features.exportGeoJson();
 
 // Demo teardown:
-runWithoutHistory(() => {
-  geoForge.features.deleteAll();
-});`;
+geoForge.features.deleteAll({ history: false });`;
 }

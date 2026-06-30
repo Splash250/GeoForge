@@ -17,6 +17,7 @@ import { BaseSource } from '@/core/map/base/source.ts';
 import { SHAPE_NAMES } from '@/modes/constants.ts';
 import {
   type FeatureId,
+  type FeatureMutationOptions,
   type FeatureOwnerId,
   type FeatureShape,
   type FeatureSourceName,
@@ -90,7 +91,7 @@ export class Features {
     this.geoJsonIO = new FeatureGeoJsonIO({
       defaultSourceName: () => this.defaultSourceName,
       createFeature: (options) => this.createFeature(options),
-      deleteFeature: (featureId) => this.delete(featureId),
+      deleteFeature: (featureId, options) => this.delete(featureId, options),
       hasFeature: (featureId) => this.has(this.defaultSourceName, featureId),
       getFeature: (sourceName, featureId) => this.get(sourceName, featureId),
       getSource: (sourceName) => this.sources[sourceName],
@@ -211,11 +212,19 @@ export class Features {
     throw new Error(`Features: failed to create the source: "${sourceName}"`);
   }
 
-  delete(featureIdOrFeatureData: FeatureData | FeatureId | GeomanFeatureRef) {
+  delete(
+    featureIdOrFeatureData: FeatureData | FeatureId | GeomanFeatureRef,
+    options?: FeatureMutationOptions,
+  ) {
     const featureData = this.resolveFeatureForHistory(featureIdOrFeatureData);
     const before = featureData ? cloneDeep(featureData.getGeoJson()) : null;
 
     this.featureStoreService.delete(featureIdOrFeatureData);
+
+    if (isHistorySuppressed(options)) {
+      clearLastHistoryRecord(this.gm);
+      return;
+    }
 
     if (featureData && before && isHistoryRecordableShape(featureData.shape)) {
       this.gm.history?.record(
@@ -232,8 +241,26 @@ export class Features {
     }
   }
 
-  deleteAll() {
+  deleteAll(options?: FeatureMutationOptions) {
+    const operations = Array.from(this.featureStore.values())
+      .filter((featureData) => isHistoryRecordableShape(featureData.shape))
+      .map((featureData) => ({
+        kind: 'delete' as const,
+        ref: { sourceName: featureData.sourceName, featureId: featureData.id },
+        before: cloneDeep(featureData.getGeoJson()),
+        after: null,
+      }));
+
     this.featureStoreService.clear();
+
+    if (isHistorySuppressed(options)) {
+      clearLastHistoryRecord(this.gm);
+      return;
+    }
+
+    if (operations.length > 0) {
+      this.gm.history?.record(operations, { label: 'feature.deleteAll' });
+    }
   }
 
   getFeatureByMouseEvent({
@@ -276,6 +303,7 @@ export class Features {
     parent,
     sourceName,
     imported,
+    history,
   }: {
     featureId?: FeatureId;
     ownerId?: FeatureOwnerId;
@@ -283,7 +311,7 @@ export class Features {
     parent?: FeatureData;
     sourceName: FeatureSourceName;
     imported?: boolean;
-  }): FeatureData | null {
+  } & FeatureMutationOptions): FeatureData | null {
     const source = this.sources[sourceName];
     if (!source) {
       log.error('Features.createFeature Missing source for feature creation');
@@ -313,7 +341,9 @@ export class Features {
     });
 
     this.add(featureData);
-    if (isHistoryRecordableShape(featureData.shape)) {
+    if (history === false) {
+      clearLastHistoryRecord(this.gm);
+    } else if (isHistoryRecordableShape(featureData.shape)) {
       this.gm.history?.record(
         [
           {
@@ -342,7 +372,7 @@ export class Features {
 
   importGeoJsonFeature(
     shapeGeoJson: GeoJsonImportFeature,
-    options?: Pick<ImportGeoJsonOptions, 'ownerId'>,
+    options?: Pick<ImportGeoJsonOptions, 'ownerId' | 'history'>,
   ): FeatureData | null {
     return this.geoJsonIO.importGeoJsonFeature(shapeGeoJson, options);
   }
@@ -353,14 +383,17 @@ export class Features {
     );
   }
 
-  deleteByOwner(ownerId: FeatureOwnerId): Array<GeomanFeatureRef> {
+  deleteByOwner(
+    ownerId: FeatureOwnerId,
+    options?: FeatureMutationOptions,
+  ): Array<GeomanFeatureRef> {
     const features = this.getByOwner(ownerId);
     const deletedRefs = features.map((featureData) => ({
       sourceName: featureData.sourceName,
       featureId: featureData.id,
     }));
 
-    features.forEach((featureData) => this.delete(featureData));
+    features.forEach((featureData) => this.delete(featureData, options));
 
     return deletedRefs;
   }
@@ -664,6 +697,14 @@ export class Features {
 
 function isHistoryRecordableShape(shape: FeatureShape): boolean {
   return !HISTORY_IGNORED_SHAPES.has(shape);
+}
+
+function isHistorySuppressed(options?: FeatureMutationOptions): boolean {
+  return options?.history === false;
+}
+
+function clearLastHistoryRecord(geoman: Geoman): void {
+  geoman.history?.record([]);
 }
 
 function isGeomanFeatureRef(value: unknown): value is GeomanFeatureRef {

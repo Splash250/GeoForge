@@ -157,9 +157,7 @@ export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
         }
 
         geoForge.disableAllModes();
-        runWithoutHistory(geoForge, () => {
-          geoForge.features.deleteAll();
-        });
+        geoForge.features.deleteAll({ history: false });
         state = {
           ...state,
           activeDrawShape: '',
@@ -178,9 +176,10 @@ export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
         });
       };
 
-      const importResult = runWithoutHistory(geoForge, () =>
-        geoForge.features.importGeoJson(drawEditSampleNetworkGeoJson, { overwrite: true }),
-      );
+      const importResult = geoForge.features.importGeoJson(drawEditSampleNetworkGeoJson, {
+        overwrite: true,
+        history: false,
+      });
       updateRuntime('Seeded sample features');
 
       context.logEvent({
@@ -211,9 +210,7 @@ export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
             context.map.off(eventName, handleFeatureMutation);
           });
           geoForge.disableAllModes();
-          runWithoutHistory(geoForge, () => {
-            geoForge.features.deleteAll();
-          });
+          geoForge.features.deleteAll({ history: false });
         },
       };
     },
@@ -230,12 +227,6 @@ function enableEditMode(geoForge: DemoContext['geoForge'], mode: DrawEditMode) {
   } satisfies Record<DrawEditMode, () => void>;
 
   modeHandlers[mode]();
-}
-
-function runWithoutHistory<T>(geoForge: DemoContext['geoForge'], callback: () => T): T {
-  const history = geoForge.history as { suspend?: <TResult>(callback: () => TResult) => TResult };
-
-  return history.suspend ? history.suspend(callback) : callback();
 }
 
 function countUserFacingFeatures(features: FeatureStoreCountSource): number {
@@ -270,13 +261,9 @@ const drawEditSampleNetworkGeoJson = {
   })),
 };
 
-function runWithoutHistory(callback) {
-  const suspend = geoForge.history.suspend?.bind(geoForge.history);
-  return suspend ? suspend(callback) : callback();
-}
-
-runWithoutHistory(() => {
-  geoForge.features.importGeoJson(drawEditSampleNetworkGeoJson, { overwrite: true });
+geoForge.features.importGeoJson(drawEditSampleNetworkGeoJson, {
+  overwrite: true,
+  history: false,
 });
 
 function activateDraw(shape) {
@@ -300,15 +287,11 @@ function activateEdit(mode) {
 
 function clearFeatures() {
   geoForge.disableAllModes();
-  runWithoutHistory(() => {
-    geoForge.features.deleteAll();
-  });
+  geoForge.features.deleteAll({ history: false });
 }
 
 function cleanup() {
   geoForge.disableAllModes();
-  runWithoutHistory(() => {
-    geoForge.features.deleteAll();
-  });
+  geoForge.features.deleteAll({ history: false });
 }`;
 }

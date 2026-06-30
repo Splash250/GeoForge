@@ -41,6 +41,17 @@ export type ForEachFeatureDataCallbackFn = (
   map: FeatureStore,
 ) => void;
 
+export type FeatureHistoryOptions = {
+  /**
+   * Set to false to skip recording this single feature operation in history.
+   *
+   * Use geoForge.history.suspend(...) when suppressing history for a multi-operation batch.
+   */
+  history?: boolean;
+};
+
+export type FeatureMutationOptions = FeatureHistoryOptions;
+
 export type FeatureShapeProperties = {
   id?: FeatureId;
   shape?: FeatureShape;
@@ -64,4 +75,4 @@ export type ImportGeoJsonOptions = {
   overwrite?: boolean;
   /** Runtime owner used for scoped lookup and cleanup through features.getByOwner/deleteByOwner */
   ownerId?: FeatureOwnerId;
-};
+} & FeatureHistoryOptions;
