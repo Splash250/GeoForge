@@ -17,6 +17,7 @@ import { BaseSource } from '@/core/map/base/source.ts';
 import { SHAPE_NAMES } from '@/modes/constants.ts';
 import {
   type FeatureId,
+  type FeatureOwnerId,
   type FeatureShape,
   type FeatureSourceName,
   type FeatureStore,
@@ -270,12 +271,14 @@ export class Features {
 
   createFeature({
     featureId,
+    ownerId,
     shapeGeoJson,
     parent,
     sourceName,
     imported,
   }: {
     featureId?: FeatureId;
+    ownerId?: FeatureOwnerId;
     shapeGeoJson: GeoJsonShapeFeature;
     parent?: FeatureData;
     sourceName: FeatureSourceName;
@@ -303,6 +306,7 @@ export class Features {
     const featureData = new FeatureData({
       gm: this.gm,
       id,
+      ownerId,
       parent: parent || null,
       source,
       geoJsonShapeFeature: cloneDeep(shapeGeoJson),
@@ -336,8 +340,29 @@ export class Features {
     return this.geoJsonIO.importGeoJson(geoJson, options);
   }
 
-  importGeoJsonFeature(shapeGeoJson: GeoJsonImportFeature): FeatureData | null {
-    return this.geoJsonIO.importGeoJsonFeature(shapeGeoJson);
+  importGeoJsonFeature(
+    shapeGeoJson: GeoJsonImportFeature,
+    options?: Pick<ImportGeoJsonOptions, 'ownerId'>,
+  ): FeatureData | null {
+    return this.geoJsonIO.importGeoJsonFeature(shapeGeoJson, options);
+  }
+
+  getByOwner(ownerId: FeatureOwnerId): Array<FeatureData> {
+    return Array.from(this.featureStore.values()).filter(
+      (featureData) => featureData.ownerId === ownerId,
+    );
+  }
+
+  deleteByOwner(ownerId: FeatureOwnerId): Array<GeomanFeatureRef> {
+    const features = this.getByOwner(ownerId);
+    const deletedRefs = features.map((featureData) => ({
+      sourceName: featureData.sourceName,
+      featureId: featureData.id,
+    }));
+
+    features.forEach((featureData) => this.delete(featureData));
+
+    return deletedRefs;
   }
 
   getAll(): FeatureCollection {

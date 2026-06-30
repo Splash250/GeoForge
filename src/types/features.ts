@@ -12,6 +12,7 @@ import type { MarkerData, ShapeName } from '@/types/modes/index.ts';
 import type { WithPrefixedKeys } from '@/types/utils.ts';
 
 export type FeatureId = number | string;
+export type FeatureOwnerId = number | string;
 
 export type FeatureShape = ShapeName | `${MarkerData['type']}_marker` | 'snap_guide';
 
@@ -23,6 +24,7 @@ export type ShapeGeoJsonProperties = {
 export type FeatureDataParameters = {
   gm: Geoman;
   id: FeatureId;
+  ownerId?: FeatureOwnerId;
   parent: FeatureData | null;
   source: BaseSource;
   geoJsonShapeFeature: GeoJsonShapeFeature;
@@ -60,4 +62,6 @@ export type ImportGeoJsonOptions = {
   idPropertyName?: string;
   /** If true, existing features with the same ID will be replaced */
   overwrite?: boolean;
+  /** Runtime owner used for scoped lookup and cleanup through features.getByOwner/deleteByOwner */
+  ownerId?: FeatureOwnerId;
 };

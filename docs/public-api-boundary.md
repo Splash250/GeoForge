@@ -23,6 +23,7 @@ These exports are the preferred public API for new application code.
 | `GeomanLayerSubsystem`             | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays.           |
 | `GeomanControlProfile`             | Type for runtime control visibility profiles used by `geoForge.control.applyProfile(...)`.                              |
 | `GeomanControlVisibilityOptions`   | Type for granular control visibility updates.                                                                           |
+| `FeatureOwnerId`                   | Runtime owner identifier for scoped feature imports and cleanup.                                                        |
 | `defineGeomanContextPanel`         | Helper for defining context panel descriptors.                                                                          |
 | `createContextPanelValidationList` | Helper for rendering context panel validation content.                                                                  |
 | `createContextPanelActionButton`   | Helper for rendering context panel action buttons.                                                                      |
@@ -107,3 +108,4 @@ Do not rely on deep imports from `src`, `dist`, or internal folders. Deep import
 - Prefer documentation and deprecation clarity over export removal.
 - Add new package subpaths only after consumer import usage is checked and the subpath is explicitly approved.
 - Prefer `geoForge.control.applyProfile(...)`, `setModeVisibility(...)`, and `getProfile()` for runtime control visibility instead of mutating `geoForge.options.controls` or refreshing controls manually.
+- Prefer `geoForge.features.importGeoJson(..., { ownerId })`, `getByOwner(...)`, and `deleteByOwner(...)` for scoped setup or preview data cleanup instead of storing every imported `FeatureData` reference in application code.

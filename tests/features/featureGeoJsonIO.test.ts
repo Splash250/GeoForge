@@ -82,6 +82,7 @@ describe('FeatureGeoJsonIO', () => {
     expect(result.addedFeatures).toEqual([addedFeature]);
     expect(createFeature).toHaveBeenCalledWith({
       featureId: 'feature-1',
+      ownerId: undefined,
       shapeGeoJson: expect.objectContaining({ id: 'feature-1' }),
       sourceName: SOURCES.main,
       imported: true,
@@ -111,7 +112,24 @@ describe('FeatureGeoJsonIO', () => {
     expect(createFeature).toHaveBeenCalledWith(
       expect.objectContaining({
         featureId: 'external-id',
+        ownerId: undefined,
         shapeGeoJson: expect.objectContaining({ id: 'external-id' }),
+      }),
+    );
+  });
+
+  it('forwards ownerId to created features during import', () => {
+    const createFeature = vi.fn(() => createFeatureData({ id: 'owned-feature' }));
+    const io = createIO({ createFeature });
+
+    io.importGeoJson(createPointFeature({ id: 'owned-feature' }), {
+      ownerId: 'demo:seed-data',
+    });
+
+    expect(createFeature).toHaveBeenCalledWith(
+      expect.objectContaining({
+        featureId: 'owned-feature',
+        ownerId: 'demo:seed-data',
       }),
     );
   });

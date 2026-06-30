@@ -11,55 +11,76 @@ const features = gm.features;
 
 ## Iteration
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `forEach((featureData, id, store) => void)` | `void` | Iterate over every feature in the main source. |
+| Method                                      | Returns | Description                                    |
+| ------------------------------------------- | ------- | ---------------------------------------------- |
+| `forEach((featureData, id, store) => void)` | `void`  | Iterate over every feature in the main source. |
 
 ## Feature Management
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `add(featureData: FeatureData)` | `void` | Add a feature to the store. |
-| `delete(featureData: FeatureData)` | `void` | Remove a feature from the store. |
-| `has(sourceName: FeatureSourceName, featureId: FeatureId)` | `boolean` | Check if a feature exists in a source. |
-| `get(sourceName: FeatureSourceName, featureId: FeatureId)` | `FeatureData \| null` | Retrieve a feature by id. |
+| Method                                                     | Returns               | Description                               |
+| ---------------------------------------------------------- | --------------------- | ----------------------------------------- |
+| `add(featureData: FeatureData)`                            | `void`                | Add a feature to the store.               |
+| `delete(featureData: FeatureData)`                         | `void`                | Remove a feature from the store.          |
+| `deleteByOwner(ownerId: FeatureOwnerId)`                   | `GeomanFeatureRef[]`  | Remove all runtime features for an owner. |
+| `getByOwner(ownerId: FeatureOwnerId)`                      | `FeatureData[]`       | Return runtime features for an owner.     |
+| `has(sourceName: FeatureSourceName, featureId: FeatureId)` | `boolean`             | Check if a feature exists in a source.    |
+| `get(sourceName: FeatureSourceName, featureId: FeatureId)` | `FeatureData \| null` | Retrieve a feature by id.                 |
 
 ## GeoJSON Operations
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `importGeoJson(geoJson)` | `{ stats: { total: number; success: number; failed: number; }; addedFeatures: Array<FeatureData>; }` | Import features from GeoJSON. |
-| `exportGeoJson()` | `GeoJsonShapeFeatureCollection` | Export all features as a FeatureCollection. |
-| `getSourceGeoJson(sourceName)` | `GeoJsonShapeFeatureCollection` | Export features from a specific source. |
-| `setSourceGeoJson({ geoJson, sourceName })` | `void` | Replace a source with GeoJSON data. |
+| Method                                      | Returns                                                                                              | Description                                 |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `importGeoJson(geoJson, options?)`          | `{ stats: { total: number; success: number; failed: number; }; addedFeatures: Array<FeatureData>; }` | Import features from GeoJSON.               |
+| `importGeoJsonFeature(feature, options?)`   | `FeatureData \| null`                                                                                | Import one feature from GeoJSON.            |
+| `exportGeoJson()`                           | `GeoJsonShapeFeatureCollection`                                                                      | Export all features as a FeatureCollection. |
+| `getSourceGeoJson(sourceName)`              | `GeoJsonShapeFeatureCollection`                                                                      | Export features from a specific source.     |
+| `setSourceGeoJson({ geoJson, sourceName })` | `void`                                                                                               | Replace a source with GeoJSON data.         |
+
+### Owner-Scoped Imports
+
+Pass `ownerId` when importing setup, preview, wizard, or demo data that should
+be cleaned up as one group later.
+
+```ts
+const ownerId = 'route:network-preview';
+
+gm.features.importGeoJson(networkPreview, { ownerId });
+
+const livePreviewFeatures = gm.features.getByOwner(ownerId);
+
+gm.features.deleteByOwner(ownerId);
+```
+
+`ownerId` is runtime metadata on `FeatureData`; it is not written into exported
+GeoJSON properties.
 
 ## Feature Creation
 
-| Method | Returns | Description |
-|--------|---------|-------------|
+| Method                                                                     | Returns               | Description                    |
+| -------------------------------------------------------------------------- | --------------------- | ------------------------------ |
 | `createFeature({ featureId, shapeGeoJson, parent, sourceName, imported })` | `FeatureData \| null` | Create a feature from GeoJSON. |
-| `addGeoJsonFeature({ shapeGeoJson, sourceName, defaultSource })` | `FeatureData \| null` | Add a single GeoJSON feature. |
+| `addGeoJsonFeature({ shapeGeoJson, sourceName, defaultSource })`           | `FeatureData \| null` | Add a single GeoJSON feature.  |
 
 ## Queries
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getFeatureByMouseEvent({ event, sourceNames })` | `FeatureData \| null` | Feature at the pointer location. |
-| `getFeaturesByGeoJsonBounds({ geoJson, sourceNames })` | `Array<FeatureData>` | Features intersecting a GeoJSON geometry. |
-| `getFeaturesByScreenBounds({ bounds, sourceNames })` | `Array<FeatureData>` | Features within screen pixel bounds. |
+| Method                                                 | Returns               | Description                               |
+| ------------------------------------------------------ | --------------------- | ----------------------------------------- |
+| `getFeatureByMouseEvent({ event, sourceNames })`       | `FeatureData \| null` | Feature at the pointer location.          |
+| `getFeaturesByGeoJsonBounds({ geoJson, sourceNames })` | `Array<FeatureData>`  | Features intersecting a GeoJSON geometry. |
+| `getFeaturesByScreenBounds({ bounds, sourceNames })`   | `Array<FeatureData>`  | Features within screen pixel bounds.      |
 
 ## Source Management
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `setDefaultSourceName(sourceName)` | `void` | Change the default source for new features. |
+| Method                             | Returns | Description                                 |
+| ---------------------------------- | ------- | ------------------------------------------- |
+| `setDefaultSourceName(sourceName)` | `void`  | Change the default source for new features. |
 
 ## Marker Operations
 
-| Method | Returns | Description |
-|--------|---------|-------------|
+| Method                                                                 | Returns               | Description                  |
+| ---------------------------------------------------------------------- | --------------------- | ---------------------------- |
 | `createMarkerFeature({ type, coordinate, parentFeature, sourceName })` | `FeatureData \| null` | Create a new marker feature. |
-| `updateMarkerFeaturePosition(markerFeatureData, coordinates)` | `void` | Move a marker feature. |
+| `updateMarkerFeaturePosition(markerFeatureData, coordinates)`          | `void`                | Move a marker feature.       |
 
 ## Built-in Sources
 
@@ -101,7 +122,7 @@ const geoJson = {
 
 const result = gm.features.importGeoJson(geoJson);
 
-gm.features.forEach(feature => {
+gm.features.forEach((feature) => {
   console.log(feature.id, feature.shape);
 });
 

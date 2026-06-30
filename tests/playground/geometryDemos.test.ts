@@ -75,15 +75,18 @@ describe('geometryDemos', () => {
           },
         },
         features: {
-          get: vi.fn(
-            (_sourceName: string, featureId: string) => featureStore.get(featureId) ?? null,
-          ),
+          getByOwner: vi.fn(() => Array.from(featureStore.values())),
           importGeoJson: vi.fn(() => ({
             stats: { total: 2, success: 2, failed: 0, overwritten: 0 },
             addedFeatures: [lineA, lineB],
           })),
-          delete: vi.fn((feature: LineFeatureDouble) => {
-            featureStore.delete(feature.id);
+          deleteByOwner: vi.fn(() => {
+            const deletedRefs = Array.from(featureStore.values()).map((feature) => ({
+              sourceName: feature.sourceName,
+              featureId: feature.id,
+            }));
+            featureStore.clear();
+            return deletedRefs;
           }),
         },
         geometry: {
