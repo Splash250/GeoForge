@@ -23,6 +23,8 @@ import type {
   HtmlOverlayDefinition,
   HtmlOverlayIframeOptions,
   HtmlOverlayManager,
+  LineDecoratorAuthoringSession,
+  LineDecoratorAuthoringSessionOptions,
   LineDecoratorGeomanSyncOptions,
   LineDecoratorLayerPosition,
   LineDecoratorManagerOptions,
@@ -61,6 +63,9 @@ const STABLE_ROOT_EXPORTS = [
 const ADVANCED_COMPATIBILITY_EXPORTS = [
   'LineDecoratorManager',
   'GeomanLineDecoratorSubsystem',
+  'GeomanLineDecoratorAuthoringSession',
+  'loadSvgSymbolImage',
+  'validateSvgSymbolMarkup',
   'HtmlOverlayManager',
   'GeomanHtmlOverlaySubsystem',
 ] as const;
@@ -331,6 +336,8 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<LineDecoratorManagerOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorGeomanSyncOptions>().toMatchTypeOf<object>();
   expectTypeOf<GeomanLineDecoratorSubsystemOptions>().toMatchTypeOf<object>();
+  expectTypeOf<LineDecoratorAuthoringSession>().toMatchTypeOf<object>();
+  expectTypeOf<LineDecoratorAuthoringSessionOptions>().toMatchTypeOf<object>();
   expectTypeOf<SymbolDecoratorRendererOptions>().toMatchTypeOf<object>();
   expectTypeOf<TextDecoratorRendererOptions>().toMatchTypeOf<object>();
   expectTypeOf<HtmlOverlayManager['upsert']>().toEqualTypeOf<

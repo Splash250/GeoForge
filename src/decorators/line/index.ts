@@ -19,6 +19,23 @@ export type {
   GeomanLineDecoratorManualSyncOptions,
   GeomanLineDecoratorSubsystemOptions,
 } from './geomanLineDecoratorSubsystem.ts';
+export {
+  GeomanLineDecoratorAuthoringSession,
+  loadSvgSymbolImage,
+  validateSvgSymbolMarkup,
+} from './lineDecoratorAuthoringSession.ts';
+export type {
+  LineDecoratorAuthoringDecoratorInput,
+  LineDecoratorAuthoringDecoratorResolver,
+  LineDecoratorAuthoringFeatureInput,
+  LineDecoratorAuthoringFeatureTarget,
+  LineDecoratorAuthoringLineStyle,
+  LineDecoratorAuthoringSession,
+  LineDecoratorAuthoringSessionOptions,
+  SvgSymbolImageMap,
+  SvgSymbolImageRegistration,
+  SvgSymbolImageRegistrationResult,
+} from './lineDecoratorAuthoringSession.ts';
 export * from './arrowheads/index.ts';
 export * from './symbols/index.ts';
 export * from './text/index.ts';

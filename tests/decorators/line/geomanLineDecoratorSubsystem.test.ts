@@ -72,6 +72,44 @@ describe('GeomanLineDecoratorSubsystem', () => {
     expect(destroy).toHaveBeenCalledTimes(2);
   });
 
+  it('replaces and rebinds the started manager when layer position is explicitly cleared', () => {
+    const firstDestroy = vi.fn();
+    const firstBindToGeoman = vi.fn();
+    const secondBindToGeoman = vi.fn();
+    const managers = [
+      createManagerMock({ bindToGeoman: firstBindToGeoman, destroy: firstDestroy }),
+      createManagerMock({ bindToGeoman: secondBindToGeoman }),
+    ];
+    const managerFactory = vi.fn(() => managers.shift() ?? createManagerMock());
+    const geoman = { destroyed: false } as unknown as Geoman;
+    const resolveDecorators = vi.fn(() => []);
+    const subsystem = new GeomanLineDecoratorSubsystem({
+      geoman,
+      getMap: () => ({}) as never,
+      managerFactory,
+    });
+
+    subsystem.start({ resolveDecorators, layerPosition: 'above-lines' });
+    subsystem.configure({ layerPosition: undefined });
+
+    expect(managerFactory).toHaveBeenCalledTimes(2);
+    expect(managerFactory).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ layerPosition: 'above-lines' }),
+    );
+    expect(managerFactory).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ layerPosition: undefined }),
+    );
+    expect(firstDestroy).toHaveBeenCalledTimes(1);
+    expect(firstBindToGeoman).toHaveBeenCalledTimes(1);
+    expect(secondBindToGeoman).toHaveBeenCalledWith({
+      geoman,
+      resolveDecorators,
+      syncOnRender: true,
+    });
+  });
+
   it('syncs caller-provided features without binding to Geoman events', () => {
     const updateFromFeatures = vi.fn();
     const bindToGeoman = vi.fn();

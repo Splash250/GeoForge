@@ -4,6 +4,11 @@ import type { Geoman } from '@/main.ts';
 import type { FeatureSourceName } from '@/types/features.ts';
 import { LineDecoratorManager, type LineDecoratorManagerOptions } from './lineDecoratorManager.ts';
 import type { LineDecoratorLayerPosition } from './layerPosition.ts';
+import {
+  GeomanLineDecoratorAuthoringSession,
+  type LineDecoratorAuthoringSession,
+  type LineDecoratorAuthoringSessionOptions,
+} from './lineDecoratorAuthoringSession.ts';
 import type { LineDecoratorOptions } from './types.ts';
 
 export type GeomanLineDecoratorSubsystemOptions = {
@@ -30,6 +35,7 @@ export class GeomanLineDecoratorSubsystem {
   private manualSyncOptions: GeomanLineDecoratorManualSyncOptions = {};
   private geomanSyncStarted = false;
   private managerLayerPosition: LineDecoratorLayerPosition | undefined;
+  private activeAuthoringSession: object | null = null;
 
   constructor(private readonly subsystemOptions: GeomanLineDecoratorSubsystemOptions) {}
 
@@ -53,8 +59,9 @@ export class GeomanLineDecoratorSubsystem {
   }
 
   configure(options: GeomanLineDecoratorConfigureOptions) {
+    const hasLayerPositionOption = Object.prototype.hasOwnProperty.call(options, 'layerPosition');
     const layerPositionChanged =
-      options.layerPosition !== undefined && options.layerPosition !== this.options.layerPosition;
+      hasLayerPositionOption && options.layerPosition !== this.options.layerPosition;
 
     this.options = {
       ...this.options,
@@ -95,6 +102,34 @@ export class GeomanLineDecoratorSubsystem {
     this.syncFromFeatures(features, this.manualSyncOptions.resolveDecorators);
   }
 
+  createAuthoringSession(
+    options: LineDecoratorAuthoringSessionOptions,
+  ): LineDecoratorAuthoringSession {
+    if (this.activeAuthoringSession) {
+      throw new Error('A line decorator authoring session is already active.');
+    }
+
+    const sessionToken = {};
+    this.activeAuthoringSession = sessionToken;
+
+    return new GeomanLineDecoratorAuthoringSession({
+      geoman: this.subsystemOptions.geoman,
+      getMap: this.subsystemOptions.getMap,
+      options,
+      syncFromFeatures: (features, resolveDecorators, layerPosition) => {
+        this.configure({ layerPosition });
+        this.syncFromFeatures(features, resolveDecorators);
+      },
+      clear: () => this.clear(),
+      isActive: () => this.activeAuthoringSession === sessionToken,
+      release: () => {
+        if (this.activeAuthoringSession === sessionToken) {
+          this.activeAuthoringSession = null;
+        }
+      },
+    });
+  }
+
   clear() {
     this.manager?.clear();
   }
@@ -104,6 +139,7 @@ export class GeomanLineDecoratorSubsystem {
     this.manager = null;
     this.geomanSyncStarted = false;
     this.managerLayerPosition = undefined;
+    this.activeAuthoringSession = null;
   }
 
   private createManager() {

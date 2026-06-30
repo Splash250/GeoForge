@@ -110,39 +110,42 @@ export type AdvancedDecoratorState = {
   customSymbolImages?: Record<string, { svg: string }>;
 };
 
-export type AdvancedDecoratorSyncTarget = {
-  decorators: {
-    lines: {
-      configure: (options: { layerPosition: AdvancedDecoratorLayerPosition }) => void;
-      syncFromFeatures: (
-        features: GeoJsonImportFeature[],
-        resolveDecorators: (feature: GeoJsonImportFeature) => LineDecoratorOptions[],
-      ) => void;
-    };
-  };
+export type AdvancedDecoratorAuthoringTarget = {
+  setDecorators: (decorators: LineDecoratorOptions[]) => void;
+  setLayerPosition: (layerPosition: AdvancedDecoratorLayerPosition) => void;
+  setLineStyle: (style: AdvancedLineStyleState) => void;
+  sync: () => void;
 };
 
 export type SyncAdvancedDecoratorsOptions = {
-  geoForge: AdvancedDecoratorSyncTarget;
+  authoring: AdvancedDecoratorAuthoringTarget;
   state: AdvancedDecoratorState;
-  features: GeoJsonImportFeature[];
 };
 
-export type AdvancedLineStyleFeatureTarget = {
-  updateProperties: (
-    properties: Pick<
-      AdvancedDecoratorLineFeature['properties'],
-      'lineColor' | 'lineWidth' | 'lineOpacity'
-    >,
-  ) => void;
-};
-
-export type AdvancedCustomSvgImageTarget<TImage = unknown> = {
+export type AdvancedCustomSvgMapImageTarget<TImage = unknown> = {
   hasImage: (id: string) => boolean;
   addImage: (id: string, image: TImage) => void;
   removeImage?: (id: string) => void;
   updateImage?: (id: string, image: TImage) => void;
 };
+
+export type AdvancedSvgSymbolImageRegistrationResult =
+  | { ok: true; id: string; action: 'added' | 'updated' }
+  | { ok: false; id: string; reason: string; error: Error };
+
+export type AdvancedCustomSvgAuthoringImageTarget<TImage = unknown> = {
+  registerSvgSymbolImage: (registration: {
+    id: string;
+    svg: string;
+    loadImage: (svg: string) => Promise<TImage>;
+    isCurrent?: () => boolean;
+  }) => Promise<AdvancedSvgSymbolImageRegistrationResult>;
+  unregisterSvgSymbolImage: (id: string) => void;
+};
+
+export type AdvancedCustomSvgImageTarget<TImage = unknown> =
+  | AdvancedCustomSvgMapImageTarget<TImage>
+  | AdvancedCustomSvgAuthoringImageTarget<TImage>;
 
 export type AdvancedSvgImageLoader<TImage = unknown> = (svg: string) => Promise<TImage>;
 
@@ -277,18 +280,54 @@ export function getAdvancedDecoratorLineFeature(
 export function getAdvancedDecoratorCode(state: AdvancedDecoratorState): string {
   const lineFeatureJson = JSON.stringify(getAdvancedDecoratorLineFeature(state), null, 2);
   const layerPositionJson = JSON.stringify(state.layerPosition);
+  const lineStyleJson = JSON.stringify(state.lineStyle, null, 2);
+  const customSymbolRegistrations = getAdvancedCustomSymbolImageSources(state).filter(
+    (source): source is AdvancedCustomSymbolImageSource & { svg: string } => Boolean(source.svg),
+  );
+  const customSymbolRegistrationCode = customSymbolRegistrations.length
+    ? `
+
+const svgToImage = async (svg) => {
+  const image = new Image(32, 32);
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  try {
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('Unable to load SVG image'));
+      image.src = url;
+    });
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+${customSymbolRegistrations
+  .map(
+    (source) => `await authoring.registerSvgSymbolImage({
+  id: ${JSON.stringify(source.id)},
+  svg: ${JSON.stringify(source.svg)},
+  loadImage: svgToImage,
+});`,
+  )
+  .join('\n')}`
+    : '';
 
   return `const lineFeature = ${lineFeatureJson};
 const importResult = geoForge.features.importGeoJson(lineFeature, {
   overwrite: true,
   history: false,
 });
-const features = importResult.addedFeatures.map((featureData) => featureData.getGeoJson());
+const authoring = geoForge.decorators.lines.createAuthoringSession({
+  features: importResult.addedFeatures,
+  layerPosition: ${layerPositionJson},
+  decorators: lineFeature.properties.decorators,
+});${customSymbolRegistrationCode}
 
-geoForge.decorators.lines.configure({ layerPosition: ${layerPositionJson} });
-geoForge.decorators.lines.syncFromFeatures(features, (feature) =>
-  Array.isArray(feature.properties?.decorators) ? feature.properties.decorators : []
-);`;
+authoring.setLineStyle(${lineStyleJson});
+authoring.sync();
+
+// Later, when the editor is closed:
+// authoring.dispose();`;
 }
 
 export function addAdvancedDecorator(
@@ -332,28 +371,11 @@ export function clearAdvancedDecorators(state: AdvancedDecoratorState): Advanced
   };
 }
 
-export function applyAdvancedLineStyleToFeatures(
-  features: AdvancedLineStyleFeatureTarget[],
-  state: AdvancedDecoratorState,
-): void {
-  const properties = {
-    lineColor: state.lineStyle.color,
-    lineWidth: state.lineStyle.width,
-    lineOpacity: state.lineStyle.opacity,
-  };
-
-  features.forEach((feature) => {
-    feature.updateProperties(properties);
-  });
-}
-
-export function syncAdvancedDecorators({
-  geoForge,
-  state,
-  features,
-}: SyncAdvancedDecoratorsOptions): void {
-  geoForge.decorators.lines.configure({ layerPosition: state.layerPosition });
-  geoForge.decorators.lines.syncFromFeatures(features, () => getAdvancedDecorators(state));
+export function syncAdvancedDecorators({ authoring, state }: SyncAdvancedDecoratorsOptions): void {
+  authoring.setLayerPosition(state.layerPosition);
+  authoring.setLineStyle(state.lineStyle);
+  authoring.setDecorators(getAdvancedDecorators(state));
+  authoring.sync();
 }
 
 export function getAdvancedDecoratorRenderState(
@@ -403,7 +425,9 @@ export function createAdvancedCustomSvgImageManager<TImage>(
     map: AdvancedCustomSvgImageTarget<TImage>,
     imageId: string,
   ): void {
-    if (map.hasImage(imageId) && map.removeImage) {
+    if (isAuthoringImageTarget(map)) {
+      map.unregisterSvgSymbolImage(imageId);
+    } else if (map.hasImage(imageId) && map.removeImage) {
       map.removeImage(imageId);
     }
 
@@ -444,38 +468,27 @@ export function createAdvancedCustomSvgImageManager<TImage>(
           continue;
         }
 
-        if (registeredSvgs.get(source.id) === source.svg && map.hasImage(source.id)) {
+        if (registeredSvgs.get(source.id) === source.svg && imageTargetHasImage(map, source.id)) {
           readyImageIds.push(source.id);
           continue;
         }
 
-        let image: TImage;
-        try {
-          image = await loadImage(source.svg);
-        } catch (error) {
+        const registration = await registerAdvancedSvgImage(
+          map,
+          { ...source, svg: source.svg },
+          loadImage,
+          options,
+        );
+
+        if (!registration.ok) {
           if (isCurrent(options)) {
             removeRegisteredImageById(map, source.id);
             if (source.throwOnFailure) {
-              pendingError = error;
+              pendingError = registration.error;
             }
           }
 
           continue;
-        }
-
-        if (!isCurrent(options)) {
-          continue;
-        }
-
-        if (map.hasImage(source.id)) {
-          if (map.updateImage) {
-            map.updateImage(source.id, image);
-          } else if (map.removeImage) {
-            map.removeImage(source.id);
-            map.addImage(source.id, image);
-          }
-        } else {
-          map.addImage(source.id, image);
         }
 
         registeredSvgs.set(source.id, source.svg);
@@ -496,6 +509,69 @@ export function createAdvancedCustomSvgImageManager<TImage>(
       removeRegisteredImage(map);
     },
   };
+}
+
+type AdvancedCustomSvgRegistrationResult = { ok: true } | { ok: false; error: Error };
+
+async function registerAdvancedSvgImage<TImage>(
+  target: AdvancedCustomSvgImageTarget<TImage>,
+  source: AdvancedCustomSymbolImageSource & { svg: string },
+  loadImage: AdvancedSvgImageLoader<TImage>,
+  options: AdvancedCustomSvgEnsureOptions,
+): Promise<AdvancedCustomSvgRegistrationResult> {
+  if (isAuthoringImageTarget(target)) {
+    const result = await target.registerSvgSymbolImage({
+      id: source.id,
+      svg: source.svg,
+      loadImage,
+      isCurrent: options.isCurrent,
+    });
+
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  }
+
+  let image: TImage;
+  try {
+    image = await loadImage(source.svg);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error : new Error('Unable to load custom SVG image.'),
+    };
+  }
+
+  if (options.isCurrent && !options.isCurrent()) {
+    return { ok: false, error: new Error('Custom SVG registration is stale.') };
+  }
+
+  if (target.hasImage(source.id)) {
+    if (target.removeImage) {
+      target.removeImage(source.id);
+      target.addImage(source.id, image);
+    } else if (target.updateImage) {
+      target.updateImage(source.id, image);
+    }
+  } else {
+    target.addImage(source.id, image);
+  }
+
+  return { ok: true };
+}
+
+function imageTargetHasImage<TImage>(
+  target: AdvancedCustomSvgImageTarget<TImage>,
+  imageId: string,
+): boolean {
+  return isAuthoringImageTarget(target) || target.hasImage(imageId);
+}
+
+function isAuthoringImageTarget<TImage>(
+  target: AdvancedCustomSvgImageTarget<TImage>,
+): target is AdvancedCustomSvgAuthoringImageTarget<TImage> {
+  return (
+    typeof (target as AdvancedCustomSvgAuthoringImageTarget<TImage>).registerSvgSymbolImage ===
+    'function'
+  );
 }
 
 function getAdvancedDecorators(state: AdvancedDecoratorState): LineDecoratorOptions[] {
@@ -911,5 +987,19 @@ function validateSvgMarkupWithoutDomParser(svg: string): AdvancedSvgValidationRe
 }
 
 function cloneLineDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
-  return JSON.parse(JSON.stringify(decorator)) as LineDecoratorOptions;
+  return cloneDecoratorValue(decorator) as LineDecoratorOptions;
+}
+
+function cloneDecoratorValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(cloneDecoratorValue);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [key, cloneDecoratorValue(entryValue)]),
+    );
+  }
+
+  return value;
 }
