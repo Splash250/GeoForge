@@ -523,7 +523,7 @@ Severity: Low
 
 Status: Implemented.
 
-The shell around the map is functional: the sidebar filters and selects demos, reset re-runs setup, the inspector renders demo-specific controls, and export copies the active snippet. `Docs`, `Examples`, and `GitHub` now resolve to real references: docs paths open as app/browser URLs, examples opens the Demo Studio source directory on GitHub, and GitHub opens the active demo source when `sourcePath` or `githubUrl` metadata is available, falling back to the repository root.
+The shell around the map is functional: the sidebar filters and selects demos, reset re-runs setup, the inspector renders demo-specific controls, and export copies the active snippet. `Docs`, `Examples`, and `GitHub` now resolve to real references: local docs metadata opens the matching GitHub markdown file, safe external docs URLs are allowed, examples opens the Demo Studio source directory on GitHub, and GitHub opens the active demo source when `sourcePath` or safe `githubUrl` metadata is available, falling back to the repository root.
 
 References:
 
@@ -550,7 +550,7 @@ type DemoDefinition = {
 };
 
 // Demo shell behavior:
-open(resolveDemoDocsUrl(demo));
+open(resolveDemoDocsUrl(demo)); // /docs/foo -> GitHub docs/foo.md
 open(resolveDemoSourceUrl(demo) ?? GEOFORGE_REPOSITORY_URL);
 open(resolveExamplesSourceUrl());
 copySnippet(activeDemo.code());

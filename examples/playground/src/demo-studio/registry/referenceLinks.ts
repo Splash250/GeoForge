@@ -22,17 +22,27 @@ export function resolveDemoDocsUrl(demo: Pick<RegisteredDemoDefinition, 'docsPat
     return null;
   }
 
-  if (isAbsoluteUrl(docsPath)) {
-    return docsPath;
+  const safeAbsoluteUrl = parseSafeAbsoluteUrl(docsPath);
+
+  if (safeAbsoluteUrl) {
+    return safeAbsoluteUrl;
   }
 
-  return docsPath.startsWith('/') ? docsPath : `/${docsPath}`;
+  if (isUnsafeAbsoluteOrProtocolRelativeUrl(docsPath)) {
+    return null;
+  }
+
+  return resolveGithubBlobUrl({
+    repositoryUrl: GEOFORGE_REPOSITORY_URL,
+    sourcePath: resolveDocsSourcePath(docsPath),
+    branch: GEOFORGE_DEFAULT_BRANCH,
+  });
 }
 
 export function resolveDemoSourceUrl(
   demo: Pick<RegisteredDemoDefinition, 'githubUrl' | 'sourcePath'>,
 ) {
-  const explicitGithubUrl = demo.githubUrl?.trim();
+  const explicitGithubUrl = demo.githubUrl ? parseSafeAbsoluteUrl(demo.githubUrl) : null;
 
   if (explicitGithubUrl) {
     return explicitGithubUrl;
@@ -64,7 +74,7 @@ export function resolveGithubBlobUrl({
 }
 
 export function openReferenceUrl(url: string | null | undefined, options: OpenReferenceOptions = {}) {
-  const normalizedUrl = url?.trim();
+  const normalizedUrl = url ? parseSafeAbsoluteUrl(url) : null;
 
   if (!normalizedUrl) {
     return false;
@@ -84,11 +94,26 @@ function normalizeRepositoryUrl(repositoryUrl: string) {
   return repositoryUrl.trim().replace(/\/+$/, '').replace(/\.git$/, '');
 }
 
-function isAbsoluteUrl(value: string) {
+function resolveDocsSourcePath(docsPath: string) {
+  const normalizedPath = docsPath
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/^docs\/?/, 'docs/')
+    .replace(/\.md$/, '');
+
+  return `${normalizedPath}.md`;
+}
+
+function parseSafeAbsoluteUrl(value: string) {
   try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    const normalizedValue = value.trim();
+    const url = new URL(normalizedValue);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? normalizedValue : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isUnsafeAbsoluteOrProtocolRelativeUrl(value: string) {
+  return value.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(value);
 }
