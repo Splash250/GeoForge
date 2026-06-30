@@ -42,6 +42,7 @@ export const overlayDemos: DemoDefinition[] = [
     title: 'HTML iframe overlay',
     description: 'Add and update iframe-backed HTML content inside a projected map rectangle.',
     docsPath: '/docs/html-overlays',
+    sourcePath: 'examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts',
     code: () => buildOverlaySnippet(createInitialState()),
     inspector: OverlayInspector,
     setup: (context) => {
@@ -116,6 +117,7 @@ export const overlayDemos: DemoDefinition[] = [
     title: 'Overlay pointer modes',
     description: 'Compare selected, always-on, and disabled iframe pointer handling.',
     docsPath: '/docs/html-overlays',
+    sourcePath: 'examples/playground/src/demo-studio/demos/overlays/overlayDemos.ts',
     code: () => buildPointerModesSnippet(createInitialPointerState()),
     inspector: OverlayPointerInspector,
     setup: (context) => {

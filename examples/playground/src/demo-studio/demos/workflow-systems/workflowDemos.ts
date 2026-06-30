@@ -50,6 +50,7 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
     title: 'Transactions',
     description: 'Preview feature property edits, commit or cancel them, and step through history.',
     docsPath: '/docs/context-panels',
+    sourcePath: 'examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts',
     code: () => buildWorkflowSnippet(),
     inspector: WorkflowInspector,
     setup: (context) => {

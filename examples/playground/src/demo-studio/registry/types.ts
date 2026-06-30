@@ -32,6 +32,8 @@ export type DemoDefinition<TInspectorProps extends object = Record<string, unkno
   title: string;
   description: string;
   docsPath: string;
+  sourcePath?: string;
+  githubUrl?: string;
   code: () => string;
   inspector: Component<TInspectorProps>;
   setup: (context: DemoContext) => DemoSetupResult | Promise<DemoSetupResult>;

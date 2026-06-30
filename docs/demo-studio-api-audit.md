@@ -41,7 +41,7 @@ These would reduce repeated consumer code, hide internal implementation details,
 | HTML overlays        | Add iframe-backed overlays and pointer modes                                                      | `overlays.html.upsert(...)`, `setSelected(...)`, `destroy()`                                                                                                       | Strong API; app still owns map camera/pointer test orchestration      |
 | Geometry topology    | Import network, build graph, validate topology, enable endpoint snapping                          | `geometry.getLineNetworkGraph(...)`, `validateLineNetworkTopology(...)`, `geometry.endpointSnapping.configure(...)`                                                | Strong public geometry API                                            |
 | Workflow systems     | Single-feature edit, transaction preview/commit/cancel, history undo/redo                         | `enableSingleFeatureEditMode(...)`, `selection.selectFeature(...)`, `transactions.start(...)`, `history.*`                                                         | Powerful but too manual for common production forms                   |
-| Studio shell         | Search demos, select demos, reset, copy docs path, show example count, copy snippets, show toasts | `DemoSidebar.svelte`, `DemoTopToolbar.svelte`, `InspectorPanel.svelte`, local handlers in `DemoStudioApp.svelte`                                                   | Useful demo wrapper; docs/GitHub actions are placeholders             |
+| Studio shell         | Search demos, select demos, reset, open docs/source references, copy snippets, show toasts        | `DemoSidebar.svelte`, `DemoTopToolbar.svelte`, `InspectorPanel.svelte`, reference helpers and local handlers in `DemoStudioApp.svelte`                               | Useful demo wrapper; reference links now resolve to real locations    |
 
 ## Findings
 
@@ -517,39 +517,42 @@ Production outcome:
 
 Raster UI components can render directly from package state, and proxy integration has a clear supported contract.
 
-### 13. Studio shell utility actions are still demo placeholders
+### 13. Studio shell utility actions use real reference links
 
 Severity: Low
 
-The shell around the map is functional: the sidebar filters and selects demos, reset re-runs setup, the inspector renders demo-specific controls, and export copies the active snippet. The weaker actions are `Docs`, `Examples`, and `GitHub`: `Docs` copies the docs path instead of navigating, `Examples` displays a registry count, and `GitHub` always reports that no repository URL is available.
+Status: Implemented.
+
+The shell around the map is functional: the sidebar filters and selects demos, reset re-runs setup, the inspector renders demo-specific controls, and export copies the active snippet. `Docs`, `Examples`, and `GitHub` now resolve to real references: local docs metadata opens the matching GitHub markdown file, safe external docs URLs are allowed, examples opens the Demo Studio source directory on GitHub, and GitHub opens the active demo source when `sourcePath` or safe `githubUrl` metadata is available, falling back to the repository root.
 
 References:
 
 - `examples/playground/src/demo-studio/DemoSidebar.svelte:20`
 - `examples/playground/src/demo-studio/DemoTopToolbar.svelte:28`
 - `examples/playground/src/demo-studio/InspectorPanel.svelte:27`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:349`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:359`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:370`
-- `examples/playground/src/demo-studio/DemoStudioApp.svelte:378`
+- `examples/playground/src/demo-studio/registry/types.ts`
+- `examples/playground/src/demo-studio/registry/referenceLinks.ts`
+- `examples/playground/src/demo-studio/DemoStudioApp.svelte`
+- `examples/playground/src/demo-studio/demos/**`
+- `tests/playground/demoStudioReferenceLinks.test.ts`
 
 Why this matters:
 
 This is not a blocker for the package API, but it affects Demo Studio's value as a production-grade reference. A reference app should send users to the real docs and source locations rather than making them copy paths or see placeholder messages.
 
-Recommended solution:
+Implemented solution:
 
 ```ts
 type DemoDefinition = {
   docsPath: string;
   sourcePath?: string;
   githubUrl?: string;
-  exampleUrl?: string;
 };
 
 // Demo shell behavior:
-open(demo.docsPath);
-open(demo.githubUrl ?? packageRepositoryUrlFor(demo.sourcePath));
+open(resolveDemoDocsUrl(demo)); // /docs/foo -> GitHub docs/foo.md
+open(resolveDemoSourceUrl(demo) ?? GEOFORGE_REPOSITORY_URL);
+open(resolveExamplesSourceUrl());
 copySnippet(activeDemo.code());
 ```
 
@@ -573,7 +576,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 | Raster state mirroring         | Implemented: add raster-layer subscription and proxy helper                  | Raster panel can render from subsystem notifications and configure proxy behavior declaratively                                   | Baking a demo-specific proxy path into core defaults                           |
 | Decorator authoring complexity | Add optional authoring session/helper layer                                  | Interactive authoring can register symbols, apply line styles, sync decorators, and dispose cleanly                               | Moving all authoring state into the renderer core                              |
 | Overlay add/update ambiguity   | Implemented: add explicit `upsert`; keep `add` as legacy upsert alias        | Consumer code can choose patch update or intentional full-definition upsert                                                       | Silent behavior that differs from method names                                 |
-| Placeholder shell actions      | Add source/docs URLs to demo metadata                                        | Docs and GitHub buttons navigate to real references; export still copies snippets                                                 | Treating placeholder shell actions as GeoForge API problems                    |
+| Placeholder shell actions      | Implemented: add source/docs URLs to demo metadata                           | Docs, Examples, and GitHub buttons navigate to real references; export still copies snippets                                      | Treating placeholder shell actions as GeoForge API problems                    |
 
 ## API Design Guardrails
 

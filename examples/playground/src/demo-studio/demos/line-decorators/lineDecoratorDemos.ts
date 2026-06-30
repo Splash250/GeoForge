@@ -52,6 +52,7 @@ export const lineDecoratorDemos: DemoDefinition[] = [
     title: 'Arrowheads',
     description: 'Tune live route decorator controls against an imported GeoForge route.',
     docsPath: '/docs/decorators',
+    sourcePath: 'examples/playground/src/demo-studio/demos/line-decorators/lineDecoratorDemos.ts',
     code: () => buildLineDecoratorSnippet(createInitialState()),
     inspector: LineDecoratorsInspector,
     setup: async (context) => {
@@ -149,6 +150,7 @@ export const lineDecoratorDemos: DemoDefinition[] = [
     description:
       'Author symbol, text, and arrowhead decorators with placement and animation controls.',
     docsPath: '/docs/decorators',
+    sourcePath: 'examples/playground/src/demo-studio/demos/line-decorators/lineDecoratorDemos.ts',
     code: () => getAdvancedDecoratorCode(createAdvancedDecoratorState()),
     inspector: AdvancedDecoratorInspector,
     setup: async (context) => {
