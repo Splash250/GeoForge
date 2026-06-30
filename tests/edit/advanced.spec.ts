@@ -28,7 +28,7 @@ test.describe('Edit Mode - Advanced Scenarios', () => {
     await configurePageTimeouts(page);
     await page.goto('/');
     await waitForGeoman(page);
-    await expect(page).toHaveTitle('Geoman plugin');
+    await expect(page).toHaveTitle('GeoForge Dev Harness');
 
     const geoJsonFeatures = await loadGeoJson('one-shape-of-each-type');
     expect(geoJsonFeatures).not.toBeNull();

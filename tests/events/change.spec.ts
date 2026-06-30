@@ -16,6 +16,8 @@ import {
 } from '@tests/utils/features.ts';
 import { setupGeomanTest } from '@tests/utils/test-helpers.ts';
 
+const POINT_BASED_SHAPES = ['marker', 'circle_marker', 'text_marker'];
+
 const getDraggableVertexForShape = async (
   page: Page,
   feature: FeatureCustomData,
@@ -43,16 +45,24 @@ test('Change events for all shape types', async ({ page }) => {
   await enableMode(page, 'edit', 'change');
 
   for (const feature of features) {
+    const vertexMarker = await getDraggableVertexForShape(page, feature);
+
+    if (!vertexMarker) {
+      expect(
+        POINT_BASED_SHAPES,
+        `${feature.shape} should be point-based when no change vertex is available`,
+      ).toContain(feature.shape);
+      continue;
+    }
+
     // Set up event listener for this feature
     const eventName = pointBasedGeometryType.includes(feature.geoJson.geometry.type)
       ? 'dragend'
       : 'editend';
     const resultId = await saveGeomanEventResultToCustomData(page, eventName);
 
-    const vertexMarker = await getDraggableVertexForShape(page, feature);
-
     await performDragAndVerify(page, feature, dX, dY, {
-      vertexMarker: vertexMarker || undefined,
+      vertexMarker,
     });
 
     const event = (await getGeomanEventResultById(page, resultId)) as

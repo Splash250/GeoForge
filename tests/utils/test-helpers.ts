@@ -56,7 +56,7 @@ export const setupGeomanTest = async (
 ) => {
   await page.goto('/');
   await waitForGeoman(page);
-  await expect(page).toHaveTitle('Geoman plugin');
+  await expect(page).toHaveTitle('GeoForge Dev Harness');
 
   // Optionally load fixtures
   if (options.loadFixture) {

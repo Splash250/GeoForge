@@ -39,7 +39,7 @@ test.describe('Draw Mode - Advanced Scenarios', () => {
     page = p;
     await page.goto('/');
     await waitForGeoman(page);
-    await expect(page).toHaveTitle('Geoman plugin');
+    await expect(page).toHaveTitle('GeoForge Dev Harness');
   });
 
   test.describe('Draw mode cancellation', () => {

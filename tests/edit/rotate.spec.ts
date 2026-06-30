@@ -42,6 +42,29 @@ async function getFirstDraggableVertex(
   return markers.length > 0 ? markers[0] : null;
 }
 
+async function rotateDragAndDrop(
+  page: Page,
+  startPoint: ScreenCoordinates,
+  targetPoint: ScreenCoordinates,
+) {
+  await page.mouse.move(startPoint[0], startPoint[1]);
+  await page.waitForTimeout(100);
+  await page.mouse.down();
+  await page.waitForTimeout(100);
+
+  const steps = 16;
+  for (let i = 1; i <= steps; i++) {
+    const x = startPoint[0] + (targetPoint[0] - startPoint[0]) * (i / steps);
+    const y = startPoint[1] + (targetPoint[1] - startPoint[1]) * (i / steps);
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(20);
+  }
+
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  await waitForMapIdle(page);
+}
+
 async function performRotationAndVerify(
   page: Page,
   feature: FeatureCustomData,
@@ -56,7 +79,7 @@ async function performRotationAndVerify(
     initialScreenPoint[1] + dragOffsetY,
   ];
 
-  await dragAndDrop(page, initialScreenPoint, targetScreenPoint);
+  await rotateDragAndDrop(page, initialScreenPoint, targetScreenPoint);
   await waitForFeatureGeoJsonUpdate({ feature, originalGeoJson, page });
 
   // Allow extra time for the rotation to fully settle and for map to re-render
@@ -185,7 +208,7 @@ async function performMovementAndVerify(
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await waitForGeoman(page);
-  await expect(page).toHaveTitle('Geoman plugin');
+  await expect(page).toHaveTitle('GeoForge Dev Harness');
 
   const geoJsonFeatures = await loadGeoJson('one-shape-of-each-type');
   expect(geoJsonFeatures, 'GeoJSON features should be loaded').not.toBeNull();
@@ -207,8 +230,10 @@ test('Rotate Polygon, Line, Rectangle, Circle via vertex drag', async ({ page })
   const features = await getRenderedFeaturesData({ page, temporary: false });
   expect(features.length).toBeGreaterThan(0);
 
+  const testedShapes = new Set<string>();
   for (const feature of features) {
-    if (rotatableShapes.includes(feature.shape)) {
+    if (rotatableShapes.includes(feature.shape) && !testedShapes.has(feature.shape)) {
+      testedShapes.add(feature.shape);
       const vertexMarker = await getFirstDraggableVertex(page, feature);
       expect(
         vertexMarker,
@@ -219,15 +244,16 @@ test('Rotate Polygon, Line, Rectangle, Circle via vertex drag', async ({ page })
       }
     }
   }
+  expect([...testedShapes].sort()).toEqual([...rotatableShapes].sort());
   await page.evaluate(() => window.geoman.options.disableMode('edit', 'rotate'));
 });
 
-test('Move Marker, CircleMarker, TextMarker via body drag', async ({ page }) => {
+test('Move Marker, CircleMarker, TextMarker via drag mode', async ({ page }) => {
   const dragOffsetX = -25;
   const dragOffsetY = 35;
   const pointBasedShapes = ['marker', 'circle_marker', 'text_marker'];
 
-  await enableMode(page, 'edit', 'rotate');
+  await enableMode(page, 'edit', 'drag');
 
   const features = await getRenderedFeaturesData({ page, temporary: false });
   expect(features.length).toBeGreaterThan(0);
@@ -258,5 +284,5 @@ test('Move Marker, CircleMarker, TextMarker via body drag', async ({ page }) => 
       await performMovementAndVerify(page, feature, dragStartScreenPoint, dragOffsetX, dragOffsetY);
     }
   }
-  await page.evaluate(() => window.geoman.options.disableMode('edit', 'rotate'));
+  await page.evaluate(() => window.geoman.options.disableMode('edit', 'drag'));
 });

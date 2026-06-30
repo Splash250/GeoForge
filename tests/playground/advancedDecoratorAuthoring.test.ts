@@ -1079,7 +1079,10 @@ describe('advanced decorator authoring helpers', () => {
       customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
       customSvgCss: '.mark { fill: red; }',
     };
-    const savedState = addAdvancedDecorator(validState, buildDecoratorFromAdvancedState(validState));
+    const savedState = addAdvancedDecorator(
+      validState,
+      buildDecoratorFromAdvancedState(validState),
+    );
     const invalidDraftState: AdvancedDecoratorState = {
       ...savedState,
       customSvg: '<span>not svg</span>',
@@ -1134,7 +1137,10 @@ describe('advanced decorator authoring helpers', () => {
       customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
       customSvgCss: '.mark { fill: red; }',
     };
-    const savedState = addAdvancedDecorator(validState, buildDecoratorFromAdvancedState(validState));
+    const savedState = addAdvancedDecorator(
+      validState,
+      buildDecoratorFromAdvancedState(validState),
+    );
     const failingDraftState: AdvancedDecoratorState = {
       ...savedState,
       customSvgCss: '.mark { fill: blue; }',
@@ -1186,7 +1192,10 @@ describe('advanced decorator authoring helpers', () => {
       customSvg: '<svg xmlns="http://www.w3.org/2000/svg"><path class="mark"/></svg>',
       customSvgCss: '.mark { fill: red; }',
     };
-    const savedState = addAdvancedDecorator(customState, buildDecoratorFromAdvancedState(customState));
+    const savedState = addAdvancedDecorator(
+      customState,
+      buildDecoratorFromAdvancedState(customState),
+    );
     const removedState: AdvancedDecoratorState = {
       ...removeAdvancedDecorator(savedState, 0),
       kind: 'text',

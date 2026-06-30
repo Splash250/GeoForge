@@ -6,7 +6,7 @@ import { loadGeoJson } from '@tests/utils/fixtures.ts';
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await waitForGeoman(page);
-  await expect(page).toHaveTitle('Geoman plugin');
+  await expect(page).toHaveTitle('GeoForge Dev Harness');
 
   const geoJsonFeatures = await loadGeoJson('common-shapes');
   expect(geoJsonFeatures).not.toBeNull();

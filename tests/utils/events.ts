@@ -18,6 +18,7 @@ export const saveGeomanEventResultToCustomData = async (
       if (!window.customData) {
         window.customData = { rawEventResults: {} };
       }
+      window.customData.rawEventResults = window.customData.rawEventResults || {};
 
       window.geoman.mapAdapter.once(
         `${context.gmPrefix}:${context.eventName}` as AnyEventName,

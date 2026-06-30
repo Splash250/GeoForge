@@ -23,9 +23,12 @@ type LineFeatureDouble = {
   };
 };
 
-vi.mock('../../examples/playground/src/demo-studio/demos/geometry-tools/GeometryInspector.svelte', () => ({
-  default: {},
-}));
+vi.mock(
+  '../../examples/playground/src/demo-studio/demos/geometry-tools/GeometryInspector.svelte',
+  () => ({
+    default: {},
+  }),
+);
 
 function createLineFeature(id: string, coordinates: number[][]): LineFeatureDouble {
   return {
@@ -47,9 +50,8 @@ function createLineFeature(id: string, coordinates: number[][]): LineFeatureDoub
 
 describe('geometryDemos', () => {
   test('recomputes network topology after live geometry mutation events', async () => {
-    const { geometryDemos } = await import(
-      '../../examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts'
-    );
+    const { geometryDemos } =
+      await import('../../examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts');
     const lineA = createLineFeature('geometry-network-a', [
       [0, 0],
       [1, 0],
@@ -73,7 +75,9 @@ describe('geometryDemos', () => {
           },
         },
         features: {
-          get: vi.fn((_sourceName: string, featureId: string) => featureStore.get(featureId) ?? null),
+          get: vi.fn(
+            (_sourceName: string, featureId: string) => featureStore.get(featureId) ?? null,
+          ),
           importGeoJson: vi.fn(() => ({
             stats: { total: 2, success: 2, failed: 0, overwritten: 0 },
             addedFeatures: [lineA, lineB],

@@ -691,9 +691,7 @@ function getGlobalFetch(): NonNullable<DiscoverRasterLayersOptions['fetchFn']> {
 }
 
 function getDirectChildText(element: Element | undefined, childName: string): string {
-  const child = element
-    ? findDirectChildrenByLocalName(element, childName)[0]
-    : undefined;
+  const child = element ? findDirectChildrenByLocalName(element, childName)[0] : undefined;
   return child?.textContent?.trim() ?? '';
 }
 

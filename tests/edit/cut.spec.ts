@@ -137,7 +137,7 @@ test.describe('Geoman "edit:cut" mode - fixture based', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await waitForGeoman(page);
-    await expect(page).toHaveTitle('Geoman plugin');
+    await expect(page).toHaveTitle('GeoForge Dev Harness');
 
     const initialGeoJson = await loadGeoJson('simple-cut/initial-features');
     expect(initialGeoJson, 'Initial features should be loaded').not.toBeNull();

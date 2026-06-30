@@ -52,11 +52,7 @@ export async function createGeoForgeSsrServer(options: {
       __GEOMAN_VERSION__: JSON.stringify('free'),
     },
     logLevel: 'error',
-    plugins: [
-      createLayerStyleStubPlugin(options),
-      ...(options.extraPlugins ?? []),
-      svelte(),
-    ],
+    plugins: [createLayerStyleStubPlugin(options), ...(options.extraPlugins ?? []), svelte()],
     resolve: {
       alias: {
         '@': path.join(packageRoot, 'src'),

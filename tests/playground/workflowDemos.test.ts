@@ -11,15 +11,17 @@ type WorkflowInspectorProps = {
   onUndo: () => void;
 };
 
-vi.mock('../../examples/playground/src/demo-studio/demos/workflow-systems/WorkflowInspector.svelte', () => ({
-  default: {},
-}));
+vi.mock(
+  '../../examples/playground/src/demo-studio/demos/workflow-systems/WorkflowInspector.svelte',
+  () => ({
+    default: {},
+  }),
+);
 
 describe('workflowDemos', () => {
   test('enables history undo from the same global history state shown in the inspector', async () => {
-    const { workflowDemos } = await import(
-      '../../examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts'
-    );
+    const { workflowDemos } =
+      await import('../../examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts');
     const selectedFeature = {
       id: 'workflow-network-a',
       shape: 'line',

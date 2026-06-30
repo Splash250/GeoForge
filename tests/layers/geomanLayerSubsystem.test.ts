@@ -504,9 +504,7 @@ describe('raster layer helpers', () => {
       'https://tiles.test/wmts?service=WMTS&request=GetCapabilities',
     );
 
-    expect(layers[0]?.url).toBe(
-      'https://tiles.test/bright/GoogleMapsCompatible/{z}/{y}/{x}.png',
-    );
+    expect(layers[0]?.url).toBe('https://tiles.test/bright/GoogleMapsCompatible/{z}/{y}/{x}.png');
     expect(layers[0]?.url).not.toContain('{Style}');
     expect(layers[0]?.url).not.toContain('{TileMatrixSet}');
   });

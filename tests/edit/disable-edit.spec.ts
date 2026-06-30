@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   await configurePageTimeouts(page);
   await page.goto('/');
   await waitForGeoman(page);
-  await expect(page).toHaveTitle('Geoman plugin');
+  await expect(page).toHaveTitle('GeoForge Dev Harness');
   page.on('console', (msg) => {
     console.log(`[Console ${msg.type()}] ${msg.text()}`);
   });

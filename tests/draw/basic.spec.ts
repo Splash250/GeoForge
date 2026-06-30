@@ -32,7 +32,7 @@ const checkFeatureCreated = async (page: Page, featureType: ShapeName) => {
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await waitForGeoman(page);
-  await expect(page).toHaveTitle('Geoman plugin');
+  await expect(page).toHaveTitle('GeoForge Dev Harness');
 });
 
 test('Draw a marker', async ({ page }) => {
