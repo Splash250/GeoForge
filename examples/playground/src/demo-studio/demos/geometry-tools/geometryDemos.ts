@@ -65,6 +65,7 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
     description:
       'Validate imported line networks for dangling endpoints and disconnected components.',
     docsPath: '/docs/custom-interaction-tools',
+    sourcePath: 'examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts',
     code: () => buildGeometryTopologySnippet(),
     inspector: GeometryInspector,
     setup: (context) => {

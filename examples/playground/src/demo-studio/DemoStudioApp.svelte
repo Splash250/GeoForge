@@ -12,6 +12,13 @@
   import { applyDemoControlProfile } from './map/controlProfiles.ts';
   import { onDemoMapLoad } from './map/onDemoMapLoad.ts';
   import { demoRegistry } from './registry/demoRegistry.ts';
+  import {
+    GEOFORGE_REPOSITORY_URL,
+    openReferenceUrl,
+    resolveDemoDocsUrl,
+    resolveDemoSourceUrl,
+    resolveExamplesSourceUrl,
+  } from './registry/referenceLinks.ts';
   import type { DemoCategory, DemoContext, RegisteredDemoDefinition } from './registry/types.ts';
   import { ToastStack, type Toast } from './ui/index.ts';
   import {
@@ -348,30 +355,60 @@
   }
 
   async function handleOpenDocs() {
+    const docsUrl = resolveDemoDocsUrl(activeDemo);
+
+    if (openReferenceUrl(docsUrl)) {
+      notify({
+        title: 'Docs opened',
+        body: docsUrl ?? activeDemo.docsPath,
+        tone: 'info'
+      });
+      return;
+    }
+
     const copied = await copyText(activeDemo.docsPath);
 
     notify({
-      title: copied ? 'Docs path copied' : 'Docs path',
+      title: copied ? 'Docs path copied' : 'Docs unavailable',
       body: activeDemo.docsPath,
       tone: copied ? 'success' : 'info'
     });
   }
 
   function handleOpenExamples() {
-    const categoryCount = categories.length;
-    const demoCount = categories.reduce((total, category) => total + category.demos.length, 0);
+    const examplesUrl = resolveExamplesSourceUrl();
+
+    if (openReferenceUrl(examplesUrl)) {
+      notify({
+        title: 'Examples source opened',
+        body: examplesUrl,
+        tone: 'info'
+      });
+      return;
+    }
 
     notify({
-      title: 'Examples registered',
-      body: `${categoryCount} categories, ${demoCount} demos. Active: ${activeCategory.title} / ${activeDemo.title}.`,
+      title: 'Examples source',
+      body: examplesUrl,
       tone: 'info'
     });
   }
 
   function handleOpenGithub() {
+    const sourceUrl = resolveDemoSourceUrl(activeDemo) ?? GEOFORGE_REPOSITORY_URL;
+
+    if (openReferenceUrl(sourceUrl)) {
+      notify({
+        title: activeDemo.sourcePath || activeDemo.githubUrl ? 'Source opened' : 'Repository opened',
+        body: sourceUrl,
+        tone: 'info'
+      });
+      return;
+    }
+
     notify({
       title: 'GitHub link unavailable',
-      body: 'No repository URL is declared in package metadata or README.',
+      body: 'No browser window API is available for opening the GeoForge repository.',
       tone: 'info'
     });
   }

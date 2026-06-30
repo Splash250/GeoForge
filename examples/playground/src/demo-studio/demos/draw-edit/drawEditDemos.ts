@@ -47,6 +47,7 @@ export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
     title: 'Shape drawing and edit modes',
     description: 'Activate drawing tools and global edit modes against seeded line features.',
     docsPath: '/docs/modes-handling',
+    sourcePath: 'examples/playground/src/demo-studio/demos/draw-edit/drawEditDemos.ts',
     code: () => buildDrawEditSnippet(),
     inspector: DrawEditInspector,
     setup: (context) => {

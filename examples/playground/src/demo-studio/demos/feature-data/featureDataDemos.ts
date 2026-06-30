@@ -32,6 +32,7 @@ export const featureDataDemos: DemoDefinition<FeatureDataInspectorProps>[] = [
     description:
       'Import a sample GeoJSON network, inspect import stats, and export the live feature store.',
     docsPath: '/docs/importing-geojson',
+    sourcePath: 'examples/playground/src/demo-studio/demos/feature-data/featureDataDemos.ts',
     code: () => buildFeatureDataSnippet(),
     inspector: FeatureDataInspector,
     setup: (context) => {
