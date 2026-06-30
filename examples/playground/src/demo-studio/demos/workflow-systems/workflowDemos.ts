@@ -32,12 +32,6 @@ type WorkflowInspectorProps = {
 };
 
 const transactionId = 'demo-feature-name-edit';
-const workflowMutationEventNames = [
-  'gm:edit',
-  'gm:drag',
-  'gm:historychange',
-  'gm:historyrecord',
-] as const;
 const typedSampleNetworkGeoJson = sampleNetworkGeoJson as GeoJsonImportFeatureCollection;
 const workflowSampleNetworkGeoJson = {
   ...typedSampleNetworkGeoJson,
@@ -69,7 +63,8 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
       let activeTransaction: GeomanTransaction | null = null;
       let importedFeatures: FeatureData[] = [];
       let singleFeatureEditActivated = false;
-      let workflowMutationHandler: (() => void) | null = null;
+      let unsubscribeFeatures: (() => void) | null = null;
+      let unsubscribeHistory: (() => void) | null = null;
       let state: WorkflowDemoState;
 
       const cancelDemoTransaction = () => {
@@ -180,10 +175,13 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           context.setCode(buildWorkflowSnippet());
         };
 
-        const handleWorkflowMutation = () => {
-          updateRuntime('Map edit history updated');
+        const refreshFeatureState = () => {
+          updateRuntime('Feature collection updated');
         };
-        workflowMutationHandler = handleWorkflowMutation;
+
+        const refreshHistoryState = () => {
+          updateRuntime('History state updated');
+        };
 
         const onNameInput = (nextName: string) => {
           if (!isActive()) {
@@ -310,11 +308,14 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
         geoForge.enableSingleFeatureEditMode({ allowedShapes: ['line'] });
         singleFeatureEditActivated = true;
         geoForge.selection.selectFeature(selectedFeature, { reason: 'api' });
-        workflowMutationEventNames.forEach((eventName) => {
-          context.map.on(eventName, handleWorkflowMutation);
-        });
         ensureActiveTransaction();
         state = buildState('Ready for a transaction-backed name edit');
+        unsubscribeFeatures = geoForge.features.subscribe(refreshFeatureState);
+        unsubscribeHistory = geoForge.history.subscribe((_historyState, event) => {
+          if (event.type !== 'initial') {
+            refreshHistoryState();
+          }
+        });
         updateRuntime(state.lastAction);
 
         context.logEvent({
@@ -344,9 +345,8 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           },
           code: buildWorkflowSnippet(),
           teardown: () => {
-            workflowMutationEventNames.forEach((eventName) => {
-              context.map.off(eventName, handleWorkflowMutation);
-            });
+            unsubscribeFeatures?.();
+            unsubscribeHistory?.();
             cancelDemoTransaction();
             if (singleFeatureEditActivated) {
               geoForge.disableSingleFeatureEditMode();
@@ -355,13 +355,8 @@ export const workflowDemos: DemoDefinition<WorkflowInspectorProps>[] = [
           },
         };
       } catch (error) {
-        const handler = workflowMutationHandler;
-        if (handler) {
-          workflowMutationEventNames.forEach((eventName) => {
-            context.map.off(eventName, handler);
-          });
-          workflowMutationHandler = null;
-        }
+        unsubscribeFeatures?.();
+        unsubscribeHistory?.();
         cancelDemoTransaction();
         if (singleFeatureEditActivated) {
           geoForge.disableSingleFeatureEditMode();
@@ -445,6 +440,8 @@ if (geoForge.transactions.getActive()?.status === 'active') {
 let transaction;
 let addedFeatures = [];
 let feature;
+let unsubscribeFeatures;
+let unsubscribeHistory;
 
 try {
   const importResult = geoForge.features.importGeoJson(workflowSampleNetworkGeoJson, {
@@ -460,6 +457,15 @@ try {
   geoForge.enableSingleFeatureEditMode({ allowedShapes: ['line'] });
   geoForge.selection.selectFeature(feature, { reason: 'api' });
   transaction = geoForge.transactions.start({ id: '${transactionId}' });
+
+  unsubscribeFeatures = geoForge.features.subscribe(() => {
+    console.log('Selected feature changed', feature.getProperty('name'));
+  });
+  unsubscribeHistory = geoForge.history.subscribe((state, event) => {
+    if (event.type !== 'initial') {
+      console.log('History controls changed', state);
+    }
+  });
 } catch (error) {
   transaction?.cancel();
   geoForge.disableSingleFeatureEditMode();
@@ -525,6 +531,8 @@ function redoName() {
 }
 
 // Demo cleanup:
+unsubscribeFeatures?.();
+unsubscribeHistory?.();
 transaction?.cancel();
 geoForge.disableSingleFeatureEditMode();
 cleanupImportedFeatures();`;

@@ -8,5 +8,8 @@ export type {
   GeomanHistoryOperationKind,
   GeomanHistoryOptions,
   GeomanHistoryOptionsPartial,
+  GeomanHistorySubscriptionCallback,
+  GeomanHistorySubscriptionEvent,
+  GeomanHistorySubscriptionEventType,
   GeomanHistoryState,
 } from './types.ts';

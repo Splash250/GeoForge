@@ -38,6 +38,11 @@ export type BaseMapEventName = (typeof baseMapEventNames)[number];
 export const gmServiceEventNames = ['loaded'] as const;
 export type GmServiceEventName = (typeof gmServiceEventNames)[number];
 export type GmServiceEventNameWithPrefix = `${GmPrefix}:${GmServiceEventName}`;
+export type GmHistoryEventNameWithPrefix =
+  | `${GmPrefix}:historyrecord`
+  | `${GmPrefix}:historychange`
+  | `${GmPrefix}:undo`
+  | `${GmPrefix}:redo`;
 
 export type MapEventName = PointerEventName | BaseMapEventName;
 
@@ -46,6 +51,7 @@ export type AnyEventName =
   | MapEventName
   | GmFwdEventNameWithPrefix
   | GmFwdSystemEventNameWithPrefix
+  | GmHistoryEventNameWithPrefix
   | GmServiceEventNameWithPrefix;
 
 export type BaseEventListener<T extends string = AnyEventName> = (event: EventFor<T>) => void;

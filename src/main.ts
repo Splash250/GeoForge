@@ -526,6 +526,10 @@ export { customShapeRectangle, customShapeTriangle } from '@/core/options/shapes
 // core classes
 export { GmOptions } from '@/core/options/index.ts';
 export type {
+  GeomanModeState,
+  GeomanModeSubscriptionCallback,
+} from '@/core/modes/modeController.ts';
+export type {
   GeomanControlProfile,
   GeomanControlVisibilityOptions,
 } from '@/core/controls/index.ts';
