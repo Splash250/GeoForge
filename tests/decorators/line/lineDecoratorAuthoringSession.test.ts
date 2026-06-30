@@ -83,6 +83,44 @@ describe('line decorator authoring session', () => {
     ]);
   });
 
+  it('preserves arrowhead perArrowheadOptions functions when cloning decorators', () => {
+    const updateFromFeatures = vi.fn();
+    const managerFactory = vi.fn(() => createManagerMock({ updateFromFeatures }));
+    const feature = createLineFeature();
+    const perArrowheadOptions = vi.fn((index: number) => ({
+      color: index % 2 === 0 ? '#123456' : '#654321',
+    }));
+    const decorator: LineDecoratorOptions = {
+      kind: 'arrowhead',
+      frequency: 'endonly',
+      offsets: { start: '1px' },
+      perArrowheadOptions,
+    };
+    const subsystem = createSubsystem({ managerFactory });
+    const authoring = subsystem.createAuthoringSession({
+      features: [feature],
+      decorators: [decorator],
+    });
+
+    if (decorator.offsets) {
+      decorator.offsets.start = '9px';
+    }
+    authoring.sync();
+
+    const resolveDecorators = updateFromFeatures.mock.calls[0][1] as (
+      feature: Feature,
+    ) => LineDecoratorOptions[];
+    const [resolvedDecorator] = resolveDecorators(feature);
+
+    expect(resolvedDecorator).toMatchObject({
+      kind: 'arrowhead',
+      offsets: { start: '1px' },
+    });
+    expect(resolvedDecorator.kind === 'arrowhead' && resolvedDecorator.perArrowheadOptions).toBe(
+      perArrowheadOptions,
+    );
+  });
+
   it('updates imported feature line style without history when history suspension is available', () => {
     const suspend = vi.fn(<T>(callback: () => T) => callback());
     const updateProperties = vi.fn();
@@ -180,8 +218,8 @@ describe('line decorator authoring session', () => {
     const calls: unknown[] = [];
     const map = {
       hasImage: (id: string) => images.has(id),
-      addImage: (id: string, image: unknown) => {
-        calls.push(['addImage', id, image]);
+      addImage: (id: string, image: unknown, options?: unknown) => {
+        calls.push(['addImage', id, image, options]);
         images.set(id, image);
       },
       updateImage: (id: string, image: unknown) => {
@@ -220,6 +258,7 @@ describe('line decorator authoring session', () => {
       authoring.registerSvgSymbolImage({
         id: 'custom-arrow',
         svg: '<svg xmlns="http://www.w3.org/2000/svg"><circle /></svg>',
+        options: { pixelRatio: 2, sdf: true },
         loadImage,
       }),
     ).resolves.toMatchObject({ ok: true, action: 'updated' });
@@ -234,17 +273,79 @@ describe('line decorator authoring session', () => {
         expect.objectContaining({
           svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
         }),
+        undefined,
       ],
+      ['removeImage', 'custom-arrow'],
       [
-        'updateImage',
+        'addImage',
         'custom-arrow',
         expect.objectContaining({
           svg: '<svg xmlns="http://www.w3.org/2000/svg"><circle /></svg>',
         }),
+        { pixelRatio: 2, sdf: true },
       ],
       ['removeImage', 'custom-arrow'],
     ]);
     expect(images.has('custom-arrow')).toBe(false);
+  });
+
+  it('falls back to updateImage for owned SVG replacement when removeImage is unavailable', async () => {
+    const images = new Map<string, unknown>();
+    const calls: unknown[] = [];
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: (id: string, image: unknown, options?: unknown) => {
+        calls.push(['addImage', id, image, options]);
+        images.set(id, image);
+      },
+      updateImage: (id: string, image: unknown) => {
+        calls.push(['updateImage', id, image]);
+        images.set(id, image);
+      },
+    };
+    const subsystem = createSubsystem({ map });
+    const authoring = subsystem.createAuthoringSession({ features: [] });
+    const loadImage = vi.fn(async (svg: string) => ({
+      width: svg.includes('circle') ? 2 : 1,
+      height: svg.includes('circle') ? 2 : 1,
+      data: new Uint8Array(svg.includes('circle') ? 16 : 4),
+      svg,
+    }));
+
+    await expect(
+      authoring.registerSvgSymbolImage({
+        id: 'fallback-arrow',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+        loadImage,
+      }),
+    ).resolves.toMatchObject({ ok: true, action: 'added' });
+    await expect(
+      authoring.registerSvgSymbolImage({
+        id: 'fallback-arrow',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg"><circle /></svg>',
+        loadImage,
+      }),
+    ).resolves.toMatchObject({ ok: true, action: 'updated' });
+
+    expect(calls).toEqual([
+      [
+        'addImage',
+        'fallback-arrow',
+        expect.objectContaining({
+          width: 1,
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+        }),
+        undefined,
+      ],
+      [
+        'updateImage',
+        'fallback-arrow',
+        expect.objectContaining({
+          width: 2,
+          svg: '<svg xmlns="http://www.w3.org/2000/svg"><circle /></svg>',
+        }),
+      ],
+    ]);
   });
 
   it('does not mutate map images when SVG loading resolves after session disposal', async () => {

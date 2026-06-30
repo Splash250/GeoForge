@@ -197,11 +197,11 @@ export class GeomanLineDecoratorAuthoringSession implements LineDecoratorAuthori
     }
 
     if (map.hasImage(registration.id)) {
-      if (map.updateImage) {
-        map.updateImage(registration.id, image);
-      } else if (map.removeImage) {
+      if (map.removeImage) {
         map.removeImage(registration.id);
         map.addImage(registration.id, image, registration.options);
+      } else if (map.updateImage) {
+        map.updateImage(registration.id, image);
       } else {
         return {
           ok: false,
@@ -382,7 +382,21 @@ function cloneLineDecorators(decorators: readonly LineDecoratorOptions[]): LineD
 }
 
 function cloneLineDecorator(decorator: LineDecoratorOptions): LineDecoratorOptions {
-  return JSON.parse(JSON.stringify(decorator)) as LineDecoratorOptions;
+  return cloneDecoratorValue(decorator) as LineDecoratorOptions;
+}
+
+function cloneDecoratorValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(cloneDecoratorValue);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [key, cloneDecoratorValue(entryValue)]),
+    );
+  }
+
+  return value;
 }
 
 function toGeoJsonFeature(target: LineDecoratorAuthoringFeatureTarget): Feature {
