@@ -65,18 +65,28 @@ export type GeomanSession = {
 export class GeomanSessionSubsystem {
   private geoman: Geoman;
   private nextSessionId = 1;
+  private activeOwnerIds = new Set<FeatureOwnerId>();
 
   constructor(options: GeomanSessionSubsystemOptions) {
     this.geoman = options.geoman;
   }
 
   start(options: GeomanSessionOptions = {}): GeomanSession {
+    const ownerId = options.ownerId ?? this.createOwnerId();
+    if (this.activeOwnerIds.has(ownerId)) {
+      throw new Error(`A GeoForge session with ownerId "${String(ownerId)}" is already active.`);
+    }
+
+    this.activeOwnerIds.add(ownerId);
     return new GeomanFeatureSession({
       geoman: this.geoman,
-      ownerId: options.ownerId ?? this.createOwnerId(),
+      ownerId,
       history: options.history,
       cleanup: options.cleanup ?? true,
       cleanupHistory: options.cleanupHistory,
+      releaseOwner: () => {
+        this.activeOwnerIds.delete(ownerId);
+      },
     });
   }
 
@@ -96,6 +106,7 @@ type GeomanFeatureSessionOptions = {
   history?: boolean;
   cleanup: boolean;
   cleanupHistory?: boolean;
+  releaseOwner: () => void;
 };
 
 class GeomanFeatureSession implements GeomanSession {
@@ -105,6 +116,7 @@ class GeomanFeatureSession implements GeomanSession {
   private defaultHistory?: boolean;
   private cleanupOnDispose: boolean;
   private cleanupHistory?: boolean;
+  private releaseOwner: () => void;
   private subscriptions = new Set<GeomanUnsubscribe>();
   private isDisposed = false;
 
@@ -114,6 +126,7 @@ class GeomanFeatureSession implements GeomanSession {
     this.defaultHistory = options.history;
     this.cleanupOnDispose = options.cleanup;
     this.cleanupHistory = options.cleanupHistory;
+    this.releaseOwner = options.releaseOwner;
     this.features = this.createFeatureFacade();
   }
 
@@ -127,38 +140,64 @@ class GeomanFeatureSession implements GeomanSession {
     }
 
     this.isDisposed = true;
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.subscriptions.clear();
+    try {
+      this.subscriptions.forEach((unsubscribe) => unsubscribe());
+      this.subscriptions.clear();
 
-    if (this.cleanupOnDispose) {
-      this.geoman.features.deleteByOwner(this.ownerId, {
-        history: this.cleanupHistory ?? false,
-      });
+      if (this.cleanupOnDispose) {
+        this.geoman.features.deleteByOwner(this.ownerId, {
+          history: this.cleanupHistory ?? false,
+        });
+      }
+    } finally {
+      this.releaseOwner();
     }
   }
 
   private createFeatureFacade(): GeomanSessionFeatureFacade {
     return {
       importGeoJson: (geoJson, options) =>
-        this.geoman.features.importGeoJson(geoJson, this.withSessionImportOptions(options)),
-      importGeoJsonFeature: (geoJsonFeature, options) =>
-        this.geoman.features.importGeoJsonFeature(
-          geoJsonFeature,
-          this.withSessionImportOptions(options),
+        this.withActiveSession(() =>
+          this.geoman.features.importGeoJson(geoJson, this.withSessionImportOptions(options)),
         ),
-      query: (options) => this.geoman.features.query(this.withSessionQueryOptions(options)),
-      count: (options) => this.geoman.features.count(this.withSessionQueryOptions(options)),
-      getAll: () => ({
-        type: 'FeatureCollection',
-        features: this.geoman.features
-          .query({ ownerId: this.ownerId })
-          .map((feature) => cloneDeep(feature.getGeoJson())),
-      }),
+      importGeoJsonFeature: (geoJsonFeature, options) =>
+        this.withActiveSession(() =>
+          this.geoman.features.importGeoJsonFeature(
+            geoJsonFeature,
+            this.withSessionImportOptions(options),
+          ),
+        ),
+      query: (options) =>
+        this.withActiveSession(() =>
+          this.geoman.features.query(this.withSessionQueryOptions(options)),
+        ),
+      count: (options) =>
+        this.withActiveSession(() =>
+          this.geoman.features.count(this.withSessionQueryOptions(options)),
+        ),
+      getAll: () =>
+        this.withActiveSession(() => ({
+          type: 'FeatureCollection',
+          features: this.geoman.features
+            .query({ ownerId: this.ownerId })
+            .map((feature) => cloneDeep(feature.getGeoJson())),
+        })),
       deleteAll: (options) =>
-        this.geoman.features.deleteByOwner(this.ownerId, this.withSessionMutationOptions(options)),
+        this.withActiveSession(() =>
+          this.geoman.features.deleteByOwner(
+            this.ownerId,
+            this.withSessionMutationOptions(options),
+          ),
+        ),
       clear: (options) =>
-        this.geoman.features.deleteByOwner(this.ownerId, this.withSessionMutationOptions(options)),
-      subscribe: (callback, options) => this.subscribe(callback, options),
+        this.withActiveSession(() =>
+          this.geoman.features.deleteByOwner(
+            this.ownerId,
+            this.withSessionMutationOptions(options),
+          ),
+        ),
+      subscribe: (callback, options) =>
+        this.withActiveSession(() => this.subscribe(callback, options)),
     };
   }
 
@@ -210,5 +249,12 @@ class GeomanFeatureSession implements GeomanSession {
 
   private sessionHistoryDefaults(): FeatureMutationOptions {
     return this.defaultHistory === undefined ? {} : { history: this.defaultHistory };
+  }
+
+  private withActiveSession<TResult>(callback: () => TResult): TResult {
+    if (this.isDisposed) {
+      throw new Error(`GeoForge session "${String(this.ownerId)}" is disposed.`);
+    }
+    return callback();
   }
 }

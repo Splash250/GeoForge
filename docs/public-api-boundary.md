@@ -109,4 +109,4 @@ Do not rely on deep imports from `src`, `dist`, or internal folders. Deep import
 - Prefer documentation and deprecation clarity over export removal.
 - Add new package subpaths only after consumer import usage is checked and the subpath is explicitly approved.
 - Prefer `geoForge.control.applyProfile(...)`, `setModeVisibility(...)`, and `getProfile()` for runtime control visibility instead of mutating `geoForge.options.controls` or refreshing controls manually.
-- Prefer `geoForge.sessions.start(...)` for scoped setup, preview data, subscriptions, and cleanup. Use lower-level `geoForge.features.importGeoJson(..., { ownerId })`, `getByOwner(...)`, and `deleteByOwner(...)` only when a session object is unnecessary.
+- Prefer `geoForge.sessions.start(...)` for scoped setup, preview data, subscriptions, and cleanup. Active sessions require unique ownerIds; disposing a session releases its ownerId and makes its `session.features.*` facade throw on later use. Use lower-level `geoForge.features.importGeoJson(..., { ownerId })`, `getByOwner(...)`, and `deleteByOwner(...)` only when a session object is unnecessary.

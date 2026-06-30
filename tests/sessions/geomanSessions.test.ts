@@ -91,7 +91,7 @@ function createFeatureCollection(...ids: string[]): GeoJsonImportFeatureCollecti
 }
 
 describe('Geoman sessions', () => {
-  it('starts sessions with generated stable owner ids and caller-provided owner ids', () => {
+  it('starts sessions with generated stable unique owner ids and caller-provided owner ids', () => {
     const { sessions } = createGeomanDouble();
 
     const generated = sessions.start();
@@ -104,6 +104,21 @@ describe('Geoman sessions', () => {
     expect(generated.ownerId).toBe(generated.ownerId);
     expect(callerOwned.ownerId).toBe('demo:owned');
     expect(generated.disposed).toBe(false);
+  });
+
+  it('rejects duplicate active caller-provided owner ids and releases owners on dispose', () => {
+    const { sessions } = createGeomanDouble();
+    const first = sessions.start({ ownerId: 'demo:shared-owner' });
+
+    expect(() => sessions.start({ ownerId: 'demo:shared-owner' })).toThrow(
+      'A GeoForge session with ownerId "demo:shared-owner" is already active.',
+    );
+
+    first.dispose();
+    const second = sessions.start({ ownerId: 'demo:shared-owner' });
+
+    expect(second.ownerId).toBe('demo:shared-owner');
+    expect(second.disposed).toBe(false);
   });
 
   it('scopes import, query, count, getAll, and deleteAll to the session owner by default', () => {
@@ -169,14 +184,40 @@ describe('Geoman sessions', () => {
 
     session.dispose();
     session.dispose();
-    session.features.importGeoJsonFeature(createFeature('inside-after-dispose'));
 
     expect(session.disposed).toBe(true);
     expect(callback).toHaveBeenCalledTimes(1);
     expect(features.get(SOURCES.main, 'outside')).not.toBeNull();
     expect(features.get(SOURCES.main, 'inside')).toBeNull();
     expect(features.get(SOURCES.main, 'inside-after-subscribe')).toBeNull();
-    expect(features.get(SOURCES.main, 'inside-after-dispose')).not.toBeNull();
+  });
+
+  it('throws for session feature operations after disposal', () => {
+    const { sessions, features } = createGeomanDouble();
+    const session = sessions.start({ ownerId: 'demo:disposed' });
+
+    session.features.importGeoJsonFeature(createFeature('before-dispose'));
+    session.dispose();
+
+    expect(() => session.features.importGeoJson(createFeature('after-dispose'))).toThrow(
+      'GeoForge session "demo:disposed" is disposed.',
+    );
+    expect(() => session.features.importGeoJsonFeature(createFeature('after-dispose'))).toThrow(
+      'GeoForge session "demo:disposed" is disposed.',
+    );
+    expect(() => session.features.deleteAll()).toThrow(
+      'GeoForge session "demo:disposed" is disposed.',
+    );
+    expect(() => session.features.clear()).toThrow('GeoForge session "demo:disposed" is disposed.');
+    expect(() => session.features.subscribe(vi.fn())).toThrow(
+      'GeoForge session "demo:disposed" is disposed.',
+    );
+    expect(() => session.features.query()).toThrow('GeoForge session "demo:disposed" is disposed.');
+    expect(() => session.features.count()).toThrow('GeoForge session "demo:disposed" is disposed.');
+    expect(() => session.features.getAll()).toThrow(
+      'GeoForge session "demo:disposed" is disposed.',
+    );
+    expect(features.get(SOURCES.main, 'after-dispose')).toBeNull();
   });
 
   it('can disable dispose cleanup and can opt cleanup history back in', () => {

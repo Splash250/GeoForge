@@ -133,14 +133,16 @@ geoForge.features.deleteByOwner('network-topology-demo', { history: false });
 
 Production outcome:
 
-Apps can stage or demonstrate feature data safely without broad `deleteAll()` cleanup, repeated `history.suspend(...)`, or manual feature reference tracking. `session.dispose()` is idempotent, unsubscribes session feature subscriptions, and deletes only the session owner by default with cleanup history suppressed unless configured otherwise.
+Apps can stage or demonstrate feature data safely without broad `deleteAll()` cleanup, repeated `history.suspend(...)`, or manual feature reference tracking. `session.dispose()` is idempotent, unsubscribes session feature subscriptions, deletes only the session owner by default with cleanup history suppressed unless configured otherwise, and makes the session feature facade unusable afterward so stale async setup fails loudly.
 
 Implemented in Phase 2:
 
 - `geoForge.sessions.start({ ownerId?, history?, cleanup?, cleanupHistory? })` returns a session with stable `ownerId`, `disposed`, `features`, and `dispose()`.
+- Active sessions must have unique ownerIds; starting a second active session for the same caller-provided `ownerId` throws. Disposing the first session releases the ownerId for reuse.
 - `session.features.importGeoJson(...)` and `importGeoJsonFeature(...)` default to the session owner and session history option.
 - `session.features.query(...)`, `count(...)`, `getAll()`, `deleteAll(...)`/`clear(...)`, and `subscribe(...)` scope to the session owner by default.
 - Session subscriptions are automatically unsubscribed on dispose.
+- After `dispose()`, every `session.features.*` method throws `GeoForge session "<ownerId>" is disposed.`.
 - The geometry topology demo now uses a session for seeded import, topology refresh subscriptions, and cleanup.
 
 ### 3. History suppression is repeatedly wrapped instead of expressed at the operation site
