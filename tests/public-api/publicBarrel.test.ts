@@ -338,6 +338,9 @@ test('exports public compatibility types from the root barrel', () => {
     [GeomanRasterLayer[], RasterLayerSubscriptionEvent]
   >();
   expectTypeOf<RasterLayerSubscriptionEvent>().toMatchTypeOf<object>();
+  expectTypeOf<RasterLayerSubscriptionEvent['type']>().toEqualTypeOf<
+    'initial' | 'configure' | 'add' | 'remove' | 'reorder' | 'destroy'
+  >();
   expectTypeOf<RasterProxyOptions>().toMatchTypeOf<object>();
 });
 

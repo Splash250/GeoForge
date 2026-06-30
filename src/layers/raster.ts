@@ -68,7 +68,7 @@ export type RasterLayerSyncOptions = {
 export type RasterLayerDefaults = DiscoverRasterLayersOptions & RasterLayerSyncOptions;
 
 export type RasterLayerSubscriptionEvent = {
-  type: 'initial' | 'configure' | 'add' | 'remove' | 'reorder' | 'sync' | 'destroy';
+  type: 'initial' | 'configure' | 'add' | 'remove' | 'reorder' | 'destroy';
 };
 
 export type RasterLayerSubscriptionCallback = (
