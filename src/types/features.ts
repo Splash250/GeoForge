@@ -87,6 +87,20 @@ export type GeomanFeatureSubscriptionOptions = {
   includeTemporary?: boolean;
 };
 
+export type GeomanFeatureQueryOptions = {
+  sourceNames?: ReadonlyArray<FeatureSourceName>;
+  shapes?: ReadonlyArray<FeatureShape>;
+  /**
+   * Include temporary helper/edit features in the result.
+   *
+   * Defaults to false to match features.forEach and feature subscription snapshots.
+   */
+  includeTemporary?: boolean;
+  ownerId?: FeatureOwnerId;
+  ids?: ReadonlyArray<FeatureId>;
+  editableOnly?: boolean;
+};
+
 export type GeomanFeatureSubscriptionEventType = 'create' | 'update' | 'delete' | 'unknown';
 
 export type GeomanFeatureSubscriptionEvent = {
