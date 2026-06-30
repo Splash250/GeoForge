@@ -346,13 +346,18 @@ The workflow demo previously manually checked for active transactions, started o
 
 References:
 
-- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:91`
-- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:114`
-- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:127`
-- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:196`
-- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:210`
-- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:254`
-- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:308`
+- `src/transactions/geomanTransactionSubsystem.ts:42`
+- `src/transactions/geomanFeaturePropertyEditor.ts:13`
+- `src/transactions/types.ts:59`
+- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:150`
+- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:159`
+- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:187`
+- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:201`
+- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:219`
+- `examples/playground/src/demo-studio/demos/workflow-systems/workflowDemos.ts:235`
+- `tests/transactions/geomanFeaturePropertyEditor.test.ts:91`
+- `tests/playground/workflowDemos.test.ts:136`
+- `tests/public-api/publicBarrel.test.ts:174`
 
 Implemented API:
 

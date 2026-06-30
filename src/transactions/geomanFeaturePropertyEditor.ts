@@ -25,6 +25,7 @@ export class GeomanFeaturePropertyEditor {
   #transaction: GeomanTransaction | null = null;
   #disposed = false;
   #validationMessages: string[] = [];
+  #releasingUnavailableTransaction = false;
 
   constructor(
     options: GeomanFeaturePropertyEditorOptions & {
@@ -39,6 +40,7 @@ export class GeomanFeaturePropertyEditor {
     this.#validate = options.validate;
     this.#label = options.label;
     this.#unsubscribeFeatureChanges = this.#geoman.features?.subscribe?.(() => {
+      this.#releaseUnavailableTransaction();
       this.#emit();
     });
     this.#unsubscribeHistoryChanges = this.#geoman.history?.subscribe?.((_state, event) => {
@@ -91,7 +93,7 @@ export class GeomanFeaturePropertyEditor {
   }
 
   undo(): boolean {
-    if (this.getState().dirty) {
+    if (!this.getState().canUndo) {
       return false;
     }
 
@@ -101,7 +103,7 @@ export class GeomanFeaturePropertyEditor {
   }
 
   redo(): boolean {
-    if (this.getState().dirty) {
+    if (!this.getState().canRedo) {
       return false;
     }
 
@@ -128,6 +130,8 @@ export class GeomanFeaturePropertyEditor {
   }
 
   getState(): GeomanFeaturePropertyEditorState {
+    this.#releaseUnavailableTransaction();
+
     const activeTransaction = this.#transactions.getActive();
     const blockedTransaction =
       activeTransaction && activeTransaction !== this.#transaction ? activeTransaction : null;
@@ -141,8 +145,8 @@ export class GeomanFeaturePropertyEditor {
     const canCommit =
       available && active && dirty && !blocked && this.#validationMessages.length === 0;
     const canCancel = available && active && dirty && !blocked;
-    const canUndo = !dirty && !blocked && Boolean(history?.canUndo);
-    const canRedo = !dirty && !blocked && Boolean(history?.canRedo);
+    const canUndo = available && !dirty && !blocked && Boolean(history?.canUndo);
+    const canRedo = available && !dirty && !blocked && Boolean(history?.canRedo);
 
     return {
       id: this.id,
@@ -236,6 +240,24 @@ export class GeomanFeaturePropertyEditor {
 
     if (!this.#isFeatureAvailable()) {
       throw new Error(`Feature property editor "${this.id}" feature is unavailable.`);
+    }
+  }
+
+  #releaseUnavailableTransaction(): void {
+    if (this.#disposed || this.#releasingUnavailableTransaction || this.#isFeatureAvailable()) {
+      return;
+    }
+
+    this.#releasingUnavailableTransaction = true;
+    try {
+      if (this.#transaction?.status === 'active') {
+        this.#transaction.cancel();
+      }
+
+      this.#transaction = null;
+      this.#validationMessages = [];
+    } finally {
+      this.#releasingUnavailableTransaction = false;
     }
   }
 

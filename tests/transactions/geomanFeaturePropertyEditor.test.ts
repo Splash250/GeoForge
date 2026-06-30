@@ -268,6 +268,34 @@ describe('GeomanFeaturePropertyEditor', () => {
     expect(transactions.getActive()).toBe(external);
   });
 
+  test('blocks undo and redo while another transaction is active even when clean', () => {
+    const { geoman, feature } = createFeature();
+    const history = geoman.history as NonNullable<Geoman['history']>;
+    vi.mocked(history.getState).mockReturnValue({
+      canUndo: true,
+      canRedo: true,
+      undoCount: 1,
+      redoCount: 1,
+      maxEntries: 100,
+      enabled: true,
+    });
+    const transactions = new GeomanTransactionSubsystem({ geoman });
+    const editor = transactions.featureProperties({ feature, id: 'name-editor' });
+
+    transactions.start({ id: 'external' });
+
+    expect(editor.getState()).toMatchObject({
+      dirty: false,
+      blocked: true,
+      canUndo: false,
+      canRedo: false,
+    });
+    expect(editor.undo()).toBe(false);
+    expect(editor.redo()).toBe(false);
+    expect(history.undo).not.toHaveBeenCalled();
+    expect(history.redo).not.toHaveBeenCalled();
+  });
+
   test('handles external feature deletion without throwing during state updates', () => {
     const { geoman, feature, featureListeners } = createFeature();
     const features = geoman.features as unknown as { get: ReturnType<typeof vi.fn> };
@@ -293,5 +321,40 @@ describe('GeomanFeaturePropertyEditor', () => {
     expect(subscriber).toHaveBeenLastCalledWith(
       expect.objectContaining({ available: false, values: {} }),
     );
+  });
+
+  test('releases a helper-owned dirty transaction when the feature becomes unavailable', () => {
+    const { geoman, feature, featureListeners } = createFeature();
+    const features = geoman.features as unknown as { get: ReturnType<typeof vi.fn> };
+    const history = geoman.history as NonNullable<Geoman['history']>;
+    vi.mocked(history.getState).mockReturnValue({
+      canUndo: true,
+      canRedo: true,
+      undoCount: 1,
+      redoCount: 1,
+      maxEntries: 100,
+      enabled: true,
+    });
+    const transactions = new GeomanTransactionSubsystem({ geoman });
+    const editor = transactions.featureProperties({ feature, id: 'name-editor' });
+
+    editor.set('name', 'Preview');
+    expect(transactions.getActive()?.id).toBe('name-editor');
+
+    features.get.mockReturnValue(null);
+    featureListeners.forEach((listener) => listener());
+
+    expect(transactions.getActive()).toBeNull();
+    expect(editor.getState()).toMatchObject({
+      available: false,
+      dirty: false,
+      active: false,
+      canUndo: false,
+      canRedo: false,
+    });
+    expect(editor.undo()).toBe(false);
+    expect(editor.redo()).toBe(false);
+    expect(history.undo).not.toHaveBeenCalled();
+    expect(history.redo).not.toHaveBeenCalled();
   });
 });
