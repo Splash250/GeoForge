@@ -5,8 +5,18 @@ import type {
   GeomanHistoryOperation,
   GeomanHistoryOptions,
   GeomanHistoryOptionsPartial,
+  GeomanHistorySubscriptionCallback,
+  GeomanHistorySubscriptionEvent,
   GeomanHistoryState,
 } from './types.ts';
+import type { AnyEventName, BaseEventListener } from '@/types/map/index.ts';
+
+const HISTORY_SUBSCRIPTION_EVENT_NAMES = [
+  'gm:historyrecord',
+  'gm:historychange',
+  'gm:undo',
+  'gm:redo',
+] as const satisfies ReadonlyArray<AnyEventName>;
 
 export type GeomanHistorySubsystemOptions = {
   geoman: Geoman;
@@ -48,6 +58,38 @@ export class GeomanHistorySubsystem {
       redoCount: this.redoStack.length,
       maxEntries: this.options.maxEntries,
       enabled: this.options.enabled,
+    };
+  }
+
+  subscribe(callback: GeomanHistorySubscriptionCallback): () => void {
+    callback(this.getState(), { type: 'initial', name: null });
+    let suppressNextChange = false;
+
+    const listeners = HISTORY_SUBSCRIPTION_EVENT_NAMES.map((eventName) => {
+      const listener: BaseEventListener = (originalEvent) => {
+        const event = createHistorySubscriptionEvent(String(eventName), originalEvent);
+        if (event.type === 'change' && suppressNextChange) {
+          suppressNextChange = false;
+          return;
+        }
+        if (event.type === 'record' || event.type === 'undo' || event.type === 'redo') {
+          suppressNextChange = true;
+        }
+        callback(this.getState(), event);
+      };
+      this.geoman.mapAdapter.on(eventName, listener);
+      return { eventName, listener };
+    });
+
+    let unsubscribed = false;
+    return () => {
+      if (unsubscribed) {
+        return;
+      }
+      unsubscribed = true;
+      listeners.forEach(({ eventName, listener }) => {
+        this.geoman.mapAdapter.off(eventName, listener);
+      });
     };
   }
 
@@ -201,4 +243,38 @@ export class GeomanHistorySubsystem {
   private fireChange(): void {
     this.fire('gm:historychange', { state: this.getState() });
   }
+}
+
+function createHistorySubscriptionEvent(
+  name: string,
+  originalEvent: unknown,
+): GeomanHistorySubscriptionEvent {
+  const event = originalEvent as { entry?: GeomanHistoryEntry } | undefined;
+
+  if (name === 'gm:historyrecord') {
+    return {
+      type: 'record',
+      name,
+      entry: event?.entry ? cloneDeep(event.entry) : undefined,
+      originalEvent,
+    };
+  }
+  if (name === 'gm:undo') {
+    return {
+      type: 'undo',
+      name,
+      entry: event?.entry ? cloneDeep(event.entry) : undefined,
+      originalEvent,
+    };
+  }
+  if (name === 'gm:redo') {
+    return {
+      type: 'redo',
+      name,
+      entry: event?.entry ? cloneDeep(event.entry) : undefined,
+      originalEvent,
+    };
+  }
+
+  return { type: 'change', name: 'gm:historychange', originalEvent };
 }

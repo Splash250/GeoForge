@@ -202,7 +202,7 @@ Recommended API:
 ```ts
 const unsubscribe = geoForge.features.subscribe(
   (event) => {
-    refreshFeatureTable(event.snapshot);
+    refreshFeatureTable(event.geoJson);
   },
   {
     sourceNames: [SOURCES.main],
@@ -215,9 +215,16 @@ const unsubscribeHistory = geoForge.history.subscribe((state, event) => {
 });
 
 const unsubscribeModes = geoForge.modes.subscribe((state) => {
-  setActiveModes(state.active);
+  setActiveModes(state.activeModes);
 });
 ```
+
+Implemented in Phase 1:
+
+- `geoForge.features.subscribe(callback, { sourceNames, includeTemporary })` listens to feature-store mutations from public APIs, imports, edit updates, deletes, and history restores, then passes `{ type, name, features, geoJson, feature, originalEvent }`.
+- `geoForge.history.subscribe(callback)` calls back immediately with the current state and `{ type: 'initial', name: null }`, then emits one callback per logical record/change/undo/redo transition with state plus event context.
+- `geoForge.modes.subscribe(callback)` calls back immediately with active draw/edit/helper mode state and updates once per settled mode lifecycle transition.
+- Each subscription returns an idempotent unsubscribe function.
 
 Production outcome:
 
@@ -582,7 +589,7 @@ Use this matrix to turn the audit into implementation work. Each solution should
 
 1. Add `geoForge.control.applyProfile(...)` and `setModeVisibility(...)`.
 2. Add `history: false` options to feature import/delete/update APIs, while retaining `history.suspend(...)` for multi-operation batches.
-3. Add `features.subscribe(...)`, `history.subscribe(...)`, and `modes.subscribe(...)`.
+3. Add `features.subscribe(...)`, `history.subscribe(...)`, and `modes.subscribe(...)`. (Implemented)
 4. Add `features.count(...)` and `features.query(...)`.
 
 These changes remove the most obvious internal leaks without changing the deeper subsystems.

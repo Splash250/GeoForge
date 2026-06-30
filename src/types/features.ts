@@ -7,9 +7,12 @@ import {
 import type { BaseSource } from '@/core/map/base/source.ts';
 import type { Geoman } from '@/main.ts';
 import type { GeoJsonShapeFeature } from '@/types/geojson.ts';
+import type { FeatureFwdEvent } from '@/types/events/forwarder/features.ts';
+import type { GeomanHistorySubscriptionEvent } from '@/history/types.ts';
 import type { LngLatTuple } from '@/types/map/index.ts';
 import type { MarkerData, ShapeName } from '@/types/modes/index.ts';
 import type { WithPrefixedKeys } from '@/types/utils.ts';
+import type { GeoJsonShapeFeatureCollection } from '@/types/geojson.ts';
 
 export type FeatureId = number | string;
 export type FeatureOwnerId = number | string;
@@ -76,3 +79,24 @@ export type ImportGeoJsonOptions = {
   /** Runtime owner used for scoped lookup and cleanup through features.getByOwner/deleteByOwner */
   ownerId?: FeatureOwnerId;
 } & FeatureHistoryOptions;
+
+export type GeomanUnsubscribe = () => void;
+
+export type GeomanFeatureSubscriptionOptions = {
+  sourceNames?: Array<FeatureSourceName>;
+  includeTemporary?: boolean;
+};
+
+export type GeomanFeatureSubscriptionEventType = 'create' | 'update' | 'delete' | 'unknown';
+
+export type GeomanFeatureSubscriptionEvent = {
+  type: GeomanFeatureSubscriptionEventType;
+  name: string;
+  sourceNames: Array<FeatureSourceName>;
+  features: Array<FeatureData>;
+  geoJson: GeoJsonShapeFeatureCollection;
+  feature?: FeatureData;
+  originalEvent?: FeatureFwdEvent | GeomanHistorySubscriptionEvent | unknown;
+};
+
+export type GeomanFeatureSubscriptionCallback = (event: GeomanFeatureSubscriptionEvent) => void;

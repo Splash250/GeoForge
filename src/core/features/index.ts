@@ -1,4 +1,4 @@
-import { GM_SYSTEM_PREFIX } from '@/core/constants.ts';
+import { GM_PREFIX, GM_SYSTEM_PREFIX } from '@/core/constants.ts';
 import {
   FEATURE_ID_PROPERTY,
   FEATURE_PROPERTY_PREFIX,
@@ -17,6 +17,11 @@ import { BaseSource } from '@/core/map/base/source.ts';
 import { SHAPE_NAMES } from '@/modes/constants.ts';
 import {
   type FeatureId,
+  type GeomanFeatureSubscriptionCallback,
+  type GeomanFeatureSubscriptionEvent,
+  type GeomanFeatureSubscriptionEventType,
+  type GeomanFeatureSubscriptionOptions,
+  type GeomanUnsubscribe,
   type FeatureMutationOptions,
   type FeatureOwnerId,
   type FeatureShape,
@@ -57,6 +62,15 @@ const HISTORY_IGNORED_SHAPES = new Set<FeatureShape>([
   'snap_guide',
 ]);
 
+type FeatureSubscriptionListener = (change: FeatureSubscriptionChange) => void;
+
+export type FeatureSubscriptionChange = {
+  type: GeomanFeatureSubscriptionEventType;
+  name: string;
+  feature?: FeatureData;
+  originalEvent?: unknown;
+};
+
 export class Features {
   gm: Geoman;
 
@@ -68,6 +82,7 @@ export class Features {
   queryService: FeatureQueryService;
   geoJsonIO: FeatureGeoJsonIO;
   layers: Array<BaseLayer>;
+  private subscriptionListeners = new Set<FeatureSubscriptionListener>();
 
   constructor(gm: Geoman) {
     this.gm = gm;
@@ -221,6 +236,14 @@ export class Features {
 
     this.featureStoreService.delete(featureIdOrFeatureData);
 
+    if (featureData) {
+      this.notifyFeatureChange({
+        type: 'delete',
+        name: `${GM_PREFIX}:remove`,
+        feature: featureData,
+      });
+    }
+
     if (isHistorySuppressed(options)) {
       clearLastHistoryRecord(this.gm);
       return;
@@ -242,6 +265,7 @@ export class Features {
   }
 
   deleteAll(options?: FeatureMutationOptions) {
+    const hadFeatures = this.featureStore.size > 0;
     const operations = Array.from(this.featureStore.values())
       .filter((featureData) => isHistoryRecordableShape(featureData.shape))
       .map((featureData) => ({
@@ -252,6 +276,13 @@ export class Features {
       }));
 
     this.featureStoreService.clear();
+
+    if (hadFeatures) {
+      this.notifyFeatureChange({
+        type: 'delete',
+        name: `${GM_PREFIX}:remove`,
+      });
+    }
 
     if (isHistorySuppressed(options)) {
       clearLastHistoryRecord(this.gm);
@@ -359,6 +390,11 @@ export class Features {
     if (!featureData.temporary && !imported) {
       this.fireFeatureCreatedEvent(featureData);
     }
+    this.notifyFeatureChange({
+      type: 'create',
+      name: `${GM_PREFIX}:create`,
+      feature: featureData,
+    });
     this.featureCounter += 1;
     return featureData;
   }
@@ -398,8 +434,75 @@ export class Features {
     return deletedRefs;
   }
 
+  subscribe(
+    callback: GeomanFeatureSubscriptionCallback,
+    options: GeomanFeatureSubscriptionOptions = {},
+  ): GeomanUnsubscribe {
+    const listener: FeatureSubscriptionListener = (change) => {
+      if (!shouldNotifySubscription(change, options)) {
+        return;
+      }
+      callback(this.createSubscriptionEvent(change, options));
+    };
+    this.subscriptionListeners.add(listener);
+
+    let unsubscribed = false;
+    return () => {
+      if (unsubscribed) {
+        return;
+      }
+      unsubscribed = true;
+      this.subscriptionListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Emits public feature subscription updates for actual feature-store mutations.
+   *
+   * @internal
+   */
+  notifyFeatureChange(change: FeatureSubscriptionChange): void {
+    this.subscriptionListeners.forEach((listener) => {
+      listener(change);
+    });
+  }
+
   getAll(): FeatureCollection {
     return this.geoJsonIO.getAll();
+  }
+
+  private createSubscriptionEvent(
+    change: FeatureSubscriptionChange,
+    options: GeomanFeatureSubscriptionOptions,
+  ): GeomanFeatureSubscriptionEvent {
+    const features = this.getSubscribedFeatures(options);
+
+    return {
+      type: change.type,
+      name: change.name,
+      sourceNames: getSubscribedSourceNames(features, options),
+      features,
+      geoJson: {
+        type: 'FeatureCollection',
+        features: features.map((feature) => cloneDeep(feature.getGeoJson())),
+      },
+      feature: change.feature,
+      originalEvent: change.originalEvent,
+    };
+  }
+
+  private getSubscribedFeatures(options: GeomanFeatureSubscriptionOptions): Array<FeatureData> {
+    const sourceNames = options.sourceNames ? new Set(options.sourceNames) : null;
+
+    return Array.from(this.featureStore.values()).filter((featureData) => {
+      if (!options.includeTemporary && featureData.temporary) {
+        return false;
+      }
+      if (sourceNames && !sourceNames.has(featureData.sourceName)) {
+        return false;
+      }
+      return true;
+    });
   }
 
   /**
@@ -711,4 +814,30 @@ function isGeomanFeatureRef(value: unknown): value is GeomanFeatureRef {
   return (
     typeof value === 'object' && value !== null && 'sourceName' in value && 'featureId' in value
   );
+}
+
+function shouldNotifySubscription(
+  change: FeatureSubscriptionChange,
+  options: GeomanFeatureSubscriptionOptions,
+): boolean {
+  if (!change.feature) {
+    return true;
+  }
+  if (!options.includeTemporary && change.feature.temporary) {
+    return false;
+  }
+  if (options.sourceNames && !options.sourceNames.includes(change.feature.sourceName)) {
+    return false;
+  }
+  return true;
+}
+
+function getSubscribedSourceNames(
+  features: Array<FeatureData>,
+  options: GeomanFeatureSubscriptionOptions,
+): Array<FeatureSourceName> {
+  if (options.sourceNames) {
+    return [...options.sourceNames];
+  }
+  return Array.from(new Set(features.map((feature) => feature.sourceName)));
 }

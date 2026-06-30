@@ -50,3 +50,17 @@ export type GeomanHistoryState = {
   maxEntries: number;
   enabled: boolean;
 };
+
+export type GeomanHistorySubscriptionEventType = 'initial' | 'record' | 'change' | 'undo' | 'redo';
+
+export type GeomanHistorySubscriptionEvent = {
+  type: GeomanHistorySubscriptionEventType;
+  name: 'gm:historyrecord' | 'gm:historychange' | 'gm:undo' | 'gm:redo' | null;
+  entry?: GeomanHistoryEntry;
+  originalEvent?: unknown;
+};
+
+export type GeomanHistorySubscriptionCallback = (
+  state: GeomanHistoryState,
+  event: GeomanHistorySubscriptionEvent,
+) => void;

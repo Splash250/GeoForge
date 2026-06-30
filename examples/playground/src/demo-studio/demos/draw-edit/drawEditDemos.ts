@@ -50,14 +50,6 @@ const drawEditSampleNetworkGeoJson = {
     },
   })),
 } satisfies GeoJsonImportFeatureCollection;
-const featureMutationEventNames = [
-  'gm:create',
-  'gm:remove',
-  'gm:edit',
-  'gm:drag',
-  'gm:rotate',
-  'gm:cut',
-] as const;
 
 export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
   {
@@ -107,9 +99,7 @@ export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
         updateRuntime('Feature collection updated');
       };
 
-      featureMutationEventNames.forEach((eventName) => {
-        context.map.on(eventName, handleFeatureMutation);
-      });
+      const unsubscribeFeatures = geoForge.features.subscribe(handleFeatureMutation);
 
       const onSelectShape = (shape: DrawEditShapeTool) => {
         if (!isActive()) {
@@ -206,9 +196,7 @@ export const drawEditDemos: DemoDefinition<DrawEditInspectorProps>[] = [
         },
         code: buildDrawEditSnippet(),
         teardown: () => {
-          featureMutationEventNames.forEach((eventName) => {
-            context.map.off(eventName, handleFeatureMutation);
-          });
+          unsubscribeFeatures();
           geoForge.disableAllModes();
           geoForge.features.deleteAll({ history: false });
         },
@@ -266,6 +254,10 @@ geoForge.features.importGeoJson(drawEditSampleNetworkGeoJson, {
   history: false,
 });
 
+const unsubscribeFeatures = geoForge.features.subscribe(() => {
+  console.log('Feature collection updated', geoForge.features.exportGeoJson());
+});
+
 function activateDraw(shape) {
   geoForge.disableAllModes();
   geoForge.enableDraw(shape);
@@ -291,6 +283,7 @@ function clearFeatures() {
 }
 
 function cleanup() {
+  unsubscribeFeatures();
   geoForge.disableAllModes();
   geoForge.features.deleteAll({ history: false });
 }`;

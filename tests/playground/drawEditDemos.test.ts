@@ -27,6 +27,7 @@ describe('drawEditDemos', () => {
     ]);
     const inspectorProps: DrawEditInspectorProps[] = [];
     const mutationHandlers = new Map<string, () => void>();
+    const unsubscribeFeatures = vi.fn();
 
     const geoForge = {
       features: {
@@ -37,6 +38,10 @@ describe('drawEditDemos', () => {
           addedFeatures: Array.from(featureStore.values()),
         })),
         deleteAll: vi.fn(() => featureStore.clear()),
+        subscribe: vi.fn((handler: () => void) => {
+          mutationHandlers.set('features', handler);
+          return unsubscribeFeatures;
+        }),
       },
       history: {
         suspend: vi.fn(<TResult>(callback: () => TResult) => callback()),
@@ -92,9 +97,13 @@ describe('drawEditDemos', () => {
 
     featureStore.set('main:drawn-1', { id: 'drawn-1', temporary: false });
     featureStore.set('temporary:helper-1', { id: 'helper-1', temporary: true });
-    mutationHandlers.get('gm:create')?.();
+    mutationHandlers.get('features')?.();
 
     expect(inspectorProps.at(-1)?.state.featureCount).toBe(1);
     expect(inspectorProps.at(-1)?.state.lastAction).toBe('Feature collection updated');
+
+    result.teardown();
+
+    expect(unsubscribeFeatures).toHaveBeenCalledTimes(1);
   });
 });

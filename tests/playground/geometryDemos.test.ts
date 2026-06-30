@@ -49,7 +49,7 @@ function createLineFeature(id: string, coordinates: number[][]): LineFeatureDoub
 }
 
 describe('geometryDemos', () => {
-  test('recomputes network topology after live geometry mutation events', async () => {
+  test('recomputes network topology after feature restore notifications', async () => {
     const { geometryDemos } =
       await import('../../examples/playground/src/demo-studio/demos/geometry-tools/geometryDemos.ts');
     const lineA = createLineFeature('geometry-network-a', [
@@ -66,6 +66,7 @@ describe('geometryDemos', () => {
     ]);
     const inspectorProps: GeometryInspectorProps[] = [];
     const mutationHandlers = new Map<string, () => void>();
+    const unsubscribeFeatures = vi.fn();
     const configureLineEndpointSnapping = vi.fn();
     const context: DemoContext = {
       geoForge: {
@@ -87,6 +88,10 @@ describe('geometryDemos', () => {
             }));
             featureStore.clear();
             return deletedRefs;
+          }),
+          subscribe: vi.fn((handler: () => void) => {
+            mutationHandlers.set('features', handler);
+            return unsubscribeFeatures;
           }),
         },
         geometry: {
@@ -165,12 +170,13 @@ describe('geometryDemos', () => {
         ],
       },
     });
-    mutationHandlers.get('gm:historychange')?.();
+    mutationHandlers.get('features')?.();
 
     expect(inspectorProps.at(-1)?.state.danglingEndpointCount).toBe(2);
 
     result.teardown();
 
     expect(configureLineEndpointSnapping).toHaveBeenLastCalledWith({ enabled: false });
+    expect(unsubscribeFeatures).toHaveBeenCalledTimes(1);
   });
 });

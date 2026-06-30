@@ -40,13 +40,6 @@ type OwnedFeatureApi = DemoContext['geoForge']['features'] & {
   ): Array<{ sourceName: string; featureId: string | number }>;
 };
 
-const geometryMutationEventNames = [
-  'gm:create',
-  'gm:edit',
-  'gm:drag',
-  'gm:remove',
-  'gm:historychange',
-] as const;
 const typedSampleNetworkGeoJson = sampleNetworkGeoJson as GeoJsonImportFeatureCollection;
 const GEOMETRY_TOPOLOGY_OWNER_ID = 'demo:geometry-tools-network-topology';
 const geometrySampleNetworkGeoJson = {
@@ -97,10 +90,9 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
           state: createLiveTopologyState(geoForge, GEOMETRY_TOPOLOGY_OWNER_ID),
         });
       };
+      const unsubscribeFeatures = geoForge.features.subscribe(updateRuntime);
       const cleanup = () => {
-        geometryMutationEventNames.forEach((eventName) => {
-          context.map.off(eventName, updateRuntime);
-        });
+        unsubscribeFeatures();
         lineEndpointSnapping?.configureLineEndpointSnapping({ enabled: false });
         geoForge.geometry.clearLineEndpointConnectionPreview();
         getOwnedFeatureApi(geoForge).deleteByOwner(GEOMETRY_TOPOLOGY_OWNER_ID, {
@@ -114,9 +106,6 @@ export const geometryDemos: DemoDefinition<GeometryInspectorProps>[] = [
         };
       }
 
-      geometryMutationEventNames.forEach((eventName) => {
-        context.map.on(eventName, updateRuntime);
-      });
       context.setInspectorProps({ state });
       context.setCode(code);
       context.logEvent({
@@ -251,14 +240,12 @@ const refreshTopology = () => {
   });
 };
 
-['gm:create', 'gm:edit', 'gm:drag', 'gm:remove', 'gm:historychange'].forEach((eventName) => {
-  map.on(eventName, refreshTopology);
+const unsubscribeFeatures = geoForge.features.subscribe(() => {
+  refreshTopology();
 });
 
 // Demo cleanup removes the preview layer and only features owned by this setup.
 geoForge.geometry.clearLineEndpointConnectionPreview();
-['gm:create', 'gm:edit', 'gm:drag', 'gm:remove', 'gm:historychange'].forEach((eventName) => {
-  map.off(eventName, refreshTopology);
-});
+unsubscribeFeatures();
 geoForge.features.deleteByOwner(ownerId, { history: false });`;
 }

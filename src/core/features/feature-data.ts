@@ -284,6 +284,11 @@ export class FeatureData {
       sourceName: this.sourceName,
     });
     this.recordUpdate(before, this.getGeoJson(), 'feature.updateGeometry', options);
+    this.gm.features.notifyFeatureChange?.({
+      type: 'update',
+      name: 'gm:edit',
+      feature: this,
+    });
   }
 
   /**
@@ -311,6 +316,11 @@ export class FeatureData {
     this.gm.features.updateManager.updateSource({
       diff: { update: [rollbackDiffGeoJson] },
       sourceName: this.sourceName,
+    });
+    this.gm.features.notifyFeatureChange?.({
+      type: 'update',
+      name: 'gm:edit',
+      feature: this,
     });
   }
 
@@ -397,6 +407,11 @@ export class FeatureData {
       sourceName: this.sourceName,
     });
     this.recordUpdate(before, this.getGeoJson(), 'feature.updateProperties', options);
+    this.gm.features.notifyFeatureChange?.({
+      type: 'update',
+      name: 'gm:edit',
+      feature: this,
+    });
   }
 
   /**
@@ -438,6 +453,11 @@ export class FeatureData {
       sourceName: this.sourceName,
     });
     this.recordUpdate(before, this.getGeoJson(), 'feature.setProperties', options);
+    this.gm.features.notifyFeatureChange?.({
+      type: 'update',
+      name: 'gm:edit',
+      feature: this,
+    });
   }
 
   /**
@@ -464,6 +484,11 @@ export class FeatureData {
       sourceName: this.sourceName,
     });
     this.recordUpdate(before, this.getGeoJson(), 'feature.updateAllProperties', options);
+    this.gm.features.notifyFeatureChange?.({
+      type: 'update',
+      name: 'gm:edit',
+      feature: this,
+    });
   }
 
   /**

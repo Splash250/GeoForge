@@ -48,6 +48,10 @@ describe('workflowDemos', () => {
       redo: vi.fn(() => false),
     };
     const inspectorProps: WorkflowInspectorProps[] = [];
+    const featureSubscriptionHandlers: Array<() => void> = [];
+    const historySubscriptionHandlers: Array<() => void> = [];
+    const unsubscribeFeatures = vi.fn();
+    const unsubscribeHistory = vi.fn();
     const geoForge = {
       features: {
         importGeoJson: vi.fn(() => ({
@@ -55,8 +59,19 @@ describe('workflowDemos', () => {
           addedFeatures: [selectedFeature],
         })),
         delete: vi.fn(),
+        subscribe: vi.fn((handler: () => void) => {
+          featureSubscriptionHandlers.push(handler);
+          return unsubscribeFeatures;
+        }),
       },
-      history,
+      history: {
+        ...history,
+        subscribe: vi.fn((handler: (state: unknown, event: { type: string }) => void) => {
+          historySubscriptionHandlers.push(() => handler(history.getState(), { type: 'change' }));
+          handler(history.getState(), { type: 'initial' });
+          return unsubscribeHistory;
+        }),
+      },
       selection: {
         selectFeature: vi.fn(),
       },
@@ -95,5 +110,15 @@ describe('workflowDemos', () => {
     expect(transaction.cancel).toHaveBeenCalledTimes(1);
     expect(history.undo).toHaveBeenCalledTimes(1);
     expect(inspectorProps.at(-1)?.state.canUndoDemoChange).toBe(true);
+
+    featureSubscriptionHandlers[0]?.();
+    historySubscriptionHandlers[0]?.();
+
+    expect(inspectorProps.at(-1)?.state.historyUndoCount).toBe(4);
+
+    result.teardown();
+
+    expect(unsubscribeFeatures).toHaveBeenCalledTimes(1);
+    expect(unsubscribeHistory).toHaveBeenCalledTimes(1);
   });
 });
