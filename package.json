@@ -47,7 +47,7 @@
     "test": "pnpm run test:e2e",
     "test:unit": "vitest run",
     "test:unit:overlays": "vitest run tests/overlays/html",
-    "test:e2e": "cross-env VITE_GEOFORGE_VERSION=free playwright test",
+    "test:e2e": "cross-env VITE_GEOFORGE_VERSION=free playwright test --grep-invert @serial-edit-interaction && cross-env VITE_GEOFORGE_VERSION=free playwright test --grep @serial-edit-interaction --workers=1",
     "test:headed": "cross-env VITE_GEOFORGE_VERSION=free playwright test --headed",
     "test:ui": "cross-env VITE_GEOFORGE_VERSION=free playwright test --ui",
     "test:debug": "cross-env VITE_GEOFORGE_VERSION=free playwright test --debug",

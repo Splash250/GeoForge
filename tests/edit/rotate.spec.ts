@@ -219,7 +219,9 @@ test.beforeEach(async ({ page }) => {
   }
 });
 
-test('Rotate Polygon, Line, Rectangle, Circle via vertex drag', async ({ page }) => {
+test('Rotate Polygon, Line, Rectangle, Circle via vertex drag @serial-edit-interaction', async ({
+  page,
+}) => {
   const dragOffsetX = 40;
   const dragOffsetY = -30;
   // const rotatableShapes = ['polygon', 'line', 'rectangle', 'circle'];
@@ -248,7 +250,9 @@ test('Rotate Polygon, Line, Rectangle, Circle via vertex drag', async ({ page })
   await page.evaluate(() => window.geoman.options.disableMode('edit', 'rotate'));
 });
 
-test('Move Marker, CircleMarker, TextMarker via drag mode', async ({ page }) => {
+test('Move Marker, CircleMarker, TextMarker via drag mode @serial-edit-interaction', async ({
+  page,
+}) => {
   const dragOffsetX = -25;
   const dragOffsetY = 35;
   const pointBasedShapes = ['marker', 'circle_marker', 'text_marker'];
