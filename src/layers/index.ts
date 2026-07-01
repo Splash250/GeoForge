@@ -2,6 +2,7 @@ export {
   GeomanLayerSubsystem,
   buildRasterCapabilitiesRequestUrl,
   buildRasterProxyUrl,
+  createRasterProxyPolicy,
   createRasterProxyTransformer,
   normalizeRasterTileUrl,
   parseRasterCapabilities,
@@ -12,6 +13,10 @@ export {
   type RasterLayerInput,
   type RasterLayerSubscriptionCallback,
   type RasterLayerSubscriptionEvent,
+  type RasterNetworkDiagnosticEvent,
+  type RasterNetworkPolicy,
+  type RasterProxyPolicy,
+  type RasterProxyPolicyOptions,
   type RasterProxyOptions,
   type RasterLayerSyncOptions,
 } from './raster.ts';

@@ -3,6 +3,7 @@ import {
   GeomanLayerSubsystem,
   buildRasterCapabilitiesRequestUrl,
   buildRasterProxyUrl,
+  createRasterProxyPolicy,
   createRasterProxyTransformer,
   normalizeRasterTileUrl,
   parseRasterCapabilities,
@@ -79,6 +80,20 @@ function createLayerSubsystem(map = createMapStub(['base', 'gm_main-fill'])) {
     map,
     layers: new GeomanLayerSubsystem({ geoman }),
   };
+}
+
+function createWmsCapabilitiesXml(layerName = 'hotmaps:nuts', title = 'NUTS boundaries') {
+  return `<?xml version="1.0"?>
+    <WMS_Capabilities version="1.3.0">
+      <Capability>
+        <Layer>
+          <Layer>
+            <Name>${layerName}</Name>
+            <Title>${title}</Title>
+          </Layer>
+        </Layer>
+      </Capability>
+    </WMS_Capabilities>`;
 }
 
 describe('GeomanLayerSubsystem', () => {
@@ -225,6 +240,195 @@ describe('GeomanLayerSubsystem', () => {
     ]);
     expect(discovered[0]?.url).toContain('layers=hotmaps%3Anuts');
     expect(discovered[0]?.url).toContain('bbox={bbox-epsg-3857}');
+  });
+
+  test('blocks raster capabilities discovery before fetch when the network policy rejects the URL', async () => {
+    const { layers } = createLayerSubsystem();
+    const fetchFn = vi.fn();
+    const diagnostics: Array<{ type: string; url: string; reason?: unknown }> = [];
+
+    await expect(
+      layers.discoverRasterLayers('https://blocked.example.test/wms?service=WMS', {
+        fetchFn,
+        networkPolicy: {
+          allowUrl: () => false,
+          onDiagnostic: (event) => diagnostics.push(event),
+        },
+      }),
+    ).rejects.toThrow('Capabilities request blocked by raster network policy.');
+
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(diagnostics).toEqual([
+      expect.objectContaining({
+        type: 'request-blocked',
+        url: 'https://blocked.example.test/wms?service=WMS&request=GetCapabilities',
+      }),
+    ]);
+  });
+
+  test('aborts raster capabilities discovery when the network policy timeout expires', async () => {
+    vi.useFakeTimers();
+    const { layers } = createLayerSubsystem();
+    const diagnostics: Array<{ type: string; timeoutMs?: number }> = [];
+    const fetchFn = vi.fn(
+      (_url: string, init?: { signal?: AbortSignal }) =>
+        new Promise<{ ok: boolean; status: number; text(): Promise<string> }>(
+          (_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(init.signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+            });
+          },
+        ),
+    );
+
+    const discovery = layers.discoverRasterLayers('https://example.test/wms?service=WMS', {
+      fetchFn,
+      networkPolicy: {
+        timeoutMs: 100,
+        onDiagnostic: (event) => diagnostics.push(event),
+      },
+    });
+    const timeoutExpectation = expect(discovery).rejects.toThrow(
+      'Capabilities request timed out after 100 ms.',
+    );
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    await timeoutExpectation;
+    expect(diagnostics).toContainEqual({
+      type: 'request-timeout',
+      url: expect.any(String),
+      timeoutMs: 100,
+    });
+
+    vi.useRealTimers();
+  });
+
+  test('keeps the network policy timeout active while reading capabilities text', async () => {
+    vi.useFakeTimers();
+    const { layers } = createLayerSubsystem();
+    const fetchFn = vi.fn(async (_url: string, init?: { signal?: AbortSignal }) => ({
+      ok: true,
+      status: 200,
+      text: () =>
+        new Promise<string>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(init.signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+          });
+        }),
+    }));
+
+    const discovery = layers.discoverRasterLayers('https://example.test/wms?service=WMS', {
+      fetchFn,
+      networkPolicy: {
+        timeoutMs: 100,
+      },
+    });
+    const timeoutExpectation = expect(discovery).rejects.toThrow(
+      'Capabilities request timed out after 100 ms.',
+    );
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    await timeoutExpectation;
+    vi.useRealTimers();
+  });
+
+  test('retries failed raster capabilities responses and emits diagnostics before parsing the success', async () => {
+    const { layers } = createLayerSubsystem();
+    const diagnostics: Array<{ type: string; attempt?: number; status?: number }> = [];
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        text: async () => '',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => createWmsCapabilitiesXml(),
+      });
+
+    const discovered = await layers.discoverRasterLayers('https://example.test/wms?service=WMS', {
+      fetchFn,
+      networkPolicy: {
+        retryCount: 1,
+        onDiagnostic: (event) => diagnostics.push(event),
+      },
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(diagnostics).toEqual([
+      expect.objectContaining({ type: 'request-start', attempt: 1 }),
+      expect.objectContaining({ type: 'request-retry', attempt: 1, status: 503 }),
+      expect.objectContaining({ type: 'request-start', attempt: 2 }),
+      expect.objectContaining({ type: 'request-success', attempt: 2, status: 200 }),
+    ]);
+    expect(discovered).toEqual([
+      expect.objectContaining({
+        name: 'hotmaps:nuts',
+        title: 'NUTS boundaries',
+      }),
+    ]);
+  });
+
+  test('discovers raster layers through a composed proxy policy', async () => {
+    const { layers, map } = createLayerSubsystem(createMapStub(['base', 'gm_main-fill']));
+    const proxyPolicy = createRasterProxyPolicy({
+      allowedOrigins: ['https://example.test'],
+      origin: 'https://app.example.test',
+      path: '/api/raster-proxy',
+      retryCount: 1,
+      timeoutMs: 5000,
+    });
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => createWmsCapabilitiesXml(),
+    }));
+
+    layers.configureRasterLayers({
+      basemapLayerId: 'base',
+      ...proxyPolicy,
+      fetchFn,
+    });
+
+    const discovered = await layers.discoverRasterLayers('https://example.test/wms?service=WMS');
+    layers.addRasterLayer({ name: discovered[0]!.title, url: discovered[0]!.url });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/api/raster-proxy?url=https%3A%2F%2Fexample.test%2Fwms%3Fservice%3DWMS%26request%3DGetCapabilities',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(map.sources.values().next().value?.tiles[0]).toContain('/api/raster-proxy?url=');
+  });
+
+  test('blocks proxied raster capabilities discovery when the original target origin is disallowed', async () => {
+    const { layers } = createLayerSubsystem();
+    const diagnostics: Array<{ type: string; reason?: unknown }> = [];
+    const fetchFn = vi.fn();
+    const proxyPolicy = createRasterProxyPolicy({
+      allowedOrigins: ['https://allowed.example.test'],
+      onDiagnostic: (event) => diagnostics.push(event),
+      origin: 'https://app.example.test',
+      path: '/api/raster-proxy',
+    });
+
+    await expect(
+      layers.discoverRasterLayers('https://blocked.example.test/wms?service=WMS', {
+        ...proxyPolicy,
+        fetchFn,
+      }),
+    ).rejects.toThrow('Capabilities request blocked by raster network policy.');
+
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({
+        type: 'request-blocked',
+        reason: 'Origin is not allowed by raster proxy policy.',
+      }),
+    );
   });
 
   test('adds raster layers above the basemap and below GeoForge feature layers', () => {
@@ -740,5 +944,52 @@ describe('raster layer helpers', () => {
     expect(transform('https://tiles.example.test/{z}/{x}/{y}.png')).toBe(
       '/api/raster-proxy?target=https%3A%2F%2Ftiles.example.test%2F{z}%2F{x}%2F{y}.png',
     );
+  });
+
+  test('creates a raster proxy policy with compatible request, tile, and network options', () => {
+    const diagnostics = vi.fn();
+    const policy = createRasterProxyPolicy({
+      allowedOrigins: ['https://tiles.example.test'],
+      onDiagnostic: diagnostics,
+      origin: 'https://app.example.test',
+      parameterName: 'target',
+      path: '/api/raster-proxy',
+      retryCount: 2,
+      timeoutMs: 1500,
+    });
+
+    expect(policy.transformRequestUrl('https://tiles.example.test/wms?service=WMS')).toBe(
+      '/api/raster-proxy?target=https%3A%2F%2Ftiles.example.test%2Fwms%3Fservice%3DWMS',
+    );
+    expect(policy.transformTileUrl('https://tiles.example.test/{z}/{x}/{y}.png')).toBe(
+      '/api/raster-proxy?target=https%3A%2F%2Ftiles.example.test%2F{z}%2F{x}%2F{y}.png',
+    );
+    expect(policy.networkPolicy).toEqual(
+      expect.objectContaining({
+        onDiagnostic: diagnostics,
+        retryCount: 2,
+        timeoutMs: 1500,
+      }),
+    );
+    expect(Object.keys(policy.networkPolicy).sort()).toEqual([
+      'allowUrl',
+      'onDiagnostic',
+      'retryCount',
+      'timeoutMs',
+    ]);
+    expect(
+      policy.networkPolicy.allowUrl?.(
+        '/api/raster-proxy?target=https%3A%2F%2Ftiles.example.test%2Fwms',
+      ),
+    ).toBe(true);
+    expect(
+      policy.networkPolicy.allowUrl?.(
+        '/api/raster-proxy?target=https%3A%2F%2Fblocked.example.test%2Fwms',
+      ),
+    ).toBe(false);
+    expect(policy.transformRequestUrl('https://app.example.test/wms?service=WMS')).toBe(
+      'https://app.example.test/wms?service=WMS',
+    );
+    expect(policy.networkPolicy.allowUrl?.('https://app.example.test/wms?service=WMS')).toBe(true);
   });
 });

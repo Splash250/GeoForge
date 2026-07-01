@@ -56,8 +56,12 @@ export type RasterLayerInput = {
 };
 
 export type DiscoverRasterLayersOptions = {
-  fetchFn?: (url: string) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+  fetchFn?: (
+    url: string,
+    init?: { signal?: AbortSignal },
+  ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
   transformRequestUrl?: (url: string) => string;
+  networkPolicy?: RasterNetworkPolicy;
 };
 
 export type RasterLayerSyncOptions = {
@@ -81,6 +85,42 @@ export type RasterProxyOptions = {
   origin?: string;
   parameterName?: string;
 };
+
+export type RasterNetworkDiagnosticEvent =
+  | { type: 'request-start'; url: string; attempt: number }
+  | { type: 'request-success'; url: string; attempt: number; status: number }
+  | { type: 'request-retry'; url: string; attempt: number; status?: number; error?: unknown }
+  | { type: 'request-blocked'; url: string; reason: string }
+  | { type: 'request-timeout'; url: string; timeoutMs: number }
+  | { type: 'request-abort'; url: string; reason?: unknown }
+  | { type: 'request-failure'; url: string; attempt: number; status?: number; error?: unknown };
+
+export type RasterNetworkPolicy = {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  retryCount?: number;
+  allowUrl?: (url: string) => boolean;
+  onDiagnostic?: (event: RasterNetworkDiagnosticEvent) => void;
+};
+
+export type RasterProxyPolicyOptions = RasterProxyOptions & {
+  allowedOrigins?: readonly string[];
+  timeoutMs?: number;
+  retryCount?: number;
+  signal?: AbortSignal;
+  onDiagnostic?: (event: RasterNetworkDiagnosticEvent) => void;
+};
+
+export type RasterProxyPolicy = {
+  transformRequestUrl: (url: string) => string;
+  transformTileUrl: (url: string) => string;
+  networkPolicy: RasterNetworkPolicy;
+};
+
+const rasterNetworkPolicyBlockedReasons = new WeakMap<
+  RasterNetworkPolicy,
+  (url: string) => string | undefined
+>();
 
 type RasterMap = {
   addLayer: (
@@ -133,13 +173,13 @@ export class GeomanLayerSubsystem {
     const capabilitiesUrl = buildRasterCapabilitiesRequestUrl(serviceUrl);
     const requestUrl = mergedOptions.transformRequestUrl?.(capabilitiesUrl) ?? capabilitiesUrl;
     const fetchFn = mergedOptions.fetchFn ?? getGlobalFetch();
-    const response = await fetchFn(requestUrl);
+    const xmlText = await fetchRasterCapabilitiesWithPolicy(
+      requestUrl,
+      fetchFn,
+      mergedOptions.networkPolicy,
+    );
 
-    if (!response.ok) {
-      throw new Error(`Capabilities request failed with HTTP ${response.status}.`);
-    }
-
-    return parseRasterCapabilities(await response.text(), capabilitiesUrl);
+    return parseRasterCapabilities(xmlText, capabilitiesUrl);
   }
 
   configureRasterLayers(defaults: RasterLayerDefaults): void {
@@ -413,6 +453,36 @@ export function createRasterProxyTransformer(
   options: RasterProxyOptions,
 ): (tileUrl: string) => string {
   return (tileUrl) => buildRasterProxyUrl(tileUrl, options);
+}
+
+export function createRasterProxyPolicy(options: RasterProxyPolicyOptions): RasterProxyPolicy {
+  const transform = createRasterProxyTransformer(options);
+  const parameterName = options.parameterName ?? 'url';
+  const allowedOrigins = new Set(options.allowedOrigins);
+  const hasAllowlist = allowedOrigins.size > 0;
+  const origin = normalizeRasterProxyPolicyOrigin(options.origin);
+  const getBlockedReason = (url: string) =>
+    isRasterProxyPolicyUrlAllowed(url, parameterName, allowedOrigins, hasAllowlist, origin)
+      ? undefined
+      : 'Origin is not allowed by raster proxy policy.';
+  const networkPolicy: RasterNetworkPolicy = {
+    timeoutMs: options.timeoutMs,
+    retryCount: options.retryCount,
+    onDiagnostic: options.onDiagnostic,
+    allowUrl: (url) => getBlockedReason(url) === undefined,
+  };
+
+  if (options.signal) {
+    networkPolicy.signal = options.signal;
+  }
+
+  rasterNetworkPolicyBlockedReasons.set(networkPolicy, getBlockedReason);
+
+  return {
+    transformRequestUrl: transform,
+    transformTileUrl: transform,
+    networkPolicy,
+  };
 }
 
 export function parseRasterCapabilities(
@@ -788,6 +858,236 @@ function getDomParser(): typeof DOMParser {
   }
 
   throw new Error('DOMParser is unavailable in this environment.');
+}
+
+async function fetchRasterCapabilitiesWithPolicy(
+  requestUrl: string,
+  fetchFn: NonNullable<DiscoverRasterLayersOptions['fetchFn']>,
+  policy: RasterNetworkPolicy | undefined,
+): Promise<string> {
+  const blockedReason = getRasterNetworkPolicyBlockReason(policy, requestUrl);
+
+  if (blockedReason) {
+    emitRasterNetworkDiagnostic(policy, {
+      type: 'request-blocked',
+      url: requestUrl,
+      reason: blockedReason,
+    });
+    throw new Error('Capabilities request blocked by raster network policy.');
+  }
+
+  const retryCount = Math.max(0, Math.floor(policy?.retryCount ?? 0));
+  let finalHttpStatus: number | undefined;
+
+  for (let attempt = 1; attempt <= retryCount + 1; attempt += 1) {
+    const abortState = createRasterFetchAbortState(policy, requestUrl);
+
+    try {
+      emitRasterNetworkDiagnostic(policy, { type: 'request-start', url: requestUrl, attempt });
+      const response = await (abortState.signal
+        ? fetchFn(requestUrl, { signal: abortState.signal })
+        : fetchFn(requestUrl));
+
+      if (response.ok) {
+        const text = await response.text();
+        abortState.cleanup();
+        emitRasterNetworkDiagnostic(policy, {
+          type: 'request-success',
+          url: requestUrl,
+          attempt,
+          status: response.status,
+        });
+        return text;
+      }
+
+      abortState.cleanup();
+      finalHttpStatus = response.status;
+
+      if (attempt <= retryCount) {
+        emitRasterNetworkDiagnostic(policy, {
+          type: 'request-retry',
+          url: requestUrl,
+          attempt,
+          status: response.status,
+        });
+        continue;
+      }
+
+      emitRasterNetworkDiagnostic(policy, {
+        type: 'request-failure',
+        url: requestUrl,
+        attempt,
+        status: response.status,
+      });
+      break;
+    } catch (error) {
+      abortState.cleanup();
+
+      if (abortState.timedOut) {
+        throw new Error(`Capabilities request timed out after ${policy?.timeoutMs} ms.`);
+      }
+
+      if (isRasterAbortError(error, policy?.signal)) {
+        emitRasterNetworkDiagnostic(policy, {
+          type: 'request-abort',
+          url: requestUrl,
+          reason: policy?.signal?.reason ?? error,
+        });
+        throw new Error('Capabilities request aborted by raster network policy.');
+      }
+
+      if (attempt <= retryCount) {
+        emitRasterNetworkDiagnostic(policy, {
+          type: 'request-retry',
+          url: requestUrl,
+          attempt,
+          error,
+        });
+        continue;
+      }
+
+      emitRasterNetworkDiagnostic(policy, {
+        type: 'request-failure',
+        url: requestUrl,
+        attempt,
+        error,
+      });
+      throw error;
+    }
+  }
+
+  throw new Error(`Capabilities request failed with HTTP ${finalHttpStatus}.`);
+}
+
+function createRasterFetchAbortState(
+  policy: RasterNetworkPolicy | undefined,
+  requestUrl: string,
+): {
+  cleanup: () => void;
+  signal?: AbortSignal;
+  timedOut: boolean;
+} {
+  if (!policy?.timeoutMs && !policy?.signal) {
+    return {
+      cleanup: () => {},
+      timedOut: false,
+    };
+  }
+
+  const controller = new AbortController();
+  let timedOut = false;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const abortFromCaller = () => {
+    controller.abort(policy.signal?.reason);
+  };
+
+  if (policy.signal) {
+    if (policy.signal.aborted) {
+      abortFromCaller();
+    } else {
+      policy.signal.addEventListener('abort', abortFromCaller, { once: true });
+    }
+  }
+
+  if (policy.timeoutMs) {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      emitRasterNetworkDiagnostic(policy, {
+        type: 'request-timeout',
+        url: requestUrl,
+        timeoutMs: policy.timeoutMs!,
+      });
+      controller.abort(new Error(`Capabilities request timed out after ${policy.timeoutMs} ms.`));
+    }, policy.timeoutMs);
+  }
+
+  return {
+    get timedOut() {
+      return timedOut;
+    },
+    signal: controller.signal,
+    cleanup: () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      policy.signal?.removeEventListener('abort', abortFromCaller);
+    },
+  };
+}
+
+function getRasterNetworkPolicyBlockReason(
+  policy: RasterNetworkPolicy | undefined,
+  requestUrl: string,
+): string | undefined {
+  if (!policy?.allowUrl) {
+    return undefined;
+  }
+
+  if (policy.allowUrl(requestUrl)) {
+    return undefined;
+  }
+
+  const reason = rasterNetworkPolicyBlockedReasons.get(policy)?.(requestUrl);
+  return reason ?? 'URL is not allowed by raster network policy.';
+}
+
+function emitRasterNetworkDiagnostic(
+  policy: RasterNetworkPolicy | undefined,
+  event: RasterNetworkDiagnosticEvent,
+): void {
+  try {
+    policy?.onDiagnostic?.(event);
+  } catch {
+    // Diagnostics must not affect raster request behavior.
+  }
+}
+
+function isRasterAbortError(error: unknown, signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true || (error instanceof DOMException && error.name === 'AbortError');
+}
+
+function isRasterProxyPolicyUrlAllowed(
+  url: string,
+  parameterName: string,
+  allowedOrigins: Set<string>,
+  hasAllowlist: boolean,
+  origin: string | undefined,
+): boolean {
+  if (!hasAllowlist) {
+    return true;
+  }
+
+  const targetUrl = getRasterProxyPolicyTargetUrl(url, parameterName) ?? url;
+
+  try {
+    const targetOrigin = new URL(targetUrl, origin).origin;
+    return targetOrigin === origin || allowedOrigins.has(targetOrigin);
+  } catch {
+    return false;
+  }
+}
+
+function normalizeRasterProxyPolicyOrigin(origin: string | undefined): string | undefined {
+  if (!origin) {
+    return undefined;
+  }
+
+  try {
+    return new URL(origin).origin;
+  } catch {
+    return origin;
+  }
+}
+
+function getRasterProxyPolicyTargetUrl(url: string, parameterName: string): string | undefined {
+  try {
+    const parsed = new URL(url, 'http://geoforge.local');
+    return parsed.searchParams.get(parameterName) ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function getGlobalFetch(): NonNullable<DiscoverRasterLayersOptions['fetchFn']> {
