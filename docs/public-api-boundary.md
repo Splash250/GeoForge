@@ -8,32 +8,32 @@ This page identifies the preferred stable API plus selected advanced and depreca
 
 These exports are the preferred public API for new application code.
 
-| Export                             | Use                                                                                                                     |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `GeoForge`                         | Preferred main package instance for modes, features, tools, decorators, overlays, selection, transactions, and history. |
-| `Geoman`                           | Compatibility alias for existing integrations that have not migrated to `GeoForge`.                                     |
-| `createGeomanInstance`             | Compatibility async helper that creates an instance and waits for package initialization.                               |
-| `GeomanGeometrySubsystem`          | Geometry helper subsystem exposed through `geoForge.geometry`.                                                          |
-| `GeomanContextPanelSubsystem`      | Context panel subsystem exposed through `geoForge.contextPanels`.                                                       |
-| `GeomanToolsSubsystem`             | Custom interaction tool subsystem exposed through `geoForge.tools`.                                                     |
-| `GeomanSelectionSubsystem`         | Selection subsystem exposed through `geoForge.selection`.                                                               |
-| `GeomanTransactionSubsystem`       | Transaction subsystem exposed through `geoForge.transactions`.                                                          |
-| `GeomanTransaction`                | Transaction object returned by `geoForge.transactions.start(...)`.                                                      |
-| `GeomanFeaturePropertyEditor`      | Form helper object returned by `geoForge.transactions.featureProperties(...)`.                                          |
-| `GeomanHistorySubsystem`           | History subsystem exposed through `geoForge.history`.                                                                   |
-| `GeomanSessionSubsystem`           | Session lifecycle subsystem exposed through `geoForge.sessions` for scoped setup and cleanup.                           |
-| `GeomanLayerSubsystem`             | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays.           |
-| `buildRasterProxyUrl`              | Helper for routing cross-origin WMS/WMTS request URLs through an application-owned proxy path.                          |
-| `createRasterProxyPolicy`          | Helper that composes raster proxy transforms with capabilities timeout, retry, allowlist, abort, and diagnostic policy. |
-| `createRasterProxyTransformer`     | Helper for creating reusable raster proxy transformers for `transformRequestUrl` and `transformTileUrl`.                |
-| `GeomanControlProfile`             | Type for runtime control visibility profiles used by `geoForge.control.applyProfile(...)`.                              |
-| `GeomanControlVisibilityOptions`   | Type for granular control visibility updates.                                                                           |
-| `FeatureOwnerId`                   | Runtime owner identifier for scoped feature imports and cleanup.                                                        |
-| `defineGeomanContextPanel`         | Helper for defining context panel descriptors.                                                                          |
-| `createContextPanelValidationList` | Helper for rendering context panel validation content.                                                                  |
-| `createContextPanelActionButton`   | Helper for rendering context panel action buttons.                                                                      |
-| `SOURCES`                          | GeoForge source-name constants.                                                                                         |
-| `GM_PREFIX`                        | Public event prefix retained for compatibility.                                                                         |
+| Export                             | Use                                                                                                                                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GeoForge`                         | Preferred main package instance for modes, features, tools, decorators, overlays, selection, transactions, and history. Use `await GeoForge.create(map, options)` for new lifecycle-aware initialization. |
+| `Geoman`                           | Compatibility alias for existing integrations that have not migrated to `GeoForge`.                                                                                                                       |
+| `createGeomanInstance`             | Compatibility async helper that delegates to `Geoman.create(...)` and waits for package initialization.                                                                                                   |
+| `GeomanGeometrySubsystem`          | Geometry helper subsystem exposed through `geoForge.geometry`.                                                                                                                                            |
+| `GeomanContextPanelSubsystem`      | Context panel subsystem exposed through `geoForge.contextPanels`.                                                                                                                                         |
+| `GeomanToolsSubsystem`             | Custom interaction tool subsystem exposed through `geoForge.tools`.                                                                                                                                       |
+| `GeomanSelectionSubsystem`         | Selection subsystem exposed through `geoForge.selection`.                                                                                                                                                 |
+| `GeomanTransactionSubsystem`       | Transaction subsystem exposed through `geoForge.transactions`.                                                                                                                                            |
+| `GeomanTransaction`                | Transaction object returned by `geoForge.transactions.start(...)`.                                                                                                                                        |
+| `GeomanFeaturePropertyEditor`      | Form helper object returned by `geoForge.transactions.featureProperties(...)`.                                                                                                                            |
+| `GeomanHistorySubsystem`           | History subsystem exposed through `geoForge.history`.                                                                                                                                                     |
+| `GeomanSessionSubsystem`           | Session lifecycle subsystem exposed through `geoForge.sessions` for scoped setup and cleanup.                                                                                                             |
+| `GeomanLayerSubsystem`             | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays.                                                                                             |
+| `buildRasterProxyUrl`              | Helper for routing cross-origin WMS/WMTS request URLs through an application-owned proxy path.                                                                                                            |
+| `createRasterProxyPolicy`          | Helper that composes raster proxy transforms with capabilities timeout, retry, allowlist, abort, and diagnostic policy.                                                                                   |
+| `createRasterProxyTransformer`     | Helper for creating reusable raster proxy transformers for `transformRequestUrl` and `transformTileUrl`.                                                                                                  |
+| `GeomanControlProfile`             | Type for runtime control visibility profiles used by `geoForge.control.applyProfile(...)`.                                                                                                                |
+| `GeomanControlVisibilityOptions`   | Type for granular control visibility updates.                                                                                                                                                             |
+| `FeatureOwnerId`                   | Runtime owner identifier for scoped feature imports and cleanup.                                                                                                                                          |
+| `defineGeomanContextPanel`         | Helper for defining context panel descriptors.                                                                                                                                                            |
+| `createContextPanelValidationList` | Helper for rendering context panel validation content.                                                                                                                                                    |
+| `createContextPanelActionButton`   | Helper for rendering context panel action buttons.                                                                                                                                                        |
+| `SOURCES`                          | GeoForge source-name constants.                                                                                                                                                                           |
+| `GM_PREFIX`                        | Public event prefix retained for compatibility.                                                                                                                                                           |
 
 ## Advanced Compatibility Exports
 
@@ -118,6 +118,7 @@ Do not rely on deep imports from `src`, `dist`, or internal folders. Deep import
 - Root runtime exports are guarded by `tests/public-api/publicBarrel.test.ts`; adding a new runtime export requires updating this document and the snapshot in the same change.
 - Type-only exports may support documented workflows, but new runtime helpers should not appear at the package root by transitively re-exporting an internal barrel.
 - Prefer documentation and deprecation clarity over export removal.
+- Prefer `await GeoForge.create(map, options)` for new application and framework lifecycle code. `new GeoForge(...)`, `new Geoman(...)`, and `createGeomanInstance(...)` remain supported compatibility paths.
 - Add new package subpaths only after consumer import usage is checked and the subpath is explicitly approved.
 - Prefer `geoForge.control.applyProfile(...)`, `setModeVisibility(...)`, and `getProfile()` for runtime control visibility instead of mutating `geoForge.options.controls` or refreshing controls manually.
 - Prefer `geoForge.sessions.start(...)` for scoped setup, preview data, subscriptions, and cleanup. Active sessions require unique ownerIds; disposing a session releases its ownerId and makes its `session.features.*` facade throw on later use. Use lower-level `geoForge.features.importGeoJson(..., { ownerId })`, `getByOwner(...)`, and `deleteByOwner(...)` only when a session object is unnecessary.

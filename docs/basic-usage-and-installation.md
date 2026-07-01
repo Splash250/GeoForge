@@ -72,26 +72,43 @@ const gmOptions: GmOptionsPartial = {
   // GeoForge options here
 };
 
-// Create a new GeoForge instance
-const geoForge = new GeoForge(map, gmOptions);
+// Create and wait for a loaded GeoForge instance
+const geoForge = await GeoForge.create(map, gmOptions);
 
-// Callback when GeoForge is fully loaded
-map.on('gm:loaded', () => {
-  console.log('GeoForge fully loaded');
+// Add GeoJSON shapes after GeoForge is loaded
+const shapeGeoJson: GeoJsonImportFeature = {
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [0, 51] },
+  properties: {},
+};
+geoForge.features.importGeoJsonFeature(shapeGeoJson);
 
-  // Add GeoJSON shapes
-  const shapeGeoJson: GeoJsonImportFeature = {
-    type: 'Feature',
-    geometry: { type: 'Point', coordinates: [0, 51] },
-    properties: {},
-  };
-  geoForge.features.importGeoJsonFeature(shapeGeoJson);
-
-  const shapeGeoJson2: GeoJsonImportFeature = {
-    type: 'Feature',
-    geometry: { type: 'Point', coordinates: [3, 52] },
-    properties: {},
-  };
-  geoForge.features.importGeoJsonFeature(shapeGeoJson2);
-});
+const shapeGeoJson2: GeoJsonImportFeature = {
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [3, 52] },
+  properties: {},
+};
+geoForge.features.importGeoJsonFeature(shapeGeoJson2);
 ```
+
+`new GeoForge(map, gmOptions)` remains supported for existing integrations. New
+application and framework code should prefer `await GeoForge.create(...)` so
+setup code runs only after GeoForge has finished initializing.
+
+## Framework Lifecycle Cleanup
+
+When a component or route owns a GeoForge instance, await cleanup when your
+framework allows it:
+
+```ts
+let geoForge: InstanceType<typeof GeoForge> | undefined;
+
+geoForge = await GeoForge.create(map, gmOptions);
+
+await geoForge.destroy({ removeSources: true });
+geoForge = undefined;
+```
+
+React, Vue, Svelte, and similar component lifecycles should await or return the
+`destroy(...)` promise when possible, especially before creating a replacement
+instance for the same map.

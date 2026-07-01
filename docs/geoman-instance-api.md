@@ -11,8 +11,27 @@ const options: GmOptionsPartial = {
   // configuration options
 };
 
-const geoForge = new GeoForge(map, options);
+const geoForge = await GeoForge.create(map, options);
 ```
+
+`new GeoForge(map, options)` and `new Geoman(map, options)` remain supported for
+compatibility. Framework and application lifecycle code should prefer
+`await GeoForge.create(...)` because it returns only after GeoForge has finished
+initializing.
+
+When a component or route owns the instance, await cleanup when possible:
+
+```ts
+let geoForge: InstanceType<typeof GeoForge> | undefined;
+
+geoForge = await GeoForge.create(map, options);
+
+await geoForge.destroy({ removeSources: true });
+geoForge = undefined;
+```
+
+React, Vue, Svelte, and similar component cleanup hooks should await or return
+the `destroy(...)` promise when the framework lifecycle supports it.
 
 ## Core Properties
 
@@ -31,7 +50,7 @@ const geoForge = new GeoForge(map, options);
 methods remain supported for compatibility.
 
 ```ts
-const geoman = new GeoForge(map);
+const geoman = await GeoForge.create(map);
 
 geoman.modes.enable('draw', 'line');
 geoman.modes.disable('draw', 'line');
@@ -312,7 +331,7 @@ const map = new maplibregl.Map({
   style: 'https://maps.geoman.io/styles/basic/style.json',
 });
 
-const geoman = new GeoForge(map);
+const geoman = await GeoForge.create(map);
 
 await geoman.addControls();
 
