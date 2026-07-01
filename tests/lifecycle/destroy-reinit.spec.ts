@@ -244,6 +244,43 @@ test.describe('Lifecycle - Destroy and Reinit', () => {
       expect(result.destroyed).toBe(false);
       expect(result.hasMainSource).toBe(true);
     });
+
+    test('should reinit through the awaited class factory after destroy', async () => {
+      const markerFeature: GeoJsonImportFeature = {
+        id: 'factory-reinit-marker',
+        type: 'Feature',
+        properties: { shape: 'marker' },
+        geometry: { type: 'Point', coordinates: [0, 51] },
+      };
+
+      await page.evaluate((feature) => {
+        window.geoman.features.importGeoJsonFeature(feature);
+      }, markerFeature);
+
+      await waitForMapIdle(page);
+
+      await page.evaluate(async () => {
+        const mapInstance = window.mapInstance;
+
+        await window.geoman.destroy({ removeSources: true });
+        window.geoman = await window.GeomanClass.create(mapInstance, {});
+      });
+
+      await waitForGeoman(page);
+
+      const result = await page.evaluate(() => {
+        const mapInstance = window.mapInstance;
+        return {
+          loaded: window.geoman.loaded,
+          destroyed: window.geoman.destroyed,
+          hasMainSource: !!mapInstance.getSource('gm_main'),
+        };
+      });
+
+      expect(result.loaded).toBe(true);
+      expect(result.destroyed).toBe(false);
+      expect(result.hasMainSource).toBe(true);
+    });
   });
 
   test.describe('multiple destroy/reinit cycles', () => {

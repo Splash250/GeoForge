@@ -96,6 +96,20 @@ export class Geoman {
   actionInstances: { [key in ActionInstanceKey]?: ActionInstance } = {};
   markerPointer: MarkerPointer;
 
+  static async create(
+    map: AnyMapInstance,
+    options: PartialDeep<GmOptionsData> = {},
+  ): Promise<Geoman> {
+    const geoman = new Geoman(map, options);
+    const result = await geoman.waitForGeomanLoaded();
+
+    if (!result || geoman.destroyed) {
+      throw new Error('Geoman initialization failed');
+    }
+
+    return geoman;
+  }
+
   constructor(map: AnyMapInstance, options: PartialDeep<GmOptionsData> = {}) {
     this.options = this.initCoreOptions(options);
     this.events = this.initCoreEvents();
@@ -508,18 +522,8 @@ function getGeomanLifecycleController(geoman: Geoman): GeomanLifecycleController
 
 export const createGeomanInstance = async (
   map: AnyMapInstance,
-  options: PartialDeep<GmOptionsData>,
-) => {
-  const geoman = new Geoman(map, options);
-  const result = await geoman.waitForGeomanLoaded();
-
-  // If initialization failed (destroyed or returned undefined), throw an error
-  if (!result || geoman.destroyed) {
-    throw new Error('Geoman initialization failed');
-  }
-
-  return geoman;
-};
+  options: PartialDeep<GmOptionsData> = {},
+) => Geoman.create(map, options);
 
 // export all possible types to make them available in rollup-dts
 export * from '@/types/index.ts';

@@ -12,6 +12,76 @@ type GeomanLifecycleWrapperHost = {
   onMapLoad(): Promise<unknown>;
 };
 
+async function withMainModule<T>(
+  callback: (modules: {
+    mainModule: {
+      Geoman: {
+        new (map: unknown, options?: unknown): GeomanLifecycleWrapperHost;
+        create(map: unknown, options?: unknown): Promise<GeomanLifecycleWrapperHost>;
+        prototype: GeomanLifecycleWrapperHost;
+      };
+      GeoForge: {
+        create(map: unknown, options?: unknown): Promise<GeomanLifecycleWrapperHost>;
+      };
+      createGeomanInstance(map: unknown, options?: unknown): Promise<GeomanLifecycleWrapperHost>;
+    };
+    lifecycleModule: {
+      GeomanLifecycleController: new (...args: never[]) => GeomanLifecycleWrapperHost;
+    };
+  }) => Promise<T>,
+): Promise<T> {
+  const { TextEncoder } = await import('node:util');
+  const textEncoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextEncoder');
+  const uint8ArrayDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
+  const originalGeomanVersion = process.env.VITE_GEOFORGE_VERSION;
+
+  Object.defineProperty(globalThis, 'TextEncoder', {
+    configurable: true,
+    value: TextEncoder,
+  });
+  Object.defineProperty(globalThis, 'Uint8Array', {
+    configurable: true,
+    value: new TextEncoder().encode('').constructor,
+  });
+  process.env.VITE_GEOFORGE_VERSION = 'free';
+
+  const server = await createGeoForgeSsrServer({
+    layerStyleStubId: '\0lifecycle-layer-style-stub',
+    layerStyleStubModule: 'export default {};',
+  });
+
+  try {
+    const mainModule = (await server.ssrLoadModule('/src/main.ts')) as Parameters<
+      typeof callback
+    >[0]['mainModule'];
+    const lifecycleModule = (await server.ssrLoadModule(
+      '/src/core/lifecycle/geomanLifecycleController.ts',
+    )) as Parameters<typeof callback>[0]['lifecycleModule'];
+
+    return await callback({ mainModule, lifecycleModule });
+  } finally {
+    await server.close();
+
+    if (textEncoderDescriptor) {
+      Object.defineProperty(globalThis, 'TextEncoder', textEncoderDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'TextEncoder');
+    }
+
+    if (uint8ArrayDescriptor) {
+      Object.defineProperty(globalThis, 'Uint8Array', uint8ArrayDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'Uint8Array');
+    }
+
+    if (originalGeomanVersion === undefined) {
+      delete process.env.VITE_GEOFORGE_VERSION;
+    } else {
+      process.env.VITE_GEOFORGE_VERSION = originalGeomanVersion;
+    }
+  }
+}
+
 describe('GeomanLifecycleController', () => {
   it('rejects addControls when map load setup fails', async () => {
     const loadError = new Error('marker load failed');
@@ -236,26 +306,6 @@ describe('GeomanLifecycleController', () => {
   });
 
   it('keeps Geoman lifecycle methods on the prototype and delegates without exposing lifecycle state', async () => {
-    const { TextEncoder } = await import('node:util');
-    const textEncoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextEncoder');
-    const uint8ArrayDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
-    const originalGeomanVersion = process.env.VITE_GEOFORGE_VERSION;
-
-    Object.defineProperty(globalThis, 'TextEncoder', {
-      configurable: true,
-      value: TextEncoder,
-    });
-    Object.defineProperty(globalThis, 'Uint8Array', {
-      configurable: true,
-      value: new TextEncoder().encode('').constructor,
-    });
-    process.env.VITE_GEOFORGE_VERSION = 'free';
-
-    const layerStyleStubId = '\0lifecycle-layer-style-stub';
-    const server = await createGeoForgeSsrServer({
-      layerStyleStubId,
-      layerStyleStubModule: 'export default {};',
-    });
     const lifecycle = {
       addControls: vi.fn(() => Promise.resolve('addControls result')),
       waitForBaseMap: vi.fn(() => Promise.resolve('waitForBaseMap result')),
@@ -265,19 +315,10 @@ describe('GeomanLifecycleController', () => {
       removeControls: vi.fn(() => 'removeControls result'),
       onMapLoad: vi.fn(() => Promise.resolve('onMapLoad result')),
     };
-    let lifecycleSpies: Record<string, { mockRestore(): void }> | undefined;
 
-    try {
-      const mainModule = (await server.ssrLoadModule('/src/main.ts')) as {
-        Geoman: new (...args: never[]) => GeomanLifecycleWrapperHost;
-      };
-      const lifecycleModule = (await server.ssrLoadModule(
-        '/src/core/lifecycle/geomanLifecycleController.ts',
-      )) as {
-        GeomanLifecycleController: new (...args: never[]) => typeof lifecycle;
-      };
+    await withMainModule(async ({ mainModule, lifecycleModule }) => {
       const controllerPrototype = lifecycleModule.GeomanLifecycleController.prototype;
-      lifecycleSpies = {
+      const lifecycleSpies = {
         addControls: vi
           .spyOn(controllerPrototype, 'addControls')
           .mockImplementation(lifecycle.addControls),
@@ -298,52 +339,86 @@ describe('GeomanLifecycleController', () => {
       };
       const geoman = Object.create(mainModule.Geoman.prototype) as GeomanLifecycleWrapperHost;
 
-      expect('lifecycle' in geoman).toBe(false);
-      expect('lifecycle' in mainModule.Geoman.prototype).toBe(false);
+      try {
+        expect('lifecycle' in geoman).toBe(false);
+        expect('lifecycle' in mainModule.Geoman.prototype).toBe(false);
 
-      const controlsElement = {} as HTMLElement;
-      await expect(geoman.addControls(controlsElement)).resolves.toBe('addControls result');
-      await expect(geoman.waitForBaseMap()).resolves.toBe('waitForBaseMap result');
-      await expect(geoman.waitForGeomanLoaded()).resolves.toBe('waitForGeomanLoaded result');
-      await expect(geoman.init()).resolves.toBe('init result');
-      await expect(geoman.destroy({ removeSources: true })).resolves.toBe('destroy result');
-      expect(geoman.removeControls()).toBe('removeControls result');
-      await expect(geoman.onMapLoad()).resolves.toBe('onMapLoad result');
+        const controlsElement = {} as HTMLElement;
+        await expect(geoman.addControls(controlsElement)).resolves.toBe('addControls result');
+        await expect(geoman.waitForBaseMap()).resolves.toBe('waitForBaseMap result');
+        await expect(geoman.waitForGeomanLoaded()).resolves.toBe('waitForGeomanLoaded result');
+        await expect(geoman.init()).resolves.toBe('init result');
+        await expect(geoman.destroy({ removeSources: true })).resolves.toBe('destroy result');
+        expect(geoman.removeControls()).toBe('removeControls result');
+        await expect(geoman.onMapLoad()).resolves.toBe('onMapLoad result');
 
-      expect(lifecycle.addControls).toHaveBeenCalledWith(controlsElement);
-      expect(lifecycle.waitForBaseMap).toHaveBeenCalledWith();
-      expect(lifecycle.waitForGeomanLoaded).toHaveBeenCalledWith();
-      expect(lifecycle.init).toHaveBeenCalledWith();
-      expect(lifecycle.destroy).toHaveBeenCalledWith({ removeSources: true });
-      expect(lifecycle.removeControls).toHaveBeenCalledWith();
-      expect(lifecycle.onMapLoad).toHaveBeenCalledWith();
-      expect('lifecycle' in geoman).toBe(false);
-    } finally {
-      if (lifecycleSpies) {
+        expect(lifecycle.addControls).toHaveBeenCalledWith(controlsElement);
+        expect(lifecycle.waitForBaseMap).toHaveBeenCalledWith();
+        expect(lifecycle.waitForGeomanLoaded).toHaveBeenCalledWith();
+        expect(lifecycle.init).toHaveBeenCalledWith();
+        expect(lifecycle.destroy).toHaveBeenCalledWith({ removeSources: true });
+        expect(lifecycle.removeControls).toHaveBeenCalledWith();
+        expect(lifecycle.onMapLoad).toHaveBeenCalledWith();
+        expect('lifecycle' in geoman).toBe(false);
+      } finally {
         for (const spy of Object.values(lifecycleSpies)) {
           spy.mockRestore();
         }
       }
+    });
+  });
 
-      await server.close();
+  it('creates Geoman instances through an awaited class factory', async () => {
+    await withMainModule(async ({ mainModule, lifecycleModule }) => {
+      const controllerPrototype = lifecycleModule.GeomanLifecycleController.prototype;
+      const waitForBaseMapSpy = vi
+        .spyOn(controllerPrototype, 'waitForBaseMap')
+        .mockResolvedValue({} as never);
+      const initSpy = vi.spyOn(controllerPrototype, 'init').mockResolvedValue(undefined as never);
+      const waitForGeomanLoadedSpy = vi
+        .spyOn(controllerPrototype, 'waitForGeomanLoaded')
+        .mockImplementation(function (this: GeomanLifecycleWrapperHost) {
+          return Promise.resolve(this);
+        });
 
-      if (textEncoderDescriptor) {
-        Object.defineProperty(globalThis, 'TextEncoder', textEncoderDescriptor);
-      } else {
-        Reflect.deleteProperty(globalThis, 'TextEncoder');
+      try {
+        const map = {};
+        const options = { controls: { draw: { marker: { uiEnabled: false } } } };
+
+        const geoman = await mainModule.Geoman.create(map, options);
+        const helperGeoman = await mainModule.createGeomanInstance(map, options);
+
+        expect(Object.getPrototypeOf(geoman)).toBe(mainModule.Geoman.prototype);
+        expect(Object.getPrototypeOf(helperGeoman)).toBe(mainModule.Geoman.prototype);
+        expect(waitForGeomanLoadedSpy).toHaveBeenCalledTimes(2);
+      } finally {
+        waitForGeomanLoadedSpy.mockRestore();
+        initSpy.mockRestore();
+        waitForBaseMapSpy.mockRestore();
       }
+    });
+  });
 
-      if (uint8ArrayDescriptor) {
-        Object.defineProperty(globalThis, 'Uint8Array', uint8ArrayDescriptor);
-      } else {
-        Reflect.deleteProperty(globalThis, 'Uint8Array');
-      }
+  it('rejects the awaited class factory when initialization does not load an instance', async () => {
+    await withMainModule(async ({ mainModule, lifecycleModule }) => {
+      const controllerPrototype = lifecycleModule.GeomanLifecycleController.prototype;
+      const waitForBaseMapSpy = vi
+        .spyOn(controllerPrototype, 'waitForBaseMap')
+        .mockResolvedValue({} as never);
+      const initSpy = vi.spyOn(controllerPrototype, 'init').mockResolvedValue(undefined as never);
+      const waitForGeomanLoadedSpy = vi
+        .spyOn(controllerPrototype, 'waitForGeomanLoaded')
+        .mockResolvedValue(undefined);
 
-      if (originalGeomanVersion === undefined) {
-        delete process.env.VITE_GEOFORGE_VERSION;
-      } else {
-        process.env.VITE_GEOFORGE_VERSION = originalGeomanVersion;
+      try {
+        await expect(mainModule.Geoman.create({}, {})).rejects.toThrow(
+          'Geoman initialization failed',
+        );
+      } finally {
+        waitForGeomanLoadedSpy.mockRestore();
+        initSpy.mockRestore();
+        waitForBaseMapSpy.mockRestore();
       }
-    }
+    });
   });
 });

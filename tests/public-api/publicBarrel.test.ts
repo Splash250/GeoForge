@@ -151,6 +151,8 @@ describe('public API barrel', () => {
       expect(publicBarrel.GeoForge).toBeDefined();
       expect(publicBarrel.GeoForge).toBe(mainModule.Geoman);
       expect(publicBarrel.Geoman).toBe(mainModule.Geoman);
+      expect(typeof publicBarrel.GeoForge.create).toBe('function');
+      expect(publicBarrel.GeoForge.create).toBe(publicBarrel.Geoman.create);
 
       for (const exportName of STABLE_ROOT_EXPORTS) {
         expect(publicBarrel[exportName], `stable export ${exportName}`).toBeDefined();
