@@ -566,31 +566,303 @@ export { formatArea, formatDistance, toMod } from '@/utils/number.ts';
 export { includesWithType, typedKeys } from '@/utils/typing.ts';
 
 // decorators
-export * from '@/decorators/index.ts';
+export {
+  LineDecoratorManager,
+  GeomanLineDecoratorSubsystem,
+  GeomanLineDecoratorAuthoringSession,
+  normalizeLineDecorators,
+  addLineDecoratorLayer,
+  positionLineDecoratorLayers,
+  createLinePlacements,
+  loadSvgSymbolImage,
+  validateSvgSymbolMarkup,
+  isInMeters,
+  isInPercent,
+  isInPixels,
+  parseNumeric,
+  distanceBetween,
+  bearingBetween,
+  destinationPoint,
+  interpolateOnLine,
+  pixelsToMeters,
+  toLngLat,
+  definedProps,
+  modulus,
+  generateArrowheads,
+  ensureArrowheadSource,
+  resolveIds,
+  updateArrowheadSource,
+  clearArrowheadSource,
+  ArrowheadManager,
+  ensureSymbolDecoratorSource,
+  resolveSymbolDecoratorIds,
+  updateSymbolDecoratorSource,
+  clearSymbolDecoratorSource,
+  ensureSymbolImage,
+  ensureTextDecoratorSource,
+  resolveTextDecoratorIds,
+  updateTextDecoratorSource,
+  clearTextDecoratorSource,
+  SymbolDecoratorRenderer,
+  TextDecoratorRenderer,
+} from '@/decorators/index.ts';
+export type {
+  ArrowFrequencyUnit,
+  ArrowOffsetUnit,
+  ArrowSizeUnit,
+  ArrowheadFeatureCollection,
+  ArrowheadManagerOptions,
+  ArrowheadOptions,
+  ArrowheadSourceIds,
+  ArrowheadsGeneratorConfig,
+  BaseArrowheadOptions,
+  CreateLinePlacementsOptions,
+  EnsureArrowheadSourceOptions,
+  EnsureSymbolDecoratorSourceOptions,
+  EnsureTextDecoratorSourceOptions,
+  InterpolatedPoint,
+  LineDecoratorAnimationDirection,
+  LineDecoratorAnimationEasing,
+  LineDecoratorAnimationOptions,
+  LineDecoratorAnimationProperty,
+  LineDecoratorAuthoringDecoratorInput,
+  LineDecoratorAuthoringDecoratorResolver,
+  LineDecoratorAuthoringFeatureInput,
+  LineDecoratorAuthoringFeatureTarget,
+  LineDecoratorAuthoringLineStyle,
+  LineDecoratorAuthoringSession,
+  LineDecoratorAuthoringSessionOptions,
+  LineDecoratorGeomanSyncOptions,
+  LineDecoratorKind,
+  LineDecoratorLayerPosition,
+  LineDecoratorManagerOptions,
+  LineDecoratorOptions,
+  LineDecoratorPlacementOptions,
+  LineDecoratorRenderer,
+  LineDecoratorRendererKind,
+  LineDecoratorRenderItem,
+  LineDecoratorRotationMode,
+  LineDecoratorRotationOptions,
+  LinePlacement,
+  LinePlacementFrequency,
+  LinePlacementOptions,
+  LineSymbolAnchor,
+  LineSymbolDecoratorOptions,
+  LineSymbolSegmentPlacementOptions,
+  LineSymbolSegmentTarget,
+  LineTextDecoratorOptions,
+  NormalizedLngLat,
+  SvgSymbolImageMap,
+  SvgSymbolImageRegistration,
+  SvgSymbolImageRegistrationResult,
+  SymbolDecoratorRendererOptions,
+  SymbolDecoratorSourceIds,
+  SymbolImageInput,
+  SymbolImageMap,
+  SymbolImageRegistration,
+  TextDecoratorRendererOptions,
+  TextDecoratorSourceIds,
+  GeomanLineDecoratorConfigureOptions,
+  GeomanLineDecoratorManualSyncOptions,
+  GeomanLineDecoratorSubsystemOptions,
+} from '@/decorators/index.ts';
+export type { CreateLineDecoratorAuthoringSessionOptions } from '@/decorators/line/lineDecoratorAuthoringSession.ts';
 
 // selection
-export * from '@/selection/index.ts';
+export { GeomanSelectionSubsystem } from '@/selection/index.ts';
+export type {
+  GeomanSelectionChangeReason,
+  GeomanSelectionEventPayload,
+  GeomanSelectionFilterReason,
+  GeomanSelectionOptions,
+  GeomanSelectionState,
+  SelectionFeatureState,
+  SelectionLayerStyleOptions,
+  SelectionStyle,
+} from '@/selection/index.ts';
 
 // tools
-export * from '@/tools/index.ts';
+export { GeomanToolsSubsystem } from '@/tools/index.ts';
+export type {
+  GeomanToolBlankMapClickEvent,
+  GeomanToolCancelReason,
+  GeomanToolControlEventType,
+  GeomanToolControlOptions,
+  GeomanToolControlState,
+  GeomanToolContext,
+  GeomanToolContextMenuEvent,
+  GeomanToolDefinition,
+  GeomanToolFeatureClickEvent,
+  GeomanToolFeatureContextMenuEvent,
+  GeomanToolFeatureHoverEndEvent,
+  GeomanToolFeatureHoverEndReason,
+  GeomanToolFeatureHoverEvent,
+  GeomanToolInteractionHookResult,
+  GeomanToolSelectionConfig,
+  GeomanToolSelectionOptions,
+  GeomanToolsSubsystemOptions,
+} from '@/tools/index.ts';
 
 // geometry
-export * from '@/geometry/index.ts';
+export { GeomanGeometrySubsystem } from '@/geometry/index.ts';
+export type {
+  GeomanDistanceFormatOptions,
+  GeomanEndpointSnappingConfigureOptions,
+  GeomanEndpointSnappingFacade,
+  GeomanEndpointSnappingState,
+  GeomanGeometrySubsystemOptions,
+  GeomanLineDegreeThresholdValidationOptions,
+  GeomanLineDanglingEndpointValidationOptions,
+  GeomanLineDisconnectedComponentValidationOptions,
+  GeomanLineDuplicateEndpointGroupValidationOptions,
+  GeomanLineEdgeHit,
+  GeomanLineEndpointConnectionEndpoint,
+  GeomanLineEndpointConnectionOptions,
+  GeomanLineEndpointConnectionPreview,
+  GeomanLineEndpointConnectionPreviewOptions,
+  GeomanLineEndpointConnectionPreviewRenderIds,
+  GeomanLineEndpointConnectionPreviewRenderOptions,
+  GeomanLineEndpointConnectionPreviewRenderStyle,
+  GeomanLineEndpointConnectionResult,
+  GeomanLineEndpointConnectionUpdate,
+  GeomanLineEndpointHit,
+  GeomanLineEndpointName,
+  GeomanLineEndpointRef,
+  GeomanLineMergeApplyOptions,
+  GeomanLineMergePlan,
+  GeomanLineMergePlanOptions,
+  GeomanLineMergePlanResult,
+  GeomanLineMergePropertyStrategy,
+  GeomanLineMergeRejectionReason,
+  GeomanLineNetworkEdge,
+  GeomanLineNetworkGraph,
+  GeomanLineNetworkGraphOptions,
+  GeomanLineNetworkNode,
+  GeomanLineSegment,
+  GeomanLineSegmentContext,
+  GeomanLineSegmentHit,
+  GeomanLineSegmentInput,
+  GeomanLineSegmentMetadata,
+  GeomanLineSegmentRemovalOptions,
+  GeomanLineSegmentRemovalResult,
+  GeomanLineSplitAtPointOptions,
+  GeomanLineSplitAtPointResult,
+  GeomanLineTopologyValidationComponent,
+  GeomanLineTopologyValidationIssue,
+  GeomanLineTopologyValidationIssueType,
+  GeomanLineTopologyValidationMessage,
+  GeomanLineTopologyValidationMessageContext,
+  GeomanLineTopologyValidationOptions,
+  GeomanLineTopologyValidationResult,
+  GeomanLineTopologyValidationRuleOptions,
+  GeomanLineTopologyValidationSeverity,
+  GeomanLineVertexHit,
+  GeomanLineVertexInsertionMetadataMode,
+  GeomanLineVertexInsertionOptions,
+  GeomanLineVertexInsertionResult,
+  GeomanNearbyLineEndpointPair,
+  GeomanNearestEdgeOptions,
+  GeomanNearestLineEndpointOptions,
+  GeomanNearestSegmentOptions,
+  GeomanNearestVertexOptions,
+  GeomanSegmentMeasurementFormatOptions,
+  GeomanSegmentPointInput,
+  LineEndpointConnectionPreviewRendererOptions,
+} from '@/geometry/index.ts';
 
 // context panels
-export * from '@/context-panels/index.ts';
+export {
+  GeomanContextPanelSubsystem,
+  defineGeomanContextPanel,
+  createContextPanelValidationList,
+  createContextPanelActionButton,
+} from '@/context-panels/index.ts';
+export type {
+  ContextPanelActionButtonOptions,
+  GeomanContextPanelCloseEvent,
+  GeomanContextPanelCloseReason,
+  GeomanContextPanelDefinition,
+  GeomanContextPanelFeatureRef,
+  GeomanContextPanelOpenData,
+  GeomanContextPanelPlacement,
+  GeomanContextPanelRenderContext,
+  GeomanContextPanelRenderResult,
+  GeomanContextPanelState,
+  GeomanContextPanelSubsystemOptions,
+  GeomanContextPanelTransactionCloseBehavior,
+  GeomanContextPanelTransactionCloseContext,
+  GeomanContextPanelTransactionDefinitionContext,
+  GeomanContextPanelTransactionOptions,
+  GeomanContextPanelTransactionRefreshContext,
+  GeomanContextPanelTransactionRenderContext,
+  GeomanContextPanelTransactionValidationContext,
+} from '@/context-panels/index.ts';
 
 // transactions
-export * from '@/transactions/index.ts';
+export {
+  GeomanFeaturePropertyEditor,
+  GeomanTransaction,
+  GeomanTransactionSubsystem,
+} from '@/transactions/index.ts';
+export type {
+  GeomanFeaturePropertyEditorOptions,
+  GeomanFeaturePropertyEditorState,
+  GeomanFeaturePropertyEditorSubscription,
+  GeomanFeaturePropertyEditorValidationContext,
+  GeomanFeaturePropertyEditorValidator,
+  GeomanTransactionChange,
+  GeomanTransactionCommitResult,
+  GeomanTransactionFeatureRef,
+  GeomanTransactionOptions,
+  GeomanTransactionStatus,
+  GeomanTransactionSubsystemOptions,
+  GeomanTransactionValidationResult,
+  GeomanTransactionValidator,
+} from '@/transactions/index.ts';
 
 // history
-export * from '@/history/index.ts';
+export { GeomanHistorySubsystem } from '@/history/index.ts';
+export type {
+  GeomanFeatureMutationKind,
+  GeomanFeatureMutationRecord,
+  GeomanFeatureRef,
+  GeomanHistoryEntry,
+  GeomanHistoryOperation,
+  GeomanHistoryOperationKind,
+  GeomanHistoryOptions,
+  GeomanHistoryOptionsPartial,
+  GeomanHistoryState,
+  GeomanHistorySubscriptionCallback,
+  GeomanHistorySubscriptionEvent,
+  GeomanHistorySubscriptionEventType,
+} from '@/history/index.ts';
 
 // sessions
-export * from '@/sessions/index.ts';
+export { GeomanSessionSubsystem } from '@/sessions/index.ts';
+export type {
+  GeomanSession,
+  GeomanSessionFeatureFacade,
+  GeomanSessionOptions,
+  GeomanSessionSubsystemOptions,
+} from '@/sessions/index.ts';
 
 // layers
-export * from '@/layers/index.ts';
+export {
+  GeomanLayerSubsystem,
+  buildRasterProxyUrl,
+  createRasterProxyTransformer,
+} from '@/layers/index.ts';
+export type {
+  DiscoverRasterLayersOptions,
+  DiscoveredRasterLayer,
+  GeomanRasterLayer,
+  RasterLayerDefaults,
+  RasterLayerInput,
+  RasterLayerSubscriptionCallback,
+  RasterLayerSubscriptionEvent,
+  RasterLayerSyncOptions,
+  RasterProxyOptions,
+} from '@/layers/index.ts';
 
 // guards
 export {
@@ -605,7 +877,18 @@ export {
 } from '@/utils/guards/events/features.ts';
 export { isGmHelperEvent } from '@/utils/guards/events/helper.ts';
 export { isGmControlEvent, isGmEvent } from '@/utils/guards/events/index.ts';
-export * from '@/utils/guards/index.ts';
+export {
+  isActionType,
+  isBaseMapEventName,
+  isDrawModeName,
+  isEditModeName,
+  isHelperModeName,
+  isMapPointerEvent,
+  isMapWithOnceMethod,
+  isModeName,
+  isNonEmptyArray,
+  isPointerEventName,
+} from '@/utils/guards/index.ts';
 export { isGmDrawEvent };
 
 // features
@@ -670,4 +953,19 @@ export { EDIT_MODES } from '@/modes/constants.ts';
 export { isGmModeEvent } from '@/utils/guards/events/mode.ts';
 
 // HTML overlays
-export * from '@/overlays/html/index.ts';
+export {
+  HtmlOverlayManager,
+  GeomanHtmlOverlaySubsystem,
+  HtmlOverlayElement,
+} from '@/overlays/html/index.ts';
+export type {
+  HtmlOverlayCornerName,
+  HtmlOverlayCorners,
+  HtmlOverlayDefinition,
+  HtmlOverlayIframeOptions,
+  HtmlOverlayPointerMode,
+  HtmlOverlayReferrerPolicy,
+  HtmlOverlaySandboxToken,
+  HtmlOverlayValidationFailureReason,
+  HtmlOverlayValidationResult,
+} from '@/overlays/html/index.ts';
