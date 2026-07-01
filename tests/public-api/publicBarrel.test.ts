@@ -27,6 +27,7 @@ import type {
   LineDecoratorAuthoringSessionOptions,
   LineDecoratorGeomanSyncOptions,
   LineDecoratorLayerPosition,
+  CreateLineDecoratorAuthoringSessionOptions,
   LineDecoratorManagerOptions,
   LineDecoratorOptions,
   RasterLayerSubscriptionCallback,
@@ -241,6 +242,197 @@ describe('public API barrel', () => {
   });
 });
 
+test('keeps root runtime exports intentional', async () => {
+  const { TextEncoder } = await import('node:util');
+  const textEncoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextEncoder');
+  const uint8ArrayDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
+  const originalGeomanVersion = process.env.VITE_GEOFORGE_VERSION;
+
+  Object.defineProperty(globalThis, 'TextEncoder', {
+    configurable: true,
+    value: TextEncoder,
+  });
+  Object.defineProperty(globalThis, 'Uint8Array', {
+    configurable: true,
+    value: new TextEncoder().encode('').constructor,
+  });
+  process.env.VITE_GEOFORGE_VERSION = 'free';
+
+  const server = await createGeoForgeSsrServer({
+    layerStyleStubId: '\0public-api-runtime-export-layer-style-stub',
+    layerStyleStubModule: 'export default {};',
+  });
+
+  try {
+    const publicBarrel = await server.ssrLoadModule('/src/index.ts');
+
+    expect(Object.keys(publicBarrel).sort()).toEqual([
+      'ArrowheadManager',
+      'BaseAction',
+      'BaseDomMarker',
+      'BaseDrag',
+      'BaseDraw',
+      'BaseEdit',
+      'BaseGroupEdit',
+      'BaseHelper',
+      'BaseLayer',
+      'BaseMapAdapter',
+      'BasePopup',
+      'BaseSource',
+      'DRAW_MODES',
+      'EDIT_MODES',
+      'EXTRA_DRAW_MODES',
+      'FEATURE_ID_PROPERTY',
+      'FEATURE_PROPERTY_PREFIX',
+      'FeatureData',
+      'GM_PREFIX',
+      'GeoForge',
+      'Geoman',
+      'GeomanContextPanelSubsystem',
+      'GeomanFeaturePropertyEditor',
+      'GeomanGeometrySubsystem',
+      'GeomanHistorySubsystem',
+      'GeomanHtmlOverlaySubsystem',
+      'GeomanLayerSubsystem',
+      'GeomanLineDecoratorAuthoringSession',
+      'GeomanLineDecoratorSubsystem',
+      'GeomanSelectionSubsystem',
+      'GeomanSessionSubsystem',
+      'GeomanToolsSubsystem',
+      'GeomanTransaction',
+      'GeomanTransactionSubsystem',
+      'GmOptions',
+      'HELPER_MODES',
+      'HtmlOverlayElement',
+      'HtmlOverlayManager',
+      'IS_PRO',
+      'LineDecoratorManager',
+      'LineDrawer',
+      'MarkerPointer',
+      'SHAPE_NAMES',
+      'SOURCES',
+      'ShapeMarkersHelper',
+      'SnappingHelper',
+      'SymbolDecoratorRenderer',
+      'TextDecoratorRenderer',
+      'addLineDecoratorLayer',
+      'bearingBetween',
+      'boundsContains',
+      'boundsToBBox',
+      'buildRasterProxyUrl',
+      'calculatePerimeter',
+      'clearArrowheadSource',
+      'clearSymbolDecoratorSource',
+      'clearTextDecoratorSource',
+      'controlIcons',
+      'convertToLineStringFeatureCollection',
+      'convertToThrottled',
+      'createContextPanelActionButton',
+      'createContextPanelValidationList',
+      'createGeomanInstance',
+      'createLinePlacements',
+      'createRasterProxyTransformer',
+      'customShapeRectangle',
+      'customShapeTriangle',
+      'defaultLayerStyles',
+      'defineGeomanContextPanel',
+      'definedProps',
+      'destinationPoint',
+      'distanceBetween',
+      'drawClassMap',
+      'eachCoordinateWithPath',
+      'eachSegmentWithPath',
+      'editClassMap',
+      'ensureArrowheadSource',
+      'ensureSymbolDecoratorSource',
+      'ensureSymbolImage',
+      'ensureTextDecoratorSource',
+      'findCoordinateWithPath',
+      'formatArea',
+      'formatDistance',
+      'generateArrowheads',
+      'geoJsonPointToLngLat',
+      'getEuclideanDistance',
+      'getEuclideanSegmentNearestPoint',
+      'getGeoJsonCoordinatesCount',
+      'getGeoJsonFirstPoint',
+      'getLngLatDiff',
+      'helperClassMap',
+      'includesWithType',
+      'interpolateOnLine',
+      'isActionType',
+      'isBaseMapEventName',
+      'isDrawModeName',
+      'isEditModeName',
+      'isEqualPosition',
+      'isGeoJsonFeatureInPolygon',
+      'isGmControlEvent',
+      'isGmDrawEvent',
+      'isGmDrawFreehandDrawerEvent',
+      'isGmDrawLineDrawerEvent',
+      'isGmDrawShapeEvent',
+      'isGmEditEvent',
+      'isGmEvent',
+      'isGmFeatureBeforeCreateEvent',
+      'isGmFeatureBeforeUpdateEvent',
+      'isGmHelperEvent',
+      'isGmModeEvent',
+      'isHelperModeName',
+      'isInMeters',
+      'isInPercent',
+      'isInPixels',
+      'isMapPointerEvent',
+      'isMapWithOnceMethod',
+      'isModeName',
+      'isMultiPolygonFeature',
+      'isNonEmptyArray',
+      'isPointerEventName',
+      'isPolygonFeature',
+      'lngLatToGeoJsonPoint',
+      'loadSvgSymbolImage',
+      'mergeByTypeCustomizer',
+      'modulus',
+      'moveFeatureData',
+      'moveGeoJson',
+      'normalizeLineDecorators',
+      'parseNumeric',
+      'pixelsToMeters',
+      'positionLineDecoratorLayers',
+      'resolveIds',
+      'resolveSymbolDecoratorIds',
+      'resolveTextDecoratorIds',
+      'toLngLat',
+      'toMod',
+      'twoCoordsToLineString',
+      'typedKeys',
+      'updateArrowheadSource',
+      'updateSymbolDecoratorSource',
+      'updateTextDecoratorSource',
+      'validateSvgSymbolMarkup',
+    ]);
+  } finally {
+    await server.close();
+
+    if (textEncoderDescriptor) {
+      Object.defineProperty(globalThis, 'TextEncoder', textEncoderDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'TextEncoder');
+    }
+
+    if (uint8ArrayDescriptor) {
+      Object.defineProperty(globalThis, 'Uint8Array', uint8ArrayDescriptor);
+    } else {
+      Reflect.deleteProperty(globalThis, 'Uint8Array');
+    }
+
+    if (originalGeomanVersion === undefined) {
+      delete process.env.VITE_GEOFORGE_VERSION;
+    } else {
+      process.env.VITE_GEOFORGE_VERSION = originalGeomanVersion;
+    }
+  }
+});
+
 test('keeps internal React bindings out of public package metadata', async () => {
   const packageRoot = process.cwd();
   const packageJson = JSON.parse(
@@ -333,6 +525,7 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<GeomanFeaturePropertyEditorState>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorLayerPosition>().toMatchTypeOf<string>();
+  expectTypeOf<CreateLineDecoratorAuthoringSessionOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorManagerOptions>().toMatchTypeOf<object>();
   expectTypeOf<LineDecoratorGeomanSyncOptions>().toMatchTypeOf<object>();
   expectTypeOf<GeomanLineDecoratorSubsystemOptions>().toMatchTypeOf<object>();

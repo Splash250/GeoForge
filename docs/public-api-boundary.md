@@ -52,6 +52,8 @@ These exports remain available for integrations that need lower-level ownership 
 
 These exports are retained to avoid breaking existing consumers. They are not preferred for new application code.
 
+Deprecated compatibility exports remain available for this release, but new integrations should not build on them. If an integration currently imports these names from `maplibre-geoforge`, migrate toward high-level `GeoForge` instance APIs first; do not replace root imports with deep `src` or `dist` imports.
+
 | Export                        | Replacement guidance                                                         |
 | ----------------------------- | ---------------------------------------------------------------------------- |
 | `BaseAction`                  | Prefer high-level `GeoForge` modes, tools, and subsystems.                   |
@@ -112,6 +114,8 @@ Do not rely on deep imports from `src`, `dist`, or internal folders. Deep import
 
 - Keep stable exports available unless a breaking package release explicitly says otherwise.
 - Keep advanced and deprecated compatibility exports until downstream consumer usage is reviewed and removal is explicitly approved.
+- Root runtime exports are guarded by `tests/public-api/publicBarrel.test.ts`; adding a new runtime export requires updating this document and the snapshot in the same change.
+- Type-only exports may support documented workflows, but new runtime helpers should not appear at the package root by transitively re-exporting an internal barrel.
 - Prefer documentation and deprecation clarity over export removal.
 - Add new package subpaths only after consumer import usage is checked and the subpath is explicitly approved.
 - Prefer `geoForge.control.applyProfile(...)`, `setModeVisibility(...)`, and `getProfile()` for runtime control visibility instead of mutating `geoForge.options.controls` or refreshing controls manually.
