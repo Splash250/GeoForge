@@ -33,6 +33,10 @@ import type {
   RasterLayerSubscriptionCallback,
   RasterLayerSubscriptionEvent,
   RasterLayerDefaults,
+  RasterNetworkDiagnosticEvent,
+  RasterNetworkPolicy,
+  RasterProxyPolicy,
+  RasterProxyPolicyOptions,
   RasterProxyOptions,
   SymbolDecoratorRendererOptions,
   TextDecoratorRendererOptions,
@@ -53,6 +57,7 @@ const STABLE_ROOT_EXPORTS = [
   'GeomanSessionSubsystem',
   'GeomanLayerSubsystem',
   'buildRasterProxyUrl',
+  'createRasterProxyPolicy',
   'createRasterProxyTransformer',
   'defineGeomanContextPanel',
   'createContextPanelValidationList',
@@ -331,6 +336,7 @@ test('keeps root runtime exports intentional', async () => {
       'createContextPanelValidationList',
       'createGeomanInstance',
       'createLinePlacements',
+      'createRasterProxyPolicy',
       'createRasterProxyTransformer',
       'customShapeRectangle',
       'customShapeTriangle',
@@ -542,6 +548,7 @@ test('exports public compatibility types from the root barrel', () => {
   expectTypeOf<HtmlOverlayDefinition>().toMatchTypeOf<object>();
   expectTypeOf<HtmlOverlayIframeOptions>().toMatchTypeOf<object>();
   expectTypeOf<RasterLayerDefaults>().toMatchTypeOf<object>();
+  expectTypeOf<RasterLayerDefaults>().toMatchTypeOf<{ networkPolicy?: RasterNetworkPolicy }>();
   expectTypeOf<RasterLayerSubscriptionCallback>().parameters.toEqualTypeOf<
     [GeomanRasterLayer[], RasterLayerSubscriptionEvent]
   >();
@@ -550,6 +557,13 @@ test('exports public compatibility types from the root barrel', () => {
     'initial' | 'configure' | 'add' | 'remove' | 'reorder' | 'destroy'
   >();
   expectTypeOf<RasterProxyOptions>().toMatchTypeOf<object>();
+  expectTypeOf<RasterProxyPolicyOptions>().toMatchTypeOf<RasterProxyOptions>();
+  expectTypeOf<RasterProxyPolicy>().toMatchTypeOf<{
+    transformRequestUrl: (url: string) => string;
+    transformTileUrl: (url: string) => string;
+    networkPolicy: RasterNetworkPolicy;
+  }>();
+  expectTypeOf<RasterNetworkDiagnosticEvent>().toMatchTypeOf<object>();
 });
 
 test('exports context panel and geometry helper types', async () => {

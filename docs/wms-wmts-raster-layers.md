@@ -59,6 +59,15 @@ fresh array, so UI code should render from the snapshot instead of mutating it.
 ```ts
 const discovered = await geoForge.layers.discoverRasterLayers(
   'https://geoserver.citiwatts.net/geoserver/hotmaps/wms?service=WMS&request=GetMap',
+  {
+    networkPolicy: {
+      timeoutMs: 8000,
+      retryCount: 1,
+      onDiagnostic: (event) => {
+        console.debug('Raster discovery', event);
+      },
+    },
+  },
 );
 
 const selected = discovered.filter((layer) => layer.name === 'hotmaps:nuts');
@@ -80,8 +89,56 @@ instead of hand-writing KVP tile URLs.
 
 ## CORS and Proxies
 
-Browsers require WMS/WMTS servers to allow cross-origin tile requests. If a server does not send
-CORS headers, proxy the capabilities and tile URLs through your application server:
+### Browser-only mode
+
+Use direct discovery and tile URLs when the WMS/WMTS service sends CORS headers that allow your
+application origin. `networkPolicy` applies to capabilities discovery, while MapLibre still loads
+tile URLs from the raster source:
+
+```ts
+const discovered = await geoForge.layers.discoverRasterLayers(serviceUrl, {
+  networkPolicy: {
+    timeoutMs: 8000,
+    retryCount: 1,
+    allowUrl: (url) => new URL(url).origin === 'https://geoserver.citiwatts.net',
+    onDiagnostic: (event) => {
+      reportRasterNetworkEvent(event);
+    },
+  },
+});
+```
+
+Diagnostics include request start, success, retry, blocked, timeout, abort, and failure events.
+
+### App-proxy mode
+
+If a server does not send CORS headers, proxy capabilities and tile URLs through your application
+server. `createRasterProxyPolicy` composes the compatible request transform, tile transform, and
+capabilities network policy in one object:
+
+```ts
+const rasterProxy = createRasterProxyPolicy({
+  path: '/api/tile-proxy',
+  origin: window.location.origin,
+  allowedOrigins: ['https://geoserver.citiwatts.net'],
+  timeoutMs: 8000,
+  retryCount: 1,
+  onDiagnostic: (event) => {
+    reportRasterNetworkEvent(event);
+  },
+});
+
+geoForge.layers.configureRasterLayers({
+  basemapLayerId: 'dark-basemap',
+  ...rasterProxy,
+});
+```
+
+The returned `transformRequestUrl` and `transformTileUrl` both use
+`buildRasterProxyUrl(url, { path, origin, parameterName })`, and the returned `networkPolicy`
+checks the original target URL origin when `allowedOrigins` is set.
+
+`createRasterProxyTransformer` is still available when you only need URL transformation:
 
 ```ts
 const proxied = createRasterProxyTransformer({
@@ -110,9 +167,13 @@ transformation is more convenient. The helper proxies only cross-origin `http` a
 preserves MapLibre template tokens such as `{z}`, `{x}`, `{y}`, and `{bbox-epsg-3857}`, and returns
 the original URL for same-origin, non-HTTP, invalid, or origin-less inputs.
 
-The playground Vite proxy is intentionally local-development-only. Production proxies should allowlist
-trusted WMS/WMTS hosts, block private-network destinations, enforce response-size limits, and set
-request timeouts.
+### Server-proxy notes
+
+The playground Vite proxy is intentionally local-development-only. Production proxies should still
+enforce trusted WMS/WMTS host allowlists, block private-network destinations, enforce response-size
+limits, validate content types, and set server-side request timeouts. The client `allowedOrigins`,
+`timeoutMs`, `retryCount`, and diagnostic hooks improve browser behavior and observability, but they
+do not replace server-side SSRF and resource-limit protections.
 
 ## Reorder or Remove Layers
 

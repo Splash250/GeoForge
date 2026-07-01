@@ -24,6 +24,7 @@ These exports are the preferred public API for new application code.
 | `GeomanSessionSubsystem`           | Session lifecycle subsystem exposed through `geoForge.sessions` for scoped setup and cleanup.                           |
 | `GeomanLayerSubsystem`             | Raster layer subsystem exposed through `geoForge.layers` for WMS/WMTS discovery and MapLibre raster overlays.           |
 | `buildRasterProxyUrl`              | Helper for routing cross-origin WMS/WMTS request URLs through an application-owned proxy path.                          |
+| `createRasterProxyPolicy`          | Helper that composes raster proxy transforms with capabilities timeout, retry, allowlist, abort, and diagnostic policy. |
 | `createRasterProxyTransformer`     | Helper for creating reusable raster proxy transformers for `transformRequestUrl` and `transformTileUrl`.                |
 | `GeomanControlProfile`             | Type for runtime control visibility profiles used by `geoForge.control.applyProfile(...)`.                              |
 | `GeomanControlVisibilityOptions`   | Type for granular control visibility updates.                                                                           |

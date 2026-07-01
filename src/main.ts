@@ -853,6 +853,7 @@ export type {
 export {
   GeomanLayerSubsystem,
   buildRasterProxyUrl,
+  createRasterProxyPolicy,
   createRasterProxyTransformer,
 } from '@/layers/index.ts';
 export type {
@@ -864,6 +865,10 @@ export type {
   RasterLayerSubscriptionCallback,
   RasterLayerSubscriptionEvent,
   RasterLayerSyncOptions,
+  RasterNetworkDiagnosticEvent,
+  RasterNetworkPolicy,
+  RasterProxyPolicy,
+  RasterProxyPolicyOptions,
   RasterProxyOptions,
 } from '@/layers/index.ts';
 
