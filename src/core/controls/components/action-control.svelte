@@ -5,8 +5,8 @@
     type ControlsStore,
   } from '@/core/controls/components/controls-store.ts';
   import type { ControlOptions, GenericSystemControl, Geoman } from '@/main.ts';
-  import DOMPurify from 'dompurify';
   import log from '@/utils/log';
+  import { sanitizeSvgMarkup } from '@/utils/sanitizeSvgMarkup.ts';
   import { getContext } from 'svelte';
 
   const { control, controlOptions }: {
@@ -14,7 +14,9 @@
     controlOptions: ControlOptions,
   } = $props();
 
-  const sanitizedSvg = $derived(controlOptions?.icon ? DOMPurify.sanitize(controlOptions.icon.trim()) : null);
+  const sanitizedSvg = $derived(
+    controlOptions?.icon ? sanitizeSvgMarkup(controlOptions.icon) : null,
+  );
   const ariaPressed = $derived(
     control.eventType === 'toggle' ? String(controlOptions.active) : undefined,
   );

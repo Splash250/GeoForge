@@ -8,7 +8,7 @@
   } from '@/core/controls/components/controls-store.ts';
   import ToolControl from '@/core/controls/components/tool-control.svelte';
   import type { ActionType, GenericSystemControls, ModeName } from '@/main.ts';
-  import DOMPurify from 'dompurify';
+  import { sanitizeSvgMarkup } from '@/utils/sanitizeSvgMarkup.ts';
   import { getContext } from 'svelte';
   import { slide } from 'svelte/transition';
 
@@ -44,7 +44,7 @@
   };
 
   const getToggleExpandedIcon = () => {
-    return DOMPurify.sanitize(expanded ? caretDown : caretUp);
+    return sanitizeSvgMarkup(expanded ? caretDown : caretUp);
   };
 </script>
 

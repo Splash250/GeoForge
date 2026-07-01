@@ -5,6 +5,7 @@ import {
   type HtmlOverlayIframeOptions,
   type HtmlOverlayReferrerPolicy,
 } from './types.ts';
+import { hasRiskyHtmlOverlaySandboxCombination } from '@/utils/sanitizeSvgMarkup.ts';
 
 const FALLBACK_IFRAME_TITLE = 'HTML map overlay';
 const DEFAULT_REFERRER_POLICY: HtmlOverlayReferrerPolicy = 'no-referrer';
@@ -104,6 +105,12 @@ export class HtmlOverlayElement {
     }
 
     this.iframe.title = iframeTitle(iframeOptions.title);
+    if (hasRiskyHtmlOverlaySandboxCombination(iframeOptions.sandbox)) {
+      console.warn(
+        'GeoForge HTML overlay iframe sandbox combines allow-scripts with allow-same-origin. Treat overlay HTML as trusted application content.',
+        { overlayId: definition.id, sandbox: iframeOptions.sandbox },
+      );
+    }
     this.iframe.setAttribute('sandbox', iframeOptions.sandbox?.join(' ') ?? '');
     const referrerPolicy = resolveReferrerPolicy(iframeOptions.referrerPolicy);
     this.iframe.referrerPolicy = referrerPolicy;

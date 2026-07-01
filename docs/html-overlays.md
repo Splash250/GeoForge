@@ -78,6 +78,18 @@ Use `setSelected(id)` before interacting with overlays that use the default
 `selected` pointer mode. The iframe defaults to an empty `sandbox`, so add only
 the sandbox tokens required by the embedded HTML.
 
+## HTML Trust Contract
+
+`HtmlOverlayDefinition.html` is assigned to an iframe `srcdoc`. GeoForge does not
+sanitize this HTML because overlays are designed for application-owned iframe
+documents. Do not pass arbitrary end-user HTML to this API unless your
+application sanitizes it first.
+
+The default iframe sandbox is empty and non-interactive. Adding both
+`allow-scripts` and `allow-same-origin` intentionally weakens browser isolation;
+GeoForge logs a warning for this combination and leaves the tokens in place so
+application-owned iframe documents keep working.
+
 ## Map pitch and rectangle expectations
 
 The overlay manager refreshes on map render, move, zoom, rotate, pitch, and

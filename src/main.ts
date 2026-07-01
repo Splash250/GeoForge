@@ -46,6 +46,7 @@ import { MarkerPointer } from '@/utils/draw/marker-pointer.ts';
 import { isGmDrawEvent, isModeName, isModeType } from '@/utils/guards/modes.ts';
 import { typedKeys } from '@/utils/typing.ts';
 import log from '@/utils/log.ts';
+import { sanitizeSvgMarkup } from '@/utils/sanitizeSvgMarkup.ts';
 import type { PartialDeep } from 'type-fest';
 
 // declare module 'maplibre-gl' {
@@ -283,7 +284,9 @@ export class Geoman {
     element.classList.add('marker-wrapper');
     element.style.lineHeight = '0';
 
-    element.innerHTML = markerIcons[type] || 'NO_ICON';
+    const rawIcon = markerIcons[type] || 'NO_ICON';
+    const sanitizedIcon = sanitizeSvgMarkup(rawIcon);
+    element.innerHTML = sanitizedIcon || 'NO_ICON';
     const svgElement = element.firstChild as HTMLElement;
 
     if (typeof svgElement !== 'object') {
