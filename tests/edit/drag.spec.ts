@@ -32,7 +32,7 @@ test.beforeEach(async ({ page }) => {
   }
 });
 
-test('Drag', async ({ page }) => {
+test('Drag @serial-edit-interaction', async ({ page }) => {
   const dX = -20;
   const dY = 0;
   await enableMode(page, 'edit', 'drag');

@@ -48,8 +48,16 @@ Before publishing a release candidate, run:
 pnpm run build
 pnpm run build:budget
 pnpm run check
+pnpm run test:e2e
 pnpm audit --prod
 ```
+
+`pnpm run test:e2e` is the complete Playwright release gate. It runs in two
+phases: first the normal suite with `--grep-invert @serial-edit-interaction`,
+then the high-sensitivity edit interaction group with
+`--grep @serial-edit-interaction --workers=1`. The serialized group covers drag,
+change, and rotate mouse interactions that are prone to false negatives under
+parallel browser load, and it remains part of the required release gate.
 
 Validate sourcemap policy explicitly:
 

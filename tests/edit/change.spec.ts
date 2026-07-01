@@ -121,7 +121,7 @@ test.beforeEach(async ({ page }) => {
   }
 });
 
-test('Change/Drag each shape type', async ({ page }) => {
+test('Change/Drag each shape type @serial-edit-interaction', async ({ page }) => {
   const dX = 20;
   const dY = 20;
 
