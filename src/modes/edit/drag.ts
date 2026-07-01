@@ -4,7 +4,7 @@ import type { MapHandlerReturnData } from '@/types/events/bus.ts';
 import type { GmSystemEvent } from '@/types/events/index.ts';
 import type { EditModeName } from '@/types/modes/index.ts';
 import { isGmEditEvent } from '@/utils/guards/modes.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export class EditDrag extends BaseDrag {
   mode: EditModeName = 'drag';

@@ -7,7 +7,7 @@ import { HelperEventListener } from '@/core/events/listeners/helper.ts';
 import type { Geoman } from '@/main.ts';
 import type { GmEventName, GmSystemEvent } from '@/types/events/index.ts';
 import type { ActionType } from '@/types/options.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export default class GmEvents {
   gm: Geoman;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ActionInstance, SubAction } from '@/main.ts';
-  import log from '@/utils/log';
+  import log from '@/utils/log.ts';
 
   const { name, actionInstance, subAction }: {
     name: string,

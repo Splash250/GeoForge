@@ -14,7 +14,7 @@ import type { AnyEventName, MapEventName } from '@/types/map/index.ts';
 import { isBaseMapEvent, isGmEvent } from '@/utils/guards/events/index.ts';
 import { typedKeys } from '@/utils/typing.ts';
 import type { BaseMapEvent } from '@mapLib/types/events.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export class EventBus {
   gm: Geoman;

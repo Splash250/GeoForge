@@ -8,7 +8,7 @@ import type {
   ShapeName,
 } from '@/main.ts';
 import type { Feature, GeoJSON } from 'geojson';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 import ml from 'maplibre-gl';
 
 function isMaplibreSourceReadinessError(error: unknown, sourceId: string): boolean {

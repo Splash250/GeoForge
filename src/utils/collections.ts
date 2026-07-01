@@ -1,5 +1,5 @@
 import { isPlainObject } from 'lodash-es';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export const findInCollection = <T>(
   collection: Map<unknown, T> | Set<T> | Array<T>,

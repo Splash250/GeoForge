@@ -3,7 +3,7 @@ import { BaseHelper } from '@/modes/helpers/base.ts';
 import type { LngLatTuple } from '@/types/map/index.ts';
 import type { HelperModeName } from '@/types/modes/index.ts';
 import bbox from '@turf/bbox';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 import { IS_PRO } from '@/core/constants.ts';
 

@@ -6,7 +6,7 @@ import type {
 } from '@/main.ts';
 import { baseMapEventNames, pointerEvents } from '@/types/map/index.ts';
 import type { BaseMapEvent, BaseMapMouseEvent, BaseMapPointerEvent } from '@mapLib/types/events.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export function isPointerEventName(key: string): key is PointerEventName {
   return pointerEvents.includes(key as PointerEventName);

@@ -5,7 +5,7 @@
     type ControlsStore,
   } from '@/core/controls/components/controls-store.ts';
   import type { ControlOptions, GenericSystemControl, Geoman } from '@/main.ts';
-  import log from '@/utils/log';
+  import log from '@/utils/log.ts';
   import { sanitizeSvgMarkup } from '@/utils/sanitizeSvgMarkup.ts';
   import { getContext } from 'svelte';
 

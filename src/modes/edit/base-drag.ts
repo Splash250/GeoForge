@@ -20,7 +20,7 @@ import { isMapPointerEvent } from '@/utils/guards/map.ts';
 import type { BaseMapEvent } from '@mapLib/types/events.ts';
 import type { Feature, Polygon } from 'geojson';
 import { isEqual } from 'lodash-es';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 type UpdateShapeHandler = (
   featureData: FeatureData,

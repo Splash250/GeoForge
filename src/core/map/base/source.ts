@@ -1,6 +1,6 @@
 import type { GeoJsonShapeFeatureCollection, GeoJsonUniversalDiff } from '@/main.ts';
 import type { GeoJSON } from 'geojson';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export abstract class BaseSource<TSourceInstance = unknown> {
   abstract sourceInstance: TSourceInstance | null;

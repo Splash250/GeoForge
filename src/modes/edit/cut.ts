@@ -23,7 +23,7 @@ import type {
   Polygon,
   Position,
 } from 'geojson';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 type PolygonFeature = Feature<Polygon | MultiPolygon>;
 

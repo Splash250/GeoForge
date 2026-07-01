@@ -29,7 +29,7 @@ import { isMapPointerEvent, isPointerEventWithModifiers } from '@/utils/guards/m
 import { isGmDrawEvent, isGmEditEvent } from '@/utils/guards/modes.ts';
 import type { BaseMapEvent, BaseMapPointerEvent } from '@mapLib/types/events.ts';
 import { cloneDeep, intersection, isEqual } from 'lodash-es';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 type SegmentData = {
   segment: SegmentPosition;

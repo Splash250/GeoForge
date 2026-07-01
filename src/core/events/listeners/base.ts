@@ -8,7 +8,7 @@ import type { GmSystemEvent } from '@/types/events/index.ts';
 import type { ActionType, ControlOptions } from '@/types/options.ts';
 import { isGmControlEvent } from '@/utils/guards/events/index.ts';
 import { isGmModeEvent } from '@/utils/guards/events/mode.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export abstract class BaseEventListener {
   gm: Geoman;

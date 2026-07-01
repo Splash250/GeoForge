@@ -9,7 +9,7 @@ import { DrawRectangle } from '@/modes/draw/rectangle.ts';
 import { DrawTextMarker } from '@/modes/draw/text-marker.ts';
 import { DrawEllipse } from '@/modes/draw/ellipse.ts';
 import type { DrawModeName } from '@/types/modes/index.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 type DrawClassConstructor = new (gm: Geoman) => BaseDraw;
 type DrawClassMap = {

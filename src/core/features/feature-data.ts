@@ -24,7 +24,7 @@ import { includesWithType, typedKeys } from '@/utils/typing.ts';
 import centroid from '@turf/centroid';
 import type { Feature } from 'geojson';
 import { cloneDeep } from 'lodash-es';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export const toPolygonAllowedShapes: Array<FeatureData['shape']> = [
   'circle',

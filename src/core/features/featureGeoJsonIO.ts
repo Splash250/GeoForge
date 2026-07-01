@@ -20,7 +20,7 @@ import type {
 import type { ShapeName } from '../../types/modes/index.ts';
 import { fixGeoJsonFeature, getCustomFeatureId } from '../../utils/geojsonImport.ts';
 import type { FeatureCollection } from 'geojson';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 type CreateFeatureOptions = {
   featureId?: FeatureId;
