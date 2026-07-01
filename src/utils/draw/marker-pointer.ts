@@ -6,7 +6,7 @@ import type { LngLatTuple, ScreenPoint } from '@/types/map/index.ts';
 import { convertToThrottled, isTouchScreen } from '@/utils/behavior.ts';
 import { isMapPointerEvent } from '@/utils/guards/map.ts';
 import type { BaseMapEvent } from '@mapLib/types/events.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 type EnableMarkerParameters = {
   lngLat?: LngLatTuple;

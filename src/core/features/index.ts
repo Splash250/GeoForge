@@ -54,7 +54,7 @@ import type {
   Polygon,
 } from 'geojson';
 import { cloneDeep } from 'lodash-es';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 const HISTORY_IGNORED_SHAPES = new Set<FeatureShape>([
   'center_marker',

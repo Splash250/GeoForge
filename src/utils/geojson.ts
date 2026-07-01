@@ -33,7 +33,7 @@ import type {
   Polygon,
 } from 'geojson';
 import { get, isEqual } from 'lodash-es';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 import { lineString } from '@turf/helpers';
 
 export const isEqualPosition = (position1: LngLatTuple, position2: LngLatTuple): boolean => {

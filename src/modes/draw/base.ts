@@ -13,7 +13,7 @@ import type {
 import type { GeoJsonShapeFeature } from '@/types/geojson.ts';
 import { BaseAction } from '@/modes/base-action.ts';
 import { isGmDrawLineDrawerEvent } from '@/utils/guards/events/draw.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export abstract class BaseDraw extends BaseAction {
   actionType: ActionType = 'draw';

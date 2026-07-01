@@ -7,7 +7,7 @@ import type { GmGeofencingViolationEvent } from '@/types/events/index.ts';
 import type { ModeName } from '@/types/controls.ts';
 import type { SnappingHelper } from '@/modes/helpers/snapping.ts';
 import { isGmGeofencingViolationEvent } from '@/utils/guards/events/helper.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export abstract class BaseAction {
   gm: Geoman;

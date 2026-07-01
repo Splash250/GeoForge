@@ -6,7 +6,7 @@ import { EditDelete } from '@/modes/edit/delete.ts';
 import { EditDrag } from '@/modes/edit/drag.ts';
 import { EditRotate } from '@/modes/edit/rotate.ts';
 import type { EditModeName } from '@/types/modes/index.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 type EditClassConstructor = new (gm: Geoman) => BaseEdit;
 type EditClassMap = {

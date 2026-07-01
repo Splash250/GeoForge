@@ -5,7 +5,7 @@ import type { Geoman } from '@/main.ts';
 import type { EventHandlers } from '@/types/events/bus.ts';
 import type { GmSystemEvent } from '@/types/events/index.ts';
 import { isGmControlEvent } from '@/utils/guards/events/control.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export class ControlEventListener extends BaseEventListener {
   eventHandlers: EventHandlers = {

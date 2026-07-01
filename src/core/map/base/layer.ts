@@ -1,4 +1,4 @@
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export abstract class BaseLayer<TLayerInstance = unknown> {
   abstract layerInstance: TLayerInstance | null;

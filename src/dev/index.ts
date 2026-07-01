@@ -1,4 +1,4 @@
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 import '@/dev/styles/style.css';
 import '@/styles/map/maplibre.css';
 

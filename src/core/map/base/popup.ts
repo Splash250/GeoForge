@@ -1,5 +1,5 @@
 import type { LngLatTuple } from '@/main.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export abstract class BasePopup<TPopupInstance = unknown> {
   abstract popupInstance: TPopupInstance | null;

@@ -1,5 +1,5 @@
 import type { LngLatTuple } from '@/main.ts';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 
 export abstract class BaseDomMarker<TMarkerInstance = unknown> {
   abstract markerInstance: TMarkerInstance | null;

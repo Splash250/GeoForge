@@ -23,7 +23,7 @@ import {
 import type { GmHelperEvent, GmHelperToolLifecycleEvent } from '@/types/events/helper.ts';
 import { typedKeys } from '@/utils/typing.ts';
 import { cloneDeep } from 'lodash-es';
-import log from '@/utils/log';
+import log from '@/utils/log.ts';
 import { mount, unmount } from 'svelte';
 
 export type GeomanControlProfile = Partial<Record<ModeType, readonly ModeName[]>> & {
