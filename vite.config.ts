@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
 
   const baseMap = 'maplibre';
   const gmVersion = (env.VITE_GEOFORGE_VERSION as Options['GmVersion']) || null;
+  const buildSourcemaps = env.GEOFORGE_BUILD_SOURCEMAPS === 'true';
 
   return {
     define: {
@@ -27,7 +28,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [svelte(), svgLoader({ defaultImport: 'raw' })],
     build: {
-      sourcemap: true,
+      sourcemap: buildSourcemaps,
       lib: {
         entry: 'src/index.ts',
         name: 'GeoForge',

@@ -113,6 +113,7 @@ Do not rely on deep imports from `src`, `dist`, or internal folders.
 - [Instance API](docs/geoman-instance-api.md)
 - [Events](docs/geoman-events.md)
 - [Public API boundary](docs/public-api-boundary.md)
+- [Release artifacts](docs/release-artifacts.md)
 - [Decorators](docs/decorators.md)
 - [HTML overlays](docs/html-overlays.md)
 - [Custom interaction tools](docs/custom-interaction-tools.md)
