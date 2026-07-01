@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CssQuadTransform } from '../../../src/overlays/html/homography.ts';
 import { HtmlOverlayElement } from '../../../src/overlays/html/htmlOverlayElement.ts';
 import type {
@@ -497,6 +497,29 @@ describe('HtmlOverlayElement', () => {
     expect(result.outerScripts).toBe(0);
     expect(result.bodyPwned).toBeUndefined();
     expect(result.bodyScriptRan).toBeUndefined();
+  });
+
+  it('warns when iframe sandbox combines scripts with same-origin', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const overlay = new HtmlOverlayElement(
+        definition({
+          iframe: {
+            title: 'Risky',
+            sandbox: ['allow-scripts', 'allow-same-origin'],
+          },
+        }) as HtmlOverlayDefinition,
+      );
+
+      expect(overlay.iframe.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('allow-scripts'),
+        expect.objectContaining({ overlayId: 'overlay-a' }),
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('remove detaches element and is idempotent', () => {

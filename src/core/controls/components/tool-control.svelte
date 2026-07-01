@@ -5,14 +5,14 @@
   } from '@/core/controls/components/controls-store.ts';
   import type { Geoman } from '@/main.ts';
   import type { GeomanToolControlState } from '@/tools/types.ts';
-  import DOMPurify from 'dompurify';
+  import { sanitizeSvgMarkup } from '@/utils/sanitizeSvgMarkup.ts';
   import { getContext } from 'svelte';
 
   const { toolControl }: { toolControl: GeomanToolControlState } = $props();
 
   const gm: Geoman = getContext('gm');
   const controlsStore = getContext<ControlsStore>(controlsStoreContextKey);
-  const sanitizedSvg = $derived(toolControl.icon ? DOMPurify.sanitize(toolControl.icon.trim()) : null);
+  const sanitizedSvg = $derived(toolControl.icon ? sanitizeSvgMarkup(toolControl.icon) : null);
   const ariaPressed = $derived(
     toolControl.eventType === 'toggle' ? String(toolControl.active) : undefined,
   );

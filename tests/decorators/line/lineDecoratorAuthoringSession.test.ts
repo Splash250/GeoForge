@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import type { Feature } from 'geojson';
 import { GeomanLineDecoratorSubsystem } from '../../../src/decorators/line/geomanLineDecoratorSubsystem.ts';
@@ -271,7 +272,7 @@ describe('line decorator authoring session', () => {
         'addImage',
         'custom-arrow',
         expect.objectContaining({
-          svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+          svg: expect.stringContaining('<path'),
         }),
         undefined,
       ],
@@ -280,7 +281,7 @@ describe('line decorator authoring session', () => {
         'addImage',
         'custom-arrow',
         expect.objectContaining({
-          svg: '<svg xmlns="http://www.w3.org/2000/svg"><circle /></svg>',
+          svg: expect.stringContaining('<circle'),
         }),
         { pixelRatio: 2, sdf: true },
       ],
@@ -333,7 +334,7 @@ describe('line decorator authoring session', () => {
         'fallback-arrow',
         expect.objectContaining({
           width: 1,
-          svg: '<svg xmlns="http://www.w3.org/2000/svg"><path /></svg>',
+          svg: expect.stringContaining('<path'),
         }),
         undefined,
       ],
@@ -342,10 +343,47 @@ describe('line decorator authoring session', () => {
         'fallback-arrow',
         expect.objectContaining({
           width: 2,
-          svg: '<svg xmlns="http://www.w3.org/2000/svg"><circle /></svg>',
+          svg: expect.stringContaining('<circle'),
         }),
       ],
     ]);
+  });
+
+  it('sanitizes malicious SVG symbol markup before validation and image loading', async () => {
+    const images = new Map<string, unknown>();
+    const map = {
+      hasImage: (id: string) => images.has(id),
+      addImage: vi.fn((id: string, image: unknown) => {
+        images.set(id, image);
+      }),
+      removeImage: vi.fn((id: string) => {
+        images.delete(id);
+      }),
+    };
+    const subsystem = createSubsystem({ map });
+    const authoring = subsystem.createAuthoringSession({ features: [] });
+    const loadImage = vi.fn(async (svg: string) => ({
+      width: 1,
+      height: 1,
+      data: new Uint8Array(4),
+      svg,
+    }));
+
+    await expect(
+      authoring.registerSvgSymbolImage({
+        id: 'unsafe-symbol',
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" onload="window.pwned=true"><script>alert(1)</script><foreignObject><p onclick="alert(2)">x</p></foreignObject><a href="javascript:alert(3)"><path d="M0 0h1v1z"/></a></svg>',
+        loadImage,
+      }),
+    ).resolves.toMatchObject({ ok: true, action: 'added' });
+
+    const sanitizedSvg = loadImage.mock.calls[0][0];
+    expect(sanitizedSvg).toContain('<svg');
+    expect(sanitizedSvg).not.toContain('onload');
+    expect(sanitizedSvg).not.toContain('onclick');
+    expect(sanitizedSvg).not.toContain('<script');
+    expect(sanitizedSvg).not.toContain('foreignObject');
+    expect(sanitizedSvg).not.toContain('javascript:');
   });
 
   it('does not mutate map images when SVG loading resolves after session disposal', async () => {

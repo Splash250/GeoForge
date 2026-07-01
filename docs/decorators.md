@@ -73,3 +73,11 @@ Supported decorator kinds are `arrowhead`, `symbol`, and `text`. `symbol` and
 including `rotate`, `opacity`, `size`, `fontSize`, and `offset` animation
 properties with CSS-like duration, delay, direction, easing, and iteration
 settings.
+
+## SVG Symbol Security
+
+SVG registered through `authoring.registerSvgSymbolImage(...)` is sanitized before
+GeoForge validates it and before the image loader receives it. The sanitizer
+removes script elements, event-handler attributes, `javascript:` URLs, and
+`foreignObject` markup. Treat SVG markup as user-controllable visual input only;
+do not rely on it to carry script, embedded HTML, or application state.

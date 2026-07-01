@@ -4,6 +4,7 @@ import type { Geoman } from '@/main.ts';
 import type { LineDecoratorLayerPosition } from './layerPosition.ts';
 import type { LineDecoratorOptions } from './types.ts';
 import type { SymbolImageInput } from './symbols/symbolImageRegistry.ts';
+import { sanitizeSvgMarkup } from '@/utils/sanitizeSvgMarkup.ts';
 
 export type LineDecoratorAuthoringLineStyle = {
   color?: string;
@@ -152,71 +153,83 @@ export class GeomanLineDecoratorAuthoringSession implements LineDecoratorAuthori
   ): Promise<SvgSymbolImageRegistrationResult> {
     this.assertUsable();
 
-    const validationError = getSvgValidationError(registration.id, registration.svg);
+    const sanitizedSvg = sanitizeSvgMarkup(registration.svg);
+    const sanitizedRegistration: SvgSymbolImageRegistration = {
+      ...registration,
+      svg: sanitizedSvg,
+    };
+
+    const validationError = getSvgValidationError(
+      sanitizedRegistration.id,
+      sanitizedRegistration.svg,
+    );
     if (validationError) {
       return validationError;
     }
 
     const map = this.sessionOptions.getMap();
-    const ownsImage = this.registeredSvgImageIds.has(registration.id);
+    const ownsImage = this.registeredSvgImageIds.has(sanitizedRegistration.id);
 
-    if (map.hasImage(registration.id) && !ownsImage) {
-      return getImageExistsRegistrationResult(registration.id);
+    if (map.hasImage(sanitizedRegistration.id) && !ownsImage) {
+      return getImageExistsRegistrationResult(sanitizedRegistration.id);
     }
 
     let image: SymbolImageInput;
     try {
-      image = registration.loadImage
-        ? await registration.loadImage(registration.svg)
-        : await loadSvgSymbolImage(registration.svg);
+      image = sanitizedRegistration.loadImage
+        ? await sanitizedRegistration.loadImage(sanitizedRegistration.svg)
+        : await loadSvgSymbolImage(sanitizedRegistration.svg);
     } catch (error) {
       return {
         ok: false,
-        id: registration.id,
+        id: sanitizedRegistration.id,
         reason: 'load-failed',
         error: error instanceof Error ? error : new Error('Unable to load SVG symbol image.'),
       };
     }
 
-    const staleSessionResult = this.getStaleRegistrationResult(registration.id);
+    const staleSessionResult = this.getStaleRegistrationResult(sanitizedRegistration.id);
     if (staleSessionResult) {
       return staleSessionResult;
     }
 
-    if (registration.isCurrent && !registration.isCurrent()) {
+    if (sanitizedRegistration.isCurrent && !sanitizedRegistration.isCurrent()) {
       return {
         ok: false,
-        id: registration.id,
+        id: sanitizedRegistration.id,
         reason: 'stale',
-        error: new Error(`Symbol image "${registration.id}" registration is stale.`),
+        error: new Error(`Symbol image "${sanitizedRegistration.id}" registration is stale.`),
       };
     }
 
-    if (map.hasImage(registration.id) && !this.registeredSvgImageIds.has(registration.id)) {
-      return getImageExistsRegistrationResult(registration.id);
+    if (
+      map.hasImage(sanitizedRegistration.id) &&
+      !this.registeredSvgImageIds.has(sanitizedRegistration.id)
+    ) {
+      return getImageExistsRegistrationResult(sanitizedRegistration.id);
     }
 
-    if (map.hasImage(registration.id)) {
+    if (map.hasImage(sanitizedRegistration.id)) {
       if (map.removeImage) {
-        map.removeImage(registration.id);
-        map.addImage(registration.id, image, registration.options);
+        map.removeImage(sanitizedRegistration.id);
+        map.addImage(sanitizedRegistration.id, image, sanitizedRegistration.options);
       } else if (map.updateImage) {
-        map.updateImage(registration.id, image);
+        map.updateImage(sanitizedRegistration.id, image);
       } else {
         return {
           ok: false,
-          id: registration.id,
+          id: sanitizedRegistration.id,
           reason: 'image-exists',
-          error: new Error(`Symbol image "${registration.id}" cannot be updated.`),
+          error: new Error(`Symbol image "${sanitizedRegistration.id}" cannot be updated.`),
         };
       }
-      this.registeredSvgImageIds.add(registration.id);
-      return { ok: true, id: registration.id, action: 'updated' };
+      this.registeredSvgImageIds.add(sanitizedRegistration.id);
+      return { ok: true, id: sanitizedRegistration.id, action: 'updated' };
     }
 
-    map.addImage(registration.id, image, registration.options);
-    this.registeredSvgImageIds.add(registration.id);
-    return { ok: true, id: registration.id, action: 'added' };
+    map.addImage(sanitizedRegistration.id, image, sanitizedRegistration.options);
+    this.registeredSvgImageIds.add(sanitizedRegistration.id);
+    return { ok: true, id: sanitizedRegistration.id, action: 'added' };
   }
 
   unregisterSvgSymbolImage(id: string): void {
