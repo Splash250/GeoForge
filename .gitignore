@@ -6,6 +6,19 @@ playwright-report/
 test-results/
 .vite/
 .turbo/
+graphify-out/
+.graphify-code-scan/
+.graphify-source-scan/
+
+# Local AI agent state and generated workflow artifacts
+.codex/
+.superpowers/
+.merge-backups/
+AGENTS.md
+REPORT.md
+output/
+docs/production-readiness-*.md
+docs/superpowers/plans/2026-07-*.md
 *.tsbuildinfo
 *.tgz
 .env
