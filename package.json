@@ -28,7 +28,9 @@
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
     "SECURITY.md",
-    "docs"
+    "docs",
+    "!docs/production-readiness-*.md",
+    "!docs/superpowers"
   ],
   "scripts": {
     "dev": "vite",
